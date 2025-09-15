@@ -1,0 +1,24 @@
+/* VideoPanel.css */
+
+.video-panel {
+  background: #111;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  /* flex-grow: 1; 已经足够，但为了保险，可以保留 */
+  flex-grow: 1;
+  width: 100%;
+  position: relative;
+  /* 关键：使用 flexbox 将视频内容居中 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden; /* 防止视频超出容器 */
+}
+
+.video-panel video {
+  /* 关键：让 video 元素直接填充其父容器。
+     我们不再需要一个额外的包装器，因为 flexbox 已经提供了居中功能。 */
+  width: 100%;
+  height: 100%;
+  object-fit: contain; 
+  display: block;
+}

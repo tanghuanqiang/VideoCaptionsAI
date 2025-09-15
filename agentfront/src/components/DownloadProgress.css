@@ -1,0 +1,244 @@
+.download-progress-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.download-progress-dialog {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  min-width: 400px;
+  max-width: 500px;
+  overflow: hidden;
+  animation: slideIn 0.3s ease-out;
+}
+
+.download-progress-dialog.minimized {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  min-width: 280px;
+  max-width: 280px;
+  transform: none;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+}
+
+.progress-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+}
+
+.status-icon {
+  font-size: 18px;
+}
+
+.progress-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.minimize-btn,
+.cancel-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 12px;
+  transition: background-color 0.2s;
+}
+
+.minimize-btn:hover,
+.cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.progress-content {
+  padding: 20px;
+}
+
+.file-info {
+  margin-bottom: 20px;
+}
+
+.file-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #2d3748;
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+
+.status-text {
+  font-size: 12px;
+  color: #718096;
+}
+
+.progress-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 8px;
+  background-color: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4299e1, #3182ce);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  position: relative;
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.progress-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a5568;
+  min-width: 35px;
+  text-align: right;
+}
+
+.progress-details {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 16px;
+}
+
+.time-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #718096;
+}
+
+.error-message {
+  background-color: #fed7d7;
+  color: #c53030;
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  margin-top: 16px;
+  border-left: 4px solid #e53e3e;
+}
+
+.completed-actions {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.close-btn {
+  background: linear-gradient(135deg, #48bb78, #38a169);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.close-btn:hover {
+  transform: translateY(-1px);
+}
+
+.minimized-content {
+  padding: 12px 16px;
+  font-size: 12px;
+  color: #4a5568;
+  text-align: center;
+}
+
+.mini-progress {
+  font-weight: 500;
+}
+
+/* 最小化状态下的样式调整 */
+.download-progress-dialog.minimized .download-progress-overlay {
+  background: none;
+  position: static;
+}
+
+.download-progress-dialog.minimized {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  border: 1px solid #e2e8f0;
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .download-progress-dialog {
+    background: #2d3748;
+    color: white;
+  }
+  
+  .file-name {
+    color: #e2e8f0;
+  }
+  
+  .status-text,
+  .time-info,
+  .mini-progress {
+    color: #a0aec0;
+  }
+  
+  .progress-bar {
+    background-color: #4a5568;
+  }
+  
+  .progress-details {
+    border-color: #4a5568;
+  }
+}

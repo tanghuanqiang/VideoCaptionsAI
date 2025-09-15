@@ -1,0 +1,182 @@
+/* SubtitleEditor.css */
+
+.subtitle-editor-container {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  color: #f0f0f0;
+  background: transparent; /* 背景交给外层 panel */
+  flex: 1;
+  min-height: 0;
+}
+
+/* Scrollbar styling for Webkit browsers */
+.subtitle-editor-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.subtitle-editor-container::-webkit-scrollbar-track {
+  background: #1c1c1c;
+}
+
+.subtitle-editor-container::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 4px;
+}
+
+.subtitle-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #333;
+}
+
+.subtitle-actions h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #c0c0c0;
+  margin: 0;
+  padding: 0;
+}
+
+.subtitle-editor-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* 添加 flex: 1 和 overflow-y: auto; 让列表独立滚动 */
+.subtitle-list {
+  flex: 1;
+  min-height: 0;
+  /* 滚动现在由外层 .subtitle-editor-scroll 控制，这里保持自适应高度 */
+}
+
+/* 可选：如果你有一个缩放/拖拽提示元素 class 名，比如 .resize-hint-subtitle，可放置在右下角 */
+.resize-hint-subtitle {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  pointer-events: none;
+  opacity: 0.6;
+  z-index: 10;
+}
+
+/* 为 subtitle-list 添加滚动条样式 */
+.subtitle-list::-webkit-scrollbar {
+  width: 8px;
+}
+.subtitle-list::-webkit-scrollbar-track {
+  background: #1c1c1c;
+}
+.subtitle-list::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 4px;
+}
+.subtitle-list::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Firefox 滚动条 */
+.subtitle-list {
+  scrollbar-width: thin;
+  scrollbar-color: #444 #1c1c1c;
+}
+
+
+.subtitle-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: #2a2e35;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.subtitle-item.selected {
+  background: #353a42;
+  border-color: #0078d4;
+}
+
+.subtitle-item:hover {
+  background: #30343c;
+}
+
+input[type="checkbox"] {
+  accent-color: #0078d4;
+}
+
+/* Common input and select styling */
+.subtitle-time,
+.subtitle-text,
+.subtitle-style,
+.subtitle-group {
+  background: #1c1c1c;
+  border: 1px solid #444;
+  color: #f0f0f0;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.subtitle-time:focus,
+.subtitle-text:focus,
+.subtitle-style:focus,
+.subtitle-group:focus {
+  border-color: #0078d4;
+}
+
+.subtitle-time {
+  width: 80px;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.subtitle-text {
+  flex: 1;
+  width: auto;
+}
+
+.subtitle-style {
+  width: 80px;
+  flex-shrink: 0;
+}
+
+/* Button styling */
+button {
+  background: #0078d4;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, opacity 0.2s ease;
+  min-width: 80px;
+}
+
+button:hover {
+  background: #0063b1;
+}
+
+button:disabled {
+  background: #444;
+  color: #888;
+  cursor: not-allowed;
+}
+
+.subtitle-actions-bottom {
+  margin-top: 16px;
+  padding-top: 12px;
+  padding-bottom: 32px;
+  /* padding-right: 16px; */
+  border-top: 1px solid #333;
+  display: flex;
+  justify-content: flex-end;
+}

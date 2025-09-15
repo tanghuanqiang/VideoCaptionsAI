@@ -1,0 +1,396 @@
+
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>智能字幕生成器</title>
+  <style>
+    body { font-family: 'Segoe UI', 'PingFang SC', Arial, sans-serif; margin: 0; background: #f4f6fb; }
+    .container { max-width: 900px; margin: 40px auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 24px #0001; padding: 32px; }
+    h1 { text-align: center; margin-bottom: 32px; }
+    .tabs { display: flex; border-bottom: 2px solid #e0e0e0; margin-bottom: 24px; }
+    .tab { flex: 1; text-align: center; padding: 16px 0; cursor: pointer; font-size: 18px; color: #888; transition: color 0.2s; }
+    .tab.active { color: #1976d2; border-bottom: 3px solid #1976d2; font-weight: bold; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .box { margin-bottom: 20px; }
+    .result { white-space: pre-wrap; background: #f8f8f8; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+    .row { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; }
+    label { min-width: 80px; }
+    input, select, textarea { padding: 6px 10px; border-radius: 4px; border: 1px solid #ccc; font-size: 15px; }
+    button { background: #1976d2; color: #fff; border: none; border-radius: 4px; padding: 10px 24px; font-size: 16px; cursor: pointer; margin-top: 8px; }
+    button:hover { background: #1565c0; }
+    .subtitle-edit { width: 100%; min-height: 80px; font-family: inherit; }
+    .chat-box { background: #f8f8f8; border-radius: 8px; padding: 16px; height: 350px; overflow-y: auto; margin-bottom: 16px; border: 1px solid #e0e0e0; }
+    .chat-msg { margin-bottom: 18px; }
+    .chat-user { color: #1976d2; font-weight: bold; }
+    .chat-ai { color: #388e3c; font-weight: bold; }
+    .thinking { color: #aaa; font-style: italic; }
+    .chat-input-row { display: flex; gap: 8px; }
+    .chat-input { flex: 1; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎬 智能字幕生成器</h1>
+    <div class="tabs">
+      <div class="tab active" onclick="showTab(0)">一键生成字幕</div>
+      <div class="tab" onclick="showTab(1)">接口工具箱</div>
+      <div class="tab" onclick="showTab(2)">智能对话</div>
+    </div>
+
+    <!-- Tab 1: 一键生成字幕 -->
+    <div class="tab-content active" id="tab1">
+      <div class="box">
+        <label>选择视频文件: </label>
+        <input type="file" id="fileInput1" accept="video/*">
+      </div>
+      <div class="box">
+        <label>语言: </label>
+        <select id="lang1">
+          <option value="zh">中文</option>
+          <option value="en">英文</option>
+        </select>
+        <label>最大句长: </label>
+        <input type="number" id="maxLen1" value="20" min="5" max="100">
+      </div>
+      <button onclick="upload1()">开始生成字幕</button>
+      <h2>结果</h2>
+      <div id="output1" class="result"></div>
+    </div>
+
+    <!-- Tab 2: 接口工具箱 -->
+    <div class="tab-content" id="tab2">
+      <div class="box">
+        <label>载入视频文件: </label>
+        <input type="file" id="fileInput2" accept="video/*">
+        <button onclick="probeMedia()">识别视频信息</button>
+        <button onclick="autoGenerateSubs()">自动生成字幕</button>
+      </div>
+      <div class="box">
+        <label>字幕内容:</label>
+        <div style="background:#f8f8f8; border-radius:8px; border:1px solid #e0e0e0; padding:12px;">
+          <textarea id="subtitleEdit" class="subtitle-edit" placeholder="可编辑字幕内容..." style="width:100%; min-height:160px; font-family:inherit; font-size:16px; border:none; background:transparent; resize:vertical; outline:none;"></textarea>
+        </div>
+      </div>
+      <div class="box">
+        <label>字幕样式:</label>
+        <div class="row" style="flex-wrap: wrap; gap: 12px;">
+          <label>字体名</label>
+          <input type="text" id="styleFont" value="微软雅黑" style="width:100px;">
+          <label>字号</label>
+          <input type="number" id="styleSize" value="48" min="10" max="120" style="width:60px;">
+          <label>主颜色</label>
+          <input type="color" id="styleColor" value="#ffffff">
+          <label>描边颜色</label>
+          <input type="color" id="styleOutlineColor" value="#000000">
+          <label>描边宽度</label>
+          <input type="number" id="styleOutline" value="2" min="0" max="10" style="width:50px;">
+          <label>阴影</label>
+          <input type="number" id="styleShadow" value="1" min="0" max="10" style="width:50px;">
+          <label>对齐</label>
+          <select id="styleAlign">
+            <option value="2">底中</option>
+            <option value="1">底左</option>
+            <option value="3">底右</option>
+            <option value="8">顶中</option>
+            <option value="7">顶左</option>
+            <option value="9">顶右</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <button onclick="previewVideo()">预览视频</button>
+        <button onclick="generateVideo()">生成视频</button>
+      </div>
+      <div id="output2" class="result"></div>
+    </div>
+
+    <!-- Tab 3: 智能对话 -->
+    <div class="tab-content" id="tab3">
+      <div class="box">
+        <label>拖入视频文件: </label>
+        <input type="file" id="fileInput3" accept="video/*">
+      </div>
+      <div class="chat-box" id="chatBox">
+        <!-- 聊天内容 -->
+      </div>
+      <div class="chat-input-row">
+        <input type="text" id="chatInput" class="chat-input" placeholder="请输入问题...">
+        <button onclick="sendChat()">发送</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function rgbToASS(hex) {
+      // #RRGGBB => &HBBGGRR
+      hex = hex.replace('#','');
+      if (hex.length !== 6) return '&H00FFFFFF';
+      return '&H00' + hex.slice(4,6) + hex.slice(2,4) + hex.slice(0,2);
+    }
+
+    function getStyleString() {
+      // 读取各项参数，拼接ASS样式字符串
+      const font = document.getElementById('styleFont').value || '微软雅黑';
+      const size = document.getElementById('styleSize').value || '48';
+      const color = rgbToASS(document.getElementById('styleColor').value || '#ffffff');
+      const outlineColor = rgbToASS(document.getElementById('styleOutlineColor').value || '#000000');
+      const outline = document.getElementById('styleOutline').value || '2';
+      const shadow = document.getElementById('styleShadow').value || '1';
+      const align = document.getElementById('styleAlign').value || '2';
+      return `FontName=${font}; FontSize=${size}; PrimaryColour=${color}; OutlineColour=${outlineColor}; BorderStyle=1; Outline=${outline}; Shadow=${shadow}; Alignment=${align}`;
+    }
+
+    function setStyleInputsDefault() {
+      document.getElementById('styleFont').value = '微软雅黑';
+      document.getElementById('styleSize').value = '48';
+      document.getElementById('styleColor').value = '#ffffff';
+      document.getElementById('styleOutlineColor').value = '#000000';
+      document.getElementById('styleOutline').value = '2';
+      document.getElementById('styleShadow').value = '1';
+      document.getElementById('styleAlign').value = '2';
+    }
+    async function autoGenerateSubs() {
+      if (!videoFile2) {
+        alert("请先选择视频文件！");
+        return;
+      }
+      document.getElementById("output2").innerText = "⏳ 正在识别音频并生成字幕...";
+      const formData = new FormData();
+      formData.append("file", videoFile2);
+      formData.append("lang", "zh"); // 可根据需要设置语言
+      try {
+        const resp = await fetch("http://127.0.0.1:8000/asr/", {
+          method: "POST",
+          body: formData
+        });
+        if (!resp.ok) {
+          const text = await resp.text();
+          document.getElementById("output2").innerText = "❌ 错误: " + resp.status + "\n" + text;
+          return;
+        }
+        const result = await resp.json();
+  // 填充字幕内容（JSON字符串）
+  document.getElementById("subtitleEdit").value = JSON.stringify(result, null, 2);
+  setStyleInputsDefault();
+  document.getElementById("output2").innerText = "✅ 字幕已自动生成，默认样式已载入，可编辑和后续处理。";
+      } catch (err) {
+        document.getElementById("output2").innerText = "❌ 请求失败: " + err;
+      }
+    }
+    function showTab(idx) {
+      document.querySelectorAll('.tab').forEach((tab, i) => tab.classList.toggle('active', i === idx));
+      document.querySelectorAll('.tab-content').forEach((tab, i) => tab.classList.toggle('active', i === idx));
+    }
+
+    // Tab 1: 一键生成字幕
+    async function upload1() {
+      const fileInput = document.getElementById("fileInput1");
+      if (!fileInput.files.length) {
+        alert("请先选择视频文件！");
+        return;
+      }
+      const file = fileInput.files[0];
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("lang", document.getElementById("lang1").value);
+      formData.append("max_len", document.getElementById("maxLen1").value);
+      document.getElementById("output1").innerText = "⏳ 正在处理，请稍候...";
+      try {
+        const resp = await fetch("http://127.0.0.1:8000/pipeline/", {
+          method: "POST",
+          body: formData
+        });
+        if (!resp.ok) {
+          const text = await resp.text();
+          document.getElementById("output1").innerText = "❌ 错误: " + resp.status + "\n" + text;
+          return;
+        }
+        const result = await resp.json();
+        let html = `
+          ✅ 成功！<br><br>
+          🎬 媒体信息: <pre>${JSON.stringify(result.media_info, null, 2)}</pre>
+          🎧 音频路径: ${result.audio_path}<br>
+          📝 字幕样例: <pre>${JSON.stringify(result.subs_sample, null, 2)}</pre><br>
+          📄 <a href="${result.srt_url}" target="_blank">下载 SRT 字幕</a>
+          📄 <a href="${result.ass_url}" target="_blank">下载 ASS 字幕</a>
+          👀 <a href="${result.preview_url}" target="_blank">预览视频 (外挂字幕)</a>
+          🔥 <a href="${result.final_url}" target="_blank">硬字幕视频</a>
+        `;
+        document.getElementById("output1").innerHTML = html;
+      } catch (err) {
+        document.getElementById("output1").innerText = "❌ 请求失败: " + err;
+      }
+    }
+
+    // Tab 2: 接口工具箱（API对接）
+    let videoFile2 = null;
+    let assBlob = null;
+
+    document.getElementById("fileInput2").addEventListener("change", function(e) {
+      videoFile2 = e.target.files[0] || null;
+    });
+
+    async function probeMedia() {
+      if (!videoFile2) {
+        alert("请先选择视频文件！");
+        return;
+      }
+      const formData = new FormData();
+      formData.append("file", videoFile2);
+      document.getElementById("output2").innerText = "⏳ 正在识别视频信息...";
+      try {
+        const resp = await fetch("http://127.0.0.1:8000/probe/", {
+          method: "POST",
+          body: formData
+        });
+        if (!resp.ok) {
+          const text = await resp.text();
+          document.getElementById("output2").innerText = "❌ 错误: " + resp.status + "\n" + text;
+          return;
+        }
+        const result = await resp.json();
+        document.getElementById("output2").innerHTML = "✅ 媒体信息:<br><pre>" + JSON.stringify(result, null, 2) + "</pre>";
+      } catch (err) {
+        document.getElementById("output2").innerText = "❌ 请求失败: " + err;
+      }
+    }
+
+    async function generateASS() {
+      // 生成ASS字幕文件，返回Blob
+      const subsText = document.getElementById("subtitleEdit").value.trim();
+      // 始终根据页面样式表单生成ASS样式字符串
+      const style = getStyleString();
+      if (!subsText) {
+        alert("请填写字幕内容！");
+        return null;
+      }
+      let subsObj;
+      try {
+        subsObj = JSON.parse(subsText);
+      } catch {
+        subsObj = { events: [{ text: subsText }] };
+      }
+      // 强制覆盖样式参数
+      subsObj.style = style;
+      document.getElementById("output2").innerText = "⏳ 正在生成ASS字幕...";
+      try {
+        const resp = await fetch("http://127.0.0.1:8000/ass/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(subsObj)
+        });
+        if (!resp.ok) {
+          const text = await resp.text();
+          document.getElementById("output2").innerText = "❌ 错误: " + resp.status + "\n" + text;
+          return null;
+        }
+        const result = await resp.json();
+        // 下载ASS文件
+        let assPath = result.ass_path.replace(/\\/g, '/');
+        if (!assPath.startsWith('/')) assPath = '/' + assPath;
+        const assUrl = "http://127.0.0.1:8000" + assPath;
+        const assResp = await fetch(assUrl);
+        const assData = await assResp.blob();
+        assBlob = assData;
+        document.getElementById("output2").innerHTML = `✅ ASS字幕已生成: <a href="${assUrl}" target="_blank">下载ASS</a>`;
+        return assBlob;
+      } catch (err) {
+        document.getElementById("output2").innerText = "❌ 请求失败: " + err;
+        return null;
+      }
+    }
+
+    async function previewVideo() {
+      if (!videoFile2) {
+        alert("请先选择视频文件！");
+        return;
+      }
+      // 先生成ASS字幕
+      const assData = await generateASS();
+      console.log("assData:", assData);
+      if (!assData) return;
+      const formData = new FormData();
+      formData.append("file", videoFile2);
+      formData.append("ass_file", new File([assData], "subtitle.ass", { type: "text/plain" }));
+      document.getElementById("output2").innerText = "⏳ 正在生成预览视频...";
+      try {
+        const resp = await fetch("http://127.0.0.1:8000/preview/", {
+          method: "POST",
+          body: formData
+        });
+        if (!resp.ok) {
+          const text = await resp.text();
+          document.getElementById("output2").innerText = "❌ 错误: " + resp.status + "\n" + text;
+          return;
+        }
+        const result = await resp.json();
+  let previewPath = result.preview_path.replace(/\\/g, '/');
+  if (!previewPath.startsWith('/')) previewPath = '/' + previewPath;
+  const previewUrl = "http://127.0.0.1:8000" + previewPath;
+  document.getElementById("output2").innerHTML = `✅ 预览视频已生成: <a href="${previewUrl}" target="_blank">点击预览</a>`;
+      } catch (err) {
+        document.getElementById("output2").innerText = "❌ 请求失败: " + err;
+      }
+    }
+
+    async function generateVideo() {
+      if (!videoFile2) {
+        alert("请先选择视频文件！");
+        return;
+      }
+      // 先生成ASS字幕
+      const assData = await generateASS();
+      if (!assData) return;
+      const formData = new FormData();
+      formData.append("file", videoFile2);
+      formData.append("ass_file", new File([assData], "subtitle.ass", { type: "text/plain" }));
+      document.getElementById("output2").innerText = "⏳ 正在生成硬字幕视频...";
+      try {
+        const resp = await fetch("http://127.0.0.1:8000/burn/", {
+          method: "POST",
+          body: formData
+        });
+        if (!resp.ok) {
+          const text = await resp.text();
+          document.getElementById("output2").innerText = "❌ 错误: " + resp.status + "\n" + text;
+          return;
+        }
+        const result = await resp.json();
+  let outputPath = result.output_path.replace(/\\/g, '/');
+  if (!outputPath.startsWith('/')) outputPath = '/' + outputPath;
+  const outputUrl = "http://127.0.0.1:8000" + outputPath;
+  document.getElementById("output2").innerHTML = `✅ 视频已生成: <a href="${outputUrl}" target="_blank">下载/预览</a>`;
+      } catch (err) {
+        document.getElementById("output2").innerText = "❌ 请求失败: " + err;
+      }
+    }
+
+    // Tab 3: 智能对话（仅前端UI，需后端API配合）
+    let chatHistory = [];
+    function sendChat() {
+      const input = document.getElementById("chatInput").value.trim();
+      if (!input) return;
+      chatHistory.push({ role: "user", text: input });
+      updateChatBox();
+      document.getElementById("chatInput").value = "";
+      // 模拟AI思考
+      chatHistory.push({ role: "ai", text: "🤔 正在思考..." });
+      updateChatBox();
+      setTimeout(() => {
+        chatHistory.pop();
+        chatHistory.push({ role: "ai", text: "[示例回复] 这是AI对你的问题的回复。" });
+        updateChatBox();
+      }, 1200);
+    }
+    function updateChatBox() {
+      const chatBox = document.getElementById("chatBox");
+      chatBox.innerHTML = chatHistory.map(msg =>
+        `<div class="chat-msg"><span class="${msg.role === 'user' ? 'chat-user' : 'chat-ai'}">${msg.role === 'user' ? '你' : 'AI'}:</span> ${msg.text}</div>`
+      ).join("");
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+.video-timeline {
+  background: #fff;
+  padding: 12px 24px;
+  border-top: 1px solid #eee;
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
+}
+.timeline-bar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.timeline-thumb {
+  width: 80px;
+  height: 45px;
+  object-fit: cover;
+  margin-right: 6px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+.timeline-slider {
+  width: 100%;
+}

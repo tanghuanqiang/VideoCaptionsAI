@@ -1,0 +1,8 @@
+langgraph>=0.2.128
+langchain-core
+langchain-openai
+whisper
+ffmpeg-python
+torch
+langchain_tavily
+fastapi

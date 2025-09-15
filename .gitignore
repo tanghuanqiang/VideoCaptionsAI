@@ -1,0 +1,287 @@
+# ======================================
+# 项目根目录 .gitignore 文件
+# 适用于 VideoSubs (Python + FastAPI) + AgentFront (React + Tauri)
+# ======================================
+
+# =====================================
+# Python (VideoSubs 后端)
+# =====================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+.Python
+.tox/
+.coverage
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+*.pyo
+*.pyd
+*.log
+*.sqlite3
+*.db
+
+# Python 虚拟环境
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+.conda/
+
+# Python 配置和缓存
+pip-log.txt
+pip-delete-this-directory.txt
+.cache/
+.pytest_cache/
+
+# =====================================
+# Node.js / React (AgentFront 前端)
+# =====================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 构建产物
+dist/
+dist-ssr/
+build/
+*.local
+
+# TypeScript 构建信息
+*.tsbuildinfo
+.tmp/
+
+# Package manager 锁文件 (可选择保留 yarn.lock 或 package-lock.json)
+# package-lock.json
+# yarn.lock
+
+# =====================================
+# Tauri (Rust 桌面应用)
+# =====================================
+src-tauri/target/
+src-tauri/gen/schemas/
+*.rs.bk
+Cargo.lock
+
+# Tauri 构建产物
+agentfront/src-tauri/target/
+*.app
+*.exe
+*.dmg
+*.deb
+*.rpm
+*.msi
+
+# =====================================
+# AI 模型和大文件
+# =====================================
+# Whisper 模型缓存
+*.pt
+*.bin
+*.safetensors
+models/
+whisper_models/
+
+# LangChain / LangGraph 缓存
+.langchain/
+.langgraph/
+
+# 输出文件
+outputs/
+temp/
+tmp/
+*.mp4
+*.wav
+*.m4a
+*.ass
+*.srt
+*.vtt
+
+
+# =====================================
+# 环境配置和敏感信息
+# =====================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*
+!.env.example
+
+# API Keys 和配置
+secrets/
+config/local.py
+config/development.py
+
+# =====================================
+# 编辑器和 IDE
+# =====================================
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+.sublime-*
+*.sublime-project
+*.sublime-workspace
+
+# JetBrains
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# =====================================
+# 操作系统
+# =====================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# =====================================
+# 日志和调试
+# =====================================
+logs/
+*.log
+*.log.*
+*.out
+*.pid
+*.seed
+*.pid.lock
+
+# 调试文件
+*.pdb
+*.debug
+core.*
+
+# =====================================
+# 临时文件和备份
+# =====================================
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+*.orig
+*.rej
+*~
+.#*
+.*.swp
+.*.swo
+
+# =====================================
+# 测试覆盖率
+# =====================================
+coverage/
+.nyc_output/
+.coverage
+htmlcov/
+.tox/
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# =====================================
+# 文档生成
+# =====================================
+docs/_build/
+site/
+
+# =====================================
+# 数据库
+# =====================================
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+
+# =====================================
+# 压缩文件
+# =====================================
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# =====================================
+# 项目特定
+# =====================================
+# FastAPI 静态文件服务的临时文件
+static/*.tmp
+static/temp/
+
+# ffmpeg 处理的临时文件
+temp_*
+*_temp.*
+
+# 用户上传的视频文件（保留示例）
+uploads/
+!uploads/.gitkeep
+
+# AI 训练数据
+datasets/
+training_data/
+
+# 性能分析文件
+*.prof
+profile_*
+
+# =====================================
+# 保留重要的空目录
+# =====================================
+!.gitkeep
+!*/

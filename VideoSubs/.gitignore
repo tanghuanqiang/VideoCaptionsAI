@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.pyo
+*.pyd
+*.so
+*.log
+*.sqlite3
+*.db
+*.env
+.env*
+
+# VSCode
+.vscode/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Output (keep directory, ignore contents)
+outputs/*
+!outputs/.gitkeep
+
+# Others
+*.bak
+*.tmp
+*.swp
+*.swo
+*.~
+
+# Static
+static/*.tmp
+
+# Build artifacts
+build/

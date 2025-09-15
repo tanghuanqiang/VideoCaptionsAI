@@ -1,0 +1,45 @@
+.toolbar {
+  width: 100%;
+  min-width: 0;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  background: #23272e;
+  color: #f5f5f7;
+  padding: 12px 24px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  margin-bottom: 16px;
+  box-sizing: border-box;
+}
+.toolbar-title {
+  font-size: 1.3rem;
+  font-weight: bold;
+  margin-right: 32px;
+}
+.toolbar-actions {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+.toolbar-actions button {
+  margin-right: 12px;
+  padding: 8px 18px;
+  background: #353a42;
+  color: #f5f5f7;
+  border: 1px solid #444a56;
+  border-radius: 8px;
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
+  font-size: 15px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.toolbar-actions button:last-child {
+  margin-right: 0;
+}
+.toolbar-actions button:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+  border-color: #6c6f7a;
+  background: #23272e;
+}
