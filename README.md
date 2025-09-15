@@ -21,6 +21,7 @@
 **快速开发/使用**：
 1. 安装依赖
    ```powershell
+   cd VideoSubs
    pip install -e .
    ```
 
@@ -105,3 +106,4 @@
 ---
 
 如需更多帮助或反馈，欢迎通过邮箱或 GitHub Issue 联系。
+
