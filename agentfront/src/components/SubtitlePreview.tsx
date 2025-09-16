@@ -6,13 +6,15 @@ interface SubtitlePreviewProps {
   subtitles: Subtitle[];
   styles: AssStyle[];
   videoRef: React.RefObject<HTMLVideoElement | null>;
+  playResX?: number;
+  playResY?: number;
 }
 
 
 
 
 
-const SubtitlePreview: React.FC<SubtitlePreviewProps> = ({ rect, subtitles, styles, videoRef }) => {
+const SubtitlePreview: React.FC<SubtitlePreviewProps> = ({ rect, subtitles, styles, videoRef, playResX = 1920, playResY = 1080 }) => {
   const [activeSubs, setActiveSubs] = useState<Subtitle[]>([]);
 
   useEffect(() => {
@@ -50,27 +52,9 @@ const SubtitlePreview: React.FC<SubtitlePreviewProps> = ({ rect, subtitles, styl
     return parseInt(h) * 3600 + parseInt(m) * 60 + parseFloat(s);
   }
 
-  // 根据视频的实际解析度来计算缩放比例，而不是一个固定的值
-  const video = videoRef.current;
-  const assPlayResX = video?.videoWidth || 1920;
-  const assPlayResY = video?.videoHeight || 1080;
-  
-  // 添加调试信息
-  // console.log('--- Subtitle Preview Debug Info ---');
-  // console.log('rect:', rect);
-  // console.log('subtitles count:', subtitles.length);
-  // console.log('activeSubs count:', activeSubs.length);
-  // console.log('videoRef.current:', video);
-  // console.log('videoWidth:', video?.videoWidth);
-  // console.log('videoHeight:', video?.videoHeight);
-  // console.log('ASS Play Res X/Y:', assPlayResX, assPlayResY);
-  // console.log('scaleX:', rect.w / assPlayResX);
-  // console.log('scaleY:', rect.h / assPlayResY);
-  // console.log('currentTime:', video?.currentTime);
-  // if (activeSubs.length > 0) {
-  //   console.log('activeSubs:', activeSubs);
-  // }
-  // console.log('-----------------------------------');
+  // 根据ASS文件的PlayRes来计算缩放比例
+  const assPlayResX = playResX;
+  const assPlayResY = playResY;
   
   const scaleX = rect.w / assPlayResX;
   const scaleY = rect.h / assPlayResY;
@@ -82,7 +66,6 @@ const SubtitlePreview: React.FC<SubtitlePreviewProps> = ({ rect, subtitles, styl
       top: rect.top,
       width: rect.w,
       height: rect.h,
-      // border: "2px dashed rgba(255,0,0,0.5)", // 临时启用边框来调试
       overflow: "hidden",
       pointerEvents: "none",
       zIndex: 9999,
@@ -115,10 +98,10 @@ const SubtitlePreview: React.FC<SubtitlePreviewProps> = ({ rect, subtitles, styl
         const outlineColor = styleObj.OutlineColour
           ? `rgba(${parseInt(outlineColorRGB.slice(1,3),16)},${parseInt(outlineColorRGB.slice(3,5),16)},${parseInt(outlineColorRGB.slice(5,7),16)},${(styleObj.OutlineAlpha ?? 255)/255})`
           : "#000";
-        const textStroke = styleObj.Outline ? `${styleObj.Outline}px ${outlineColor}` : undefined;
+        const textStroke = styleObj.Outline ? `${styleObj.Outline * scaleY}px ${outlineColor}` : undefined;
 
         const textShadow = styleObj.Shadow
-          ? `0 0 ${styleObj.Shadow}px rgba(0,0,0,0.7)`
+          ? `${styleObj.Shadow * scaleX}px ${styleObj.Shadow * scaleY}px ${styleObj.Shadow * scaleY}px rgba(0,0,0,0.7)`
           : "2px 2px 4px rgba(0,0,0,0.7)";
 
         const backgroundColorRGB = styleObj.BackColour ? convertBGRToRGB(styleObj.BackColour) : '#000000';
@@ -126,41 +109,137 @@ const SubtitlePreview: React.FC<SubtitlePreviewProps> = ({ rect, subtitles, styl
           ? `rgba(${parseInt(backgroundColorRGB.slice(1,3),16)},${parseInt(backgroundColorRGB.slice(3,5),16)},${parseInt(backgroundColorRGB.slice(5,7),16)},${(styleObj.BackAlpha ?? 255)/255})`
           : styleObj.BackColour || undefined;
 
+        // 计算字幕的位置 - 严格按照ASS标准
+        // ASS对齐方式：1-左下，2-底部居中，3-右下，4-左中，5-居中，6-右中，7-左上，8-顶部居中，9-右上
+        const alignment = styleObj.Alignment || 2;
+        
+        // 标准ASS渲染逻辑：边距按照PlayRes坐标系缩放
+        const marginL = (styleObj.MarginL || 0) * scaleX;
+        const marginR = (styleObj.MarginR || 0) * scaleX;
+        const marginV = (styleObj.MarginV || 0) * scaleY;
+        
+        let positionStyle: React.CSSProperties = {
+          position: "absolute",
+          color,
+          fontSize: Math.max(12, styleObj.FontSize * scaleY),
+          fontFamily: styleObj.FontName,
+          fontWeight: styleObj.Bold ? "bold" : "normal",
+          fontStyle: styleObj.Italic ? "italic" : "normal",
+          textDecoration: [
+            styleObj.Underline ? "underline" : "none",
+            styleObj.StrikeOut ? "line-through" : "none"
+          ].filter(v => v !== "none").join(" ") || "none",
+          letterSpacing: styleObj.Spacing ? `${styleObj.Spacing * scaleX}px` : undefined,
+          transform: `rotate(${styleObj.Angle || 0}deg) scaleX(${(styleObj.ScaleX || 100) / 100}) scaleY(${(styleObj.ScaleY || 100) / 100})`,
+          borderStyle: styleObj.BorderStyle === 1 ? "solid" : "none",
+          WebkitTextStroke: textStroke,
+          textShadow: textShadow,
+          background,
+          pointerEvents: "none",
+          zIndex: 10,
+          whiteSpace: "pre-wrap",
+        };
+
+        // 根据对齐方式设置位置
+        switch (alignment) {
+          case 1: // 左下
+            positionStyle = {
+              ...positionStyle,
+              left: marginL,
+              bottom: marginV,
+              textAlign: "left",
+              maxWidth: `${rect.w - marginL}px`,
+            };
+            break;
+          case 2: // 底部居中
+            positionStyle = {
+              ...positionStyle,
+              left: marginL,
+              right: marginR,
+              bottom: marginV,
+              textAlign: "center",
+            };
+            break;
+          case 3: // 右下
+            positionStyle = {
+              ...positionStyle,
+              right: marginR,
+              bottom: marginV,
+              textAlign: "right",
+              maxWidth: `${rect.w - marginR}px`,
+            };
+            break;
+          case 4: // 左中
+            positionStyle = {
+              ...positionStyle,
+              left: marginL,
+              top: "50%",
+              transform: `${positionStyle.transform} translateY(-50%)`,
+              textAlign: "left",
+              maxWidth: `${rect.w - marginL}px`,
+            };
+            break;
+          case 5: // 居中
+            positionStyle = {
+              ...positionStyle,
+              left: marginL,
+              right: marginR,
+              top: "50%",
+              transform: `${positionStyle.transform} translateY(-50%)`,
+              textAlign: "center",
+            };
+            break;
+          case 6: // 右中
+            positionStyle = {
+              ...positionStyle,
+              right: marginR,
+              top: "50%",
+              transform: `${positionStyle.transform} translateY(-50%)`,
+              textAlign: "right",
+              maxWidth: `${rect.w - marginR}px`,
+            };
+            break;
+          case 7: // 左上
+            positionStyle = {
+              ...positionStyle,
+              left: marginL,
+              top: marginV,
+              textAlign: "left",
+              maxWidth: `${rect.w - marginL}px`,
+            };
+            break;
+          case 8: // 顶部居中
+            positionStyle = {
+              ...positionStyle,
+              left: marginL,
+              right: marginR,
+              top: marginV,
+              textAlign: "center",
+            };
+            break;
+          case 9: // 右上
+            positionStyle = {
+              ...positionStyle,
+              right: marginR,
+              top: marginV,
+              textAlign: "right",
+              maxWidth: `${rect.w - marginR}px`,
+            };
+            break;
+          default: // 默认底部居中
+            positionStyle = {
+              ...positionStyle,
+              left: marginL,
+              right: marginR,
+              bottom: marginV,
+              textAlign: "center",
+            };
+        }
+
         return (
           <div
             key={sub.id}
-            style={{
-              position: "absolute",
-              bottom: "10%",
-              left: 0,
-              width: "100%",
-              textAlign: "center",
-              color,
-              fontSize: Math.max(12, styleObj.FontSize * scaleY), // 确保最小字体大小
-              fontFamily: styleObj.FontName,
-              fontWeight: styleObj.Bold ? "bold" : "normal",
-              fontStyle: styleObj.Italic ? "italic" : "normal",
-              textDecoration: [
-                styleObj.Underline ? "underline" : "none",
-                styleObj.StrikeOut ? "line-through" : "none"
-              ].filter(v => v !== "none").join(" ") || "none",
-              letterSpacing: styleObj.Spacing ? `${styleObj.Spacing * scaleX}px` : undefined,
-              transform: `rotate(${styleObj.Angle || 0}deg) scaleX(${(styleObj.ScaleX || 100) / 100}) scaleY(${(styleObj.ScaleY || 100) / 100})`,
-              borderStyle: styleObj.BorderStyle === 1 ? "solid" : "none",
-              WebkitTextStroke: textStroke,
-              textShadow: textShadow || "2px 2px 4px rgba(0,0,0,0.8)", // 确保有文字阴影
-              background,
-              paddingLeft: styleObj.MarginL ? `${styleObj.MarginL * scaleX}px` : undefined,
-              paddingRight: styleObj.MarginR ? `${styleObj.MarginR * scaleX}px` : undefined,
-              paddingBottom: styleObj.MarginV ? `${styleObj.MarginV * scaleY}px` : undefined,
-              pointerEvents: "none",
-              zIndex: 10,
-              whiteSpace: "pre-wrap",
-              // 临时添加背景色来调试字幕位置
-              // backgroundColor: activeSubs.length > 0 ? 'rgba(0,0,0,0.3)' : undefined,
-              padding: '8px 16px',
-              borderRadius: '4px',
-            }}
+            style={positionStyle}
           >
             {sub.text}
           </div>

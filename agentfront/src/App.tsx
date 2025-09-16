@@ -84,6 +84,9 @@ function App() {
   const [rect, setRect] = useState({ w: 0, h: 0, left: 0, top: 0 });
   const [layoutHeight, setLayoutHeight] = useState(window.innerHeight - 56); // header 高度 56px
   const videoRef = useRef<HTMLVideoElement>(null); // Explicitly define videoRef type
+  // ASS字幕的PlayRes设置，从视频分辨率获取
+  const [playResX, setPlayResX] = useState<number>(1920);
+  const [playResY, setPlayResY] = useState<number>(1080);
 
   useEffect(() => {
     const handleResize = () => setLayoutWidth(window.innerWidth);
@@ -96,6 +99,33 @@ function App() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // 监听视频文件变化，获取视频分辨率作为PlayRes
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleVideoMetadata = () => {
+      if (video.videoWidth && video.videoHeight) {
+        setPlayResX(video.videoWidth);
+        setPlayResY(video.videoHeight);
+        console.log(`视频分辨率更新: ${video.videoWidth}x${video.videoHeight}`);
+      }
+    };
+
+    video.addEventListener("loadedmetadata", handleVideoMetadata);
+    video.addEventListener("loadeddata", handleVideoMetadata);
+
+    // 如果视频已经加载，立即获取分辨率
+    if (video.readyState >= 1) {
+      handleVideoMetadata();
+    }
+
+    return () => {
+      video.removeEventListener("loadedmetadata", handleVideoMetadata);
+      video.removeEventListener("loadeddata", handleVideoMetadata);
+    };
+  }, [videoFile]); // 当视频文件变化时重新设置
 
   const updateRect = useCallback(() => {
     const domRect = videoRef.current?.getBoundingClientRect();
@@ -147,7 +177,7 @@ function App() {
   const layout = [
     { i: "video", x: 0, y: 0, w: 7*alpha, h: 4*alpha, minW: 3*alpha, minH: 2*alpha },
     { i: "subtitle", x: 7*alpha, y: 0, w: 5*alpha, h: 4*alpha, minW: 2*alpha, minH: 2*alpha },
-    { i: "style", x: 12*alpha, y: 0, w: 4*alpha, h: 4*alpha, minW: 2*alpha, minH: 2*alpha },
+    { i: "style", x: 12*alpha, y: 0, w: 4*alpha, h: 6*alpha, minW: 2*alpha, minH: 2*alpha },
   ];
   const videoUrl = useMemo(() => videoFile ? URL.createObjectURL(videoFile) : "", [videoFile]);
 
@@ -160,7 +190,8 @@ function App() {
           videoFile={videoFile}
           onSubtitlesUpdate={(resp: ASRResponse) => {
             const subsArr = resp.events || [];
-            console.log("ASR返回的字幕数据：", subsArr);
+            console.log("ASR返回的字幕数据：", resp);
+            
             const formatted: Subtitle[] = subsArr.map((item) => ({
               id: item.id,
               start: item.start,
@@ -181,6 +212,8 @@ function App() {
         subtitles={subtitles} 
         styles={styles}
         videoRef={videoRef} 
+        playResX={playResX}  
+        playResY={playResY}  
       />
       <main className="main-content">
         {/* Copilot 侧边栏开关按钮，模仿 VSCode，固定在左下角 */}
