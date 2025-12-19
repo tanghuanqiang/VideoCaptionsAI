@@ -1,8 +1,9 @@
 import React, { useRef, useState, useEffect } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
+import { useAuth } from "../context/AuthContext";
 import "./SidebarCopilot.css";
-import type { Subtitle, AssStyle } from "../App";
+import type { Subtitle, AssStyle } from "../types/subtitleTypes";
 export interface Message {
   id: string;
   text: string;
@@ -19,31 +20,69 @@ interface SidebarCopilotProps {
   videoFile?: File | null;
 }
 
+// 局部 patch 函数：根据 id 更新字幕/样式
+const patchById = <T extends {id: string}>(oldArr: T[], patchArr: T[]): T[] => {
+  // Keep the original order of oldArr, replacing items when an id matches.
+  // Any items in patchArr that don't exist in oldArr will be appended
+  // at the end in the order they appear in patchArr.
+  const patchMap = new Map<string, T>(patchArr.map(item => [item.id, item] as [string, T]));
+  const used = new Set<string>();
+  const result: T[] = [];
+
+  for (const item of oldArr) {
+    if (patchMap.has(item.id)) {
+      result.push(patchMap.get(item.id)!);
+      used.add(item.id);
+    } else {
+      result.push(item);
+    }
+  }
+
+  for (const p of patchArr) {
+    if (!used.has(p.id)) result.push(p);
+  }
+
+  return result;
+};
+
+// Helper: marked typings may expose a Promise<string> in some type versions.
+// Coerce safely to a string at runtime to satisfy TS and sanitization.
+const safeParseInline = (src: string): string => {
+  try {
+    const parsed = (marked.parseInline as unknown as (s: string) => string)(src);
+    return typeof parsed === "string" ? parsed : String(parsed);
+  } catch (e) {
+    console.warn("marked.parseInline failed:", e);
+    return "";
+  }
+};
+
+// Try to parse JSON; if that fails, attempt to coerce Python-like repr
+// (single quotes, True/False/None) into valid JSON and parse again.
+const parseMaybeJson = (src: string): unknown | null => {
+  const s = src.trim();
+  if (!s) return null;
+  try {
+    return JSON.parse(s);
+  } catch {
+    console.debug('parseMaybeJson initial JSON.parse failed, trying fallback');
+    // fallback: replace single quotes with double quotes and python literals
+    let alt = s.replace(/\bTrue\b/g, 'true').replace(/\bFalse\b/g, 'false').replace(/\bNone\b/g, 'null');
+    // naive single-quote -> double-quote replacement
+    alt = alt.replace(/'/g, '"');
+    // remove trailing commas before ] or }
+    alt = alt.replace(/,\s*(?=[}\]])/g, '');
+    try {
+      return JSON.parse(alt);
+    } catch (err2) {
+      console.warn('parseMaybeJson failed for content, returning null', err2, src);
+      return null;
+    }
+  }
+};
+
 const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, setSubtitles, setStyles, subtitles, styles, videoFile }) => {
-  // 局部 patch 函数：根据 id 更新字幕/样式
-  const patchById = <T extends {id: string}>(oldArr: T[], patchArr: T[]): T[] => {
-    // Keep the original order of oldArr, replacing items when an id matches.
-    // Any items in patchArr that don't exist in oldArr will be appended
-    // at the end in the order they appear in patchArr.
-    const patchMap = new Map<string, T>(patchArr.map(item => [item.id, item] as [string, T]));
-    const used = new Set<string>();
-    const result: T[] = [];
-
-    for (const item of oldArr) {
-      if (patchMap.has(item.id)) {
-        result.push(patchMap.get(item.id)!);
-        used.add(item.id);
-      } else {
-        result.push(item);
-      }
-    }
-
-    for (const p of patchArr) {
-      if (!used.has(p.id)) result.push(p);
-    }
-
-    return result;
-  };
+  const { token, logout } = useAuth();
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [isSending, setIsSending] = useState(false);
@@ -63,42 +102,6 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
   // editable content for codeblocks, keyed by `${msg.id}-${type}-${blockIdx}`
   const [editingContent, setEditingContent] = useState<Record<string, string>>({});
 
-  // Helper: marked typings may expose a Promise<string> in some type versions.
-  // Coerce safely to a string at runtime to satisfy TS and sanitization.
-  const safeParseInline = (src: string): string => {
-    try {
-      const parsed = (marked.parseInline as unknown as (s: string) => string)(src);
-      return typeof parsed === "string" ? parsed : String(parsed);
-    } catch (e) {
-      console.warn("marked.parseInline failed:", e);
-      return "";
-    }
-  };
-
-  // Try to parse JSON; if that fails, attempt to coerce Python-like repr
-  // (single quotes, True/False/None) into valid JSON and parse again.
-  const parseMaybeJson = (src: string): unknown | null => {
-    const s = src.trim();
-    if (!s) return null;
-    try {
-      return JSON.parse(s);
-    } catch {
-      console.debug('parseMaybeJson initial JSON.parse failed, trying fallback');
-      // fallback: replace single quotes with double quotes and python literals
-      let alt = s.replace(/\bTrue\b/g, 'true').replace(/\bFalse\b/g, 'false').replace(/\bNone\b/g, 'null');
-      // naive single-quote -> double-quote replacement
-      alt = alt.replace(/'/g, '"');
-      // remove trailing commas before ] or }
-      alt = alt.replace(/,\s*(?=[}\]])/g, '');
-      try {
-        return JSON.parse(alt);
-      } catch (err2) {
-        console.warn('parseMaybeJson failed for content, returning null', err2, src);
-        return null;
-      }
-    }
-  };
-
   // Type guard: check array of objects each with an 'id' string
   const isArrayOfIdObjects = (v: unknown): v is {id: string}[] => {
     return Array.isArray(v) && v.every(item => {
@@ -109,7 +112,18 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
   };
 
   useEffect(() => {
-    const es = new EventSource("http://127.0.0.1:8000/copilot/sse");
+    if (!token) return;
+    const baseUrl = import.meta.env.VITE_BACKEND_URL || '/api';
+    // Ensure baseUrl doesn't end with slash if we are appending path starting with slash, 
+    // or handle it. The paths below start with /copilot...
+    const url = `${baseUrl.replace(/\/$/, '')}/copilot/sse?token=${token}`;
+    
+    const es = new EventSource(url);
+    es.onerror = (err) => {
+        console.error("SSE Error:", err);
+        // Optional: check if 401 and logout
+        // es.close();
+    };
     es.onmessage = (e) => {
       const data = e.data ?? "";
       // clear previous timer and set a new one to mark sending finished after inactivity
@@ -210,11 +224,19 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
       formData.append("files", file);
     });
     try {
-      await fetch("http://127.0.0.1:8000/copilot/send", {
+      const baseUrl = import.meta.env.VITE_BACKEND_URL || '/api';
+      const url = `${baseUrl.replace(/\/$/, '')}/copilot/send`;
+      const res = await fetch(url, {
         method: "POST",
+        headers: {
+            'Authorization': `Bearer ${token}`
+        },
         body: formData,
         // 不需要设置 Content-Type，fetch 会自动处理
       });
+      if (res.status === 401) {
+          logout();
+      }
     } catch (err) {
       console.warn('send failed', err);
       setIsSending(false);

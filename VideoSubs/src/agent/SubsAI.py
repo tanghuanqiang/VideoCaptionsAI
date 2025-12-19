@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from typing import Annotated, TypedDict
 from langchain_tavily import TavilySearch
 import torch
-import whisper
+# import whisper
 from src.tools.subtitle_tools import (
     probe_media,
     asr_transcribe_video,
@@ -21,7 +21,8 @@ from langgraph.prebuilt import ToolNode, tools_condition
 
 load_dotenv()
 
-torch.set_num_threads(4)
+# Optimize torch threads for low-resource environment
+torch.set_num_threads(int(os.environ.get("TORCH_THREADS", "2")))
 
 # Read keys and model settings from environment (use .env file in project root)
 TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
@@ -41,7 +42,7 @@ Model = {
         model_name=LLM_MODEL_NAME,
         temperature=float(os.environ.get("LLM_TEMPERATURE", "0")),
     ),
-    "whisper": whisper.load_model(os.environ.get("WHISPER_MODEL", "large-v3"))
+    # "whisper": whisper.load_model(os.environ.get("WHISPER_MODEL", "large-v3"))
 }
 
 

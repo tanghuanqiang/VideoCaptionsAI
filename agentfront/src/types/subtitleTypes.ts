@@ -9,29 +9,34 @@ export interface SubtitleEvent {
 }
 
 export interface AssStyle {
-    Name: string;
-    Fontname: string;
-    Fontsize: number;
-    PrimaryColour: string;
-    SecondaryColour?: string;
-    OutlineColour?: string;
-    BackColour?: string;
-    Bold?: boolean;
-    Italic?: boolean;
-    Underline?: boolean;
-    StrikeOut?: boolean;
-    ScaleX?: number;
-    ScaleY?: number;
-    Spacing?: number;
-    Angle?: number;
-    BorderStyle?: number;  // 1: outline 3: box
-    Outline?: number;
-    Shadow?: number;
-    Alignment?: number;    // 1..9 (Numpad)
-    MarginL?: number;
-    MarginR?: number;
-    MarginV?: number;
-    Encoding?: number;     // 0:ANSI, 1:Default etc
+  id: string;
+  Name: string;
+  FontName: string;
+  FontSize: number;
+  PrimaryColour: string;
+  SecondaryColour?: string;
+  OutlineColour?: string;
+  BackColour?: string;
+  Bold?: boolean;
+  Italic?: boolean;
+  Underline?: boolean;
+  StrikeOut?: boolean;
+  ScaleX?: number;
+  ScaleY?: number;
+  Spacing?: number;
+  Angle?: number;
+  BorderStyle?: number;
+  Outline?: number;
+  Shadow?: number;
+  Alignment?: number;
+  MarginL?: number;
+  MarginR?: number;
+  MarginV?: number;
+  Encoding?: number;
+  PrimaryAlpha?: number;
+  SecondaryAlpha?: number;
+  OutlineAlpha?: number;
+  BackAlpha?: number;
 }
 
 export interface SubtitleDoc {
@@ -43,3 +48,29 @@ export interface SubtitleDoc {
     fps?: number;
     events?: SubtitleEvent[];
 }
+
+export interface Subtitle {
+  id: string;
+  start: string | number; // Allow number for easier calculation
+  end: string | number;
+  text: string;
+  style: string;
+  group: string;
+  selected?: boolean;
+  layer?: number;
+}
+
+export type ASRResponse = {
+  language: string;
+  resolution: string;
+  fps: string;
+  events: Array<{
+    id: string;
+    start: string;
+    end: string;
+    text: string;
+    style?: string;
+    speaker?: string;
+  }>;
+};
+

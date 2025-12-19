@@ -1,0 +1,93 @@
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: var(--ant-color-bg-layout);
+  color: var(--ant-color-text);
+}
+
+.login-box {
+  background: var(--ant-color-bg-container);
+  padding: 32px;
+  border-radius: var(--ant-border-radius);
+  box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05);
+  width: 320px;
+  border: 1px solid var(--ant-color-border-secondary);
+}
+
+.form-group {
+  margin-bottom: 24px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ant-color-text);
+  font-size: 14px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 4px 11px;
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius);
+  background: var(--ant-color-bg-container);
+  color: var(--ant-color-text);
+  height: 32px;
+  transition: all 0.2s;
+}
+
+.form-group input:hover {
+  border-color: var(--ant-color-primary-hover);
+}
+
+.form-group input:focus {
+  border-color: var(--ant-color-primary);
+  box-shadow: 0 0 0 2px rgba(5, 145, 255, 0.1);
+  outline: 0;
+}
+
+button {
+  width: 100%;
+  padding: 4px 15px;
+  height: 32px;
+  background: var(--ant-color-primary);
+  border: 1px solid var(--ant-color-primary);
+  border-radius: var(--ant-border-radius);
+  color: #fff;
+  font-weight: 400;
+  cursor: pointer;
+  box-shadow: 0 2px 0 rgba(5, 145, 255, 0.1);
+  transition: all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
+}
+
+button:hover {
+  background: var(--ant-color-primary-hover);
+  border-color: var(--ant-color-primary-hover);
+  color: #fff;
+}
+
+button:active {
+  background: var(--ant-color-primary-active);
+  border-color: var(--ant-color-primary-active);
+  color: #fff;
+}
+
+.error {
+  color: #ff6b6b;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.toggle-auth {
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #abb2bf;
+  cursor: pointer;
+}
+
+.toggle-auth:hover {
+  color: #61dafb;
+}

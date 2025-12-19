@@ -4,39 +4,41 @@
   display: flex;
   flex-direction: column;
   padding: 16px;
-  color: #f0f0f0;
-  background: transparent; /* 背景交给外层 panel */
+  color: var(--ant-color-text);
+  background: var(--ant-color-bg-container);
   flex: 1;
   min-height: 0;
+  border-right: 1px solid var(--ant-color-border-secondary);
 }
 
 /* Scrollbar styling for Webkit browsers */
 .subtitle-editor-container::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 .subtitle-editor-container::-webkit-scrollbar-track {
-  background: #1c1c1c;
+  background: transparent;
 }
 
 .subtitle-editor-container::-webkit-scrollbar-thumb {
-  background: #444;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
 }
 
 .subtitle-actions {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  padding: 8px 0;
-  margin-bottom: 12px;
-  border-bottom: 1px solid #333;
+  padding: 0 0 16px 0;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
 }
 
 .subtitle-actions h3 {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
-  color: #c0c0c0;
+  color: var(--ant-color-text);
   margin: 0;
   padding: 0;
 }
@@ -65,23 +67,23 @@
 
 /* 为 subtitle-list 添加滚动条样式 */
 .subtitle-list::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 .subtitle-list::-webkit-scrollbar-track {
-  background: #1c1c1c;
+  background: transparent;
 }
 .subtitle-list::-webkit-scrollbar-thumb {
-  background: #444;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
 }
 .subtitle-list::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: rgba(255, 255, 255, 0.3);
 }
 
 /* Firefox 滚动条 */
 .subtitle-list {
   scrollbar-width: thin;
-  scrollbar-color: #444 #1c1c1c;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 
 
@@ -90,24 +92,29 @@
   align-items: center;
   gap: 8px;
   padding: 8px;
-  background: #2a2e35;
+  background: var(--ant-color-bg-elevated);
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--ant-border-radius);
   margin-bottom: 8px;
-  transition: background 0.2s ease, border-color 0.2s ease;
+  transition: all 0.2s;
+  position: relative;
 }
 
 .subtitle-item.selected {
-  background: #353a42;
-  border-color: #0078d4;
+  background: rgba(22, 119, 255, 0.15);
+  border-color: var(--ant-color-primary);
 }
 
 .subtitle-item:hover {
-  background: #30343c;
+  background: var(--ant-color-bg-elevated);
+  border-color: var(--ant-color-primary-hover);
 }
 
 input[type="checkbox"] {
-  accent-color: #0078d4;
+  accent-color: var(--ant-color-primary);
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
 }
 
 /* Common input and select styling */
@@ -115,21 +122,25 @@ input[type="checkbox"] {
 .subtitle-text,
 .subtitle-style,
 .subtitle-group {
-  background: #1c1c1c;
-  border: 1px solid #444;
-  color: #f0f0f0;
-  padding: 6px 8px;
-  border-radius: 4px;
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border);
+  color: var(--ant-color-text);
+  padding: 4px 8px;
+  border-radius: var(--ant-border-radius);
   font-size: 12px;
   outline: none;
-  transition: border-color 0.2s ease;
+  transition: all 0.2s;
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
 }
 
 .subtitle-time:focus,
 .subtitle-text:focus,
 .subtitle-style:focus,
 .subtitle-group:focus {
-  border-color: #0078d4;
+  border-color: var(--ant-color-primary);
+  box-shadow: 0 0 0 2px rgba(5, 145, 255, 0.1);
 }
 
 .subtitle-time {
@@ -140,6 +151,9 @@ input[type="checkbox"] {
 .subtitle-text {
   flex: 1;
   width: auto;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  cursor: text;
 }
 
 .subtitle-style {
@@ -149,25 +163,26 @@ input[type="checkbox"] {
 
 /* Button styling */
 button {
-  background: #0078d4;
+  background: var(--ant-color-primary);
   color: #fff;
   border: none;
-  border-radius: 4px;
-  padding: 8px 12px;
+  border-radius: var(--ant-border-radius);
+  padding: 4px 12px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 400;
   cursor: pointer;
-  transition: background 0.2s ease, opacity 0.2s ease;
+  transition: all 0.2s;
   min-width: 80px;
 }
 
 button:hover {
-  background: #0063b1;
+  background: var(--ant-color-primary-hover);
 }
 
 button:disabled {
-  background: #444;
-  color: #888;
+  background: var(--ant-color-bg-container);
+  color: var(--ant-color-text-tertiary);
+  border: 1px solid var(--ant-color-border);
   cursor: not-allowed;
 }
 
@@ -176,7 +191,7 @@ button:disabled {
   padding-top: 12px;
   padding-bottom: 32px;
   /* padding-right: 16px; */
-  border-top: 1px solid #333;
+  border-top: 1px solid var(--ant-color-border-secondary);
   display: flex;
   justify-content: flex-end;
 }

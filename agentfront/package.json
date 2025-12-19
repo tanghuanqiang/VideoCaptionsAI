@@ -6,17 +6,24 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "tauri": "tauri",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.10",
+    "@ffmpeg/util": "^0.12.1",
+    "@langchain/core": "^0.1.0",
+    "@langchain/openai": "^0.0.14",
     "dompurify": "^3.2.6",
+    "langchain": "^0.1.0",
     "libass-wasm": "^4.1.0",
     "marked": "^16.2.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-grid-layout": "^1.5.2",
-    "react-resizable": "^3.0.5"
+    "react-resizable": "^3.0.5",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
@@ -33,5 +40,5 @@
     "typescript-eslint": "^8.39.1",
     "vite": "^7.1.2"
   },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  "packageManager": "pnpm@10.26.0"
 }

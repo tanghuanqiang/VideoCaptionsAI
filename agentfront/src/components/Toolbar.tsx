@@ -1,9 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import "./Toolbar.css";
-import type { ASRResponse } from "../App";
-import type { Subtitle, AssStyle } from "../App";
+import type { ASRResponse, Subtitle, AssStyle, SubtitleEvent } from "../types/subtitleTypes";
 import toAssColor from "../utils/toAssColor";
 import DownloadProgress from "./DownloadProgress";
+import { useAuth } from "../context/AuthContext";
+import { toSRT, toASS, downloadFile } from "../utils/subtitleUtils";
+
 
 interface ToolbarProps {
   title: string;
@@ -12,23 +14,22 @@ interface ToolbarProps {
   onSubtitlesUpdate: (resp: ASRResponse) => void;
   styles: AssStyle[];
   subtitles: Subtitle[];
+  theme: 'dark' | 'light';
+  toggleTheme: () => void;
+  playResX?: number;
+  playResY?: number;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSubtitlesUpdate, styles, subtitles }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSubtitlesUpdate, styles, subtitles, theme, toggleTheme, playResX = 1920, playResY = 1080 }) => {
+  const { token } = useAuth();
   const [recognizing, setRecognizing] = useState(false);
   const [videoHeight, setVideoHeight] = useState<number | null>(null);
   const [videoWidth, setVideoWidth] = useState<number | null>(null);
   const [currentXhr, setCurrentXhr] = useState<XMLHttpRequest | null>(null);
   const [processingTimer, setProcessingTimer] = useState<NodeJS.Timeout | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
-  // 清理定时器，防止内存泄漏
-  React.useEffect(() => {
-    return () => {
-      if (processingTimer) {
-        clearTimeout(processingTimer);
-      }
-    };
-  }, [processingTimer]);
   const [downloadProgress, setDownloadProgress] = useState<{
     isVisible: boolean;
     progress: number;
@@ -44,12 +45,68 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
     isMinimized: false,
   });
 
+  // Close export menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const handleExport = (format: 'srt' | 'ass' | 'txt') => {
+      if (subtitles.length === 0) {
+          alert("没有可导出的字幕");
+          return;
+      }
+
+      if (format === 'srt') {
+          const content = toSRT(subtitles);
+          downloadFile(content, 'subtitles.srt', 'text/plain');
+      } else if (format === 'ass') {
+          const content = toASS(subtitles, styles, playResX, playResY);
+          downloadFile(content, 'subtitles.ass', 'text/plain');
+      } else if (format === 'txt') {
+          // Export as [Time] Text format
+          const content = subtitles.map(s => `[${s.start} - ${s.end}] ${s.text}`).join('\n');
+          downloadFile(content, 'subtitles.txt', 'text/plain');
+      }
+      setShowExportMenu(false);
+  };
+
+
+
+
   const doASR = async (file: File) => {
     setRecognizing(true);
-    const formData = new FormData();
-    formData.append("file", file);
     try {
-      const resp = await fetch("/api/asr/", { method: "POST", body: formData });
+      // 1. 尝试在前端提取音频
+      let fileToUpload: File | Blob = file;
+      try {
+        console.log("开始前端音频提取...");
+        const audioBlob = await ffmpegService.extractAudio(file);
+        console.log("音频提取成功，大小:", audioBlob.size);
+        // 创建一个新的 File 对象，或者直接使用 Blob
+        fileToUpload = new File([audioBlob], "audio.mp3", { type: "audio/mp3" });
+      } catch (err) {
+        console.warn("前端音频提取失败，将回退到上传原始视频:", err);
+        // 提取失败则上传原视频
+      }
+
+      const formData = new FormData();
+      formData.append("file", fileToUpload);
+      
+      const resp = await fetch("/api/asr/", { 
+        method: "POST", 
+        body: formData,
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
       if (!resp.ok) throw new Error("识别失败");
       const data = await resp.json();
       const secondsToTimeStr = (seconds: number) => {
@@ -60,7 +117,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
         const ms = Math.round((seconds - Math.floor(seconds)) * 100);
         return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}.${ms.toString().padStart(2, "0")}`;
       };
-      interface SubtitleEvent { id: string; start: number; end: number; text: string; style?: string; speaker?: string; }
+      
       const formatted = (data.events || []).map((item: SubtitleEvent) => ({
         id: item.id,
         start: secondsToTimeStr(Number(item.start)),
@@ -89,9 +146,9 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
     <>
       <div className="toolbar">
         <span className="toolbar-title">{title}</span>
-        <div className="toolbar-actions">
-          <label htmlFor="video-upload" style={{ marginRight: "8px", cursor: "pointer" }}>
-            <button type="button" style={{ pointerEvents: "none" }}>导入视频</button>
+        <div className="toolbar-actions toolbar-actions-left">
+          <label htmlFor="video-upload" className="toolbar-btn">
+            <span>导入视频</span>
             <input
               id="video-upload"
               type="file"
@@ -109,41 +166,71 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
               }}
             />
           </label>
-          <button type="button" disabled={recognizing} onClick={() => { if (videoFile) doASR(videoFile); else alert("请先导入视频文件"); }}>
-            {recognizing ? "正在识别..." : "自动识别字幕"}
+          <button type="button" className="toolbar-btn" onClick={toggleTheme} title={theme === 'dark' ? "切换到亮色模式" : "切换到暗色模式"}>
+            {theme === 'dark' ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+            )}
           </button>
-          <div style={{ flex: 1 }} />
+        </div>
+        <div className="toolbar-actions toolbar-actions-right">
+          <div className="export-dropdown-container" ref={exportMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
+            <button 
+                type="button" 
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="toolbar-btn export-btn"
+            >
+                导出字幕 ▼
+            </button>
+            {showExportMenu && (
+                <div className="export-dropdown-menu" style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    backgroundColor: 'var(--ant-color-bg-container)',
+                    border: '1px solid var(--ant-color-border)',
+                    borderRadius: '4px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                    zIndex: 1000,
+                    minWidth: '120px',
+                    marginTop: '4px'
+                }}>
+                    <div className="export-menu-item" onClick={() => handleExport('srt')}>导出 SRT</div>
+                    <div className="export-menu-item" onClick={() => handleExport('ass')}>导出 ASS</div>
+                    <div className="export-menu-item" onClick={() => handleExport('txt')}>导出 TXT</div>
+                </div>
+            )}
+          </div>
           <button
             type="button"
-            className="export-video-btn"
-            disabled={downloadProgress.isVisible} // 防止重复点击
-            style={{ 
-              marginLeft: "16px", 
-              fontSize: "1.2rem", 
-              padding: "8px 24px", 
-              borderRadius: "8px", 
-              fontWeight: "bold",
-              opacity: downloadProgress.isVisible ? 0.6 : 1,
-              cursor: downloadProgress.isVisible ? "not-allowed" : "pointer"
-            }}
+            className="toolbar-btn"
+            disabled={downloadProgress.isVisible}
+            style={{ opacity: downloadProgress.isVisible ? 0.6 : 1, cursor: downloadProgress.isVisible ? "not-allowed" : "pointer" }}
             onClick={async () => {
               if (!videoFile) {
                 alert("请先导入视频文件");
                 return;
               }
-
-              // 防止重复导出
               if (downloadProgress.isVisible) {
                 return;
               }
-
-              // 清理之前可能存在的定时器
               if (processingTimer) {
                 clearTimeout(processingTimer);
                 setProcessingTimer(null);
               }
-
-              // 获取保存文件名（简化版，避免File System Access API的问题）
               let fileName: string = "";
               
               try {
@@ -414,6 +501,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
                 // 设置请求参数
                 xhr.responseType = 'arraybuffer'; // 重要：设置为arraybuffer以正确处理二进制数据
                 xhr.open('POST', '/api/burn/');
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
                 xhr.send(formData);
 
               } catch (error) {

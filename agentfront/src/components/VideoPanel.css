@@ -1,8 +1,8 @@
 /* VideoPanel.css */
 
 .video-panel {
-  background: #111;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  background: #000; /* Video background usually stays black */
+  box-shadow: none;
   /* flex-grow: 1; 已经足够，但为了保险，可以保留 */
   flex-grow: 1;
   width: 100%;
@@ -12,6 +12,7 @@
   justify-content: center;
   align-items: center;
   overflow: hidden; /* 防止视频超出容器 */
+  border-right: 1px solid var(--ant-color-border-secondary);
 }
 
 .video-panel video {

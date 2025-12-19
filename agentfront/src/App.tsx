@@ -8,7 +8,7 @@ import "./App.css";
 import Toolbar from "./components/Toolbar";
 import VideoPanel from "./components/VideoPanel";
 import SubtitleEditor from "./components/SubtitleEditor";
-// import VideoTimeline from "./components/VideoTimeline";
+import VideoTimeline from "./components/VideoTimeline";
 import { defaultStyle } from "./constants";
 
 import GridLayout from "react-grid-layout";
@@ -18,68 +18,32 @@ import SubtitleStylePanel from './components/SubtitleStylePanel';
 import SubtitlePreview from './components/SubtitlePreview';
 import SidebarCopilot from './components/SidebarCopilot';
 import type { Message } from './components/SidebarCopilot';
+import type { AssStyle, Subtitle, ASRResponse } from './types/subtitleTypes';
 
-export interface AssStyle {
-  id: string;
-  Name: string;
-  FontName: string;
-  FontSize: number;
-  PrimaryColour: string;
-  SecondaryColour?: string;
-  OutlineColour?: string;
-  BackColour?: string;
-  Bold?: boolean;
-  Italic?: boolean;
-  Underline?: boolean;
-  StrikeOut?: boolean;
-  ScaleX?: number;
-  ScaleY?: number;
-  Spacing?: number;
-  Angle?: number;
-  BorderStyle?: number;
-  Outline?: number;
-  Shadow?: number;
-  Alignment?: number;
-  MarginL?: number;
-  MarginR?: number;
-  MarginV?: number;
-  Encoding?: number;
-  PrimaryAlpha?: number;
-  SecondaryAlpha?: number;
-  OutlineAlpha?: number;
-  BackAlpha?: number;
-}
-export type Subtitle = {
-  id: string;
-  start: string;
-  end: string;
-  text: string;
-  style: string;
-  group: string;
-};
+import { AuthProvider, useAuth } from './context/AuthContext';
+import Login from './pages/Login';
+import { calculateLayers } from './utils/subtitleUtils';
+import { useHistory } from './hooks/useHistory';
 
-export type ASRResponse = {
-  language: string;
-  resolution: string;
-  fps: string;
-  events: Array<{
-    id: string;
-    start: string;
-    end: string;
-    text: string;
-    style?: string;
-    speaker?: string;
-  }>;
-
-};
-
-function App() {
+function MainApp() {
   // Copilot 侧边栏开关
   const [copilotOpen, setCopilotOpen] = useState(false);
   // Copilot 消息历史
   const [copilotMessages, setCopilotMessages] = useState<Message[]>([]);
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
+  
+  // Use useHistory for subtitles state
+  const { 
+    state: subtitles, 
+    set: setSubtitles, 
+    undo, 
+    redo, 
+    canUndo, 
+    canRedo,
+    reset: resetSubtitles
+  } = useHistory<Subtitle[]>([]);
+
+  const [selectedSubtitleIds, setSelectedSubtitleIds] = useState<string[]>([]);
   const [layoutWidth, setLayoutWidth] = useState(window.innerWidth);
   const [rect, setRect] = useState({ w: 0, h: 0, left: 0, top: 0 });
   const [layoutHeight, setLayoutHeight] = useState(window.innerHeight - 56); // header 高度 56px
@@ -88,16 +52,47 @@ function App() {
   const [playResX, setPlayResX] = useState<number>(1920);
   const [playResY, setPlayResY] = useState<number>(1080);
 
+  // 主题状态管理
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  // Keyboard shortcuts for Undo/Redo
   useEffect(() => {
-    const handleResize = () => setLayoutWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        undo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
   useEffect(() => {
-    const handleResize = () => setLayoutHeight(window.innerHeight - 56);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
+
+  useEffect(() => {
+    let timeoutId: number;
+    const handleResize = () => {
+      window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => {
+        setLayoutWidth(window.innerWidth);
+        setLayoutHeight(window.innerHeight - 56);
+      }, 100);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.clearTimeout(timeoutId);
+    };
   }, []);
 
   // 监听视频文件变化，获取视频分辨率作为PlayRes
@@ -176,10 +171,73 @@ function App() {
   const alpha = 5;
   const layout = [
     { i: "video", x: 0, y: 0, w: 7*alpha, h: 4*alpha, minW: 3*alpha, minH: 2*alpha },
+    { i: "timeline", x: 0, y: 4*alpha, w: 12*alpha, h: 2*alpha, minW: 3*alpha, minH: 1*alpha },
     { i: "subtitle", x: 7*alpha, y: 0, w: 5*alpha, h: 4*alpha, minW: 2*alpha, minH: 2*alpha },
     { i: "style", x: 12*alpha, y: 0, w: 4*alpha, h: 6*alpha, minW: 2*alpha, minH: 2*alpha },
   ];
   const videoUrl = useMemo(() => videoFile ? URL.createObjectURL(videoFile) : "", [videoFile]);
+
+  const handleSubtitleSelect = useCallback((subtitle: Subtitle, e?: React.MouseEvent) => {
+      if (e?.ctrlKey || e?.metaKey) {
+          setSelectedSubtitleIds(prev => {
+              const isSelected = prev.includes(subtitle.id);
+              if (isSelected) {
+                  return prev.filter(id => id !== subtitle.id);
+              } else {
+                  return [...prev, subtitle.id];
+              }
+          });
+          return; // Don't seek when multi-selecting
+      }
+
+      setSelectedSubtitleIds([subtitle.id]);
+      if (videoRef.current) {
+          let time = 0;
+          if (typeof subtitle.start === 'number') {
+              time = subtitle.start;
+          } else if (typeof subtitle.start === 'string') {
+              const parts = subtitle.start.split(':');
+              if (parts.length === 3) {
+                 const h = parseInt(parts[0], 10);
+                 const m = parseInt(parts[1], 10);
+                 const s = parseFloat(parts[2]);
+                 time = h * 3600 + m * 60 + s;
+              }
+          }
+          if (time >= 0) {
+              videoRef.current.currentTime = time;
+          }
+      }
+  }, []);
+
+  const handleSubtitleDelete = useCallback((subtitle: Subtitle) => {
+    setSubtitles(prev => prev.filter(s => s.id !== subtitle.id));
+    setSelectedSubtitleIds(prev => prev.filter(id => id !== subtitle.id));
+  }, [setSubtitles]);
+
+  // Keyboard delete support
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            // Check if input is active
+            const active = document.activeElement;
+            if (active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA' || active?.isContentEditable) {
+                return;
+            }
+            
+            if (selectedSubtitleIds.length > 0) {
+                setSubtitles(prev => prev.filter(s => !selectedSubtitleIds.includes(s.id)));
+                setSelectedSubtitleIds([]);
+            }
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedSubtitleIds, setSubtitles]);
+
+  const handleSubtitleUpdate = useCallback((updatedSub: Subtitle, transient: boolean = false) => {
+    setSubtitles(prev => prev.map(sub => sub.id === updatedSub.id ? updatedSub : sub), { transient });
+  }, [setSubtitles]);
 
   return (
     <div className="app-container">
@@ -200,10 +258,16 @@ function App() {
               style: item.style || "Default",
               group: item.speaker || "",
             }));
-            setSubtitles(formatted);
+            
+            const layered = calculateLayers(formatted);
+            setSubtitles(layered);
           }}
           styles={styles}
           subtitles={subtitles}
+          theme={theme}
+          toggleTheme={toggleTheme}
+          playResX={playResX}
+          playResY={playResY}
         />
       </header>
       {/* 预览字幕 */}
@@ -216,37 +280,18 @@ function App() {
         playResY={playResY}  
       />
       <main className="main-content">
-        {/* Copilot 侧边栏开关按钮，模仿 VSCode，固定在左下角 */}
+        {/* Copilot 侧边栏开关按钮 */}
         <button
-          className="copilot-toggle-btn"
+          className={`copilot-toggle-btn ${copilotOpen ? 'open' : ''}`}
           style={{
-            position: 'fixed',
-            right: copilotOpen ? 374 : 24, // 侧边栏宽度350+间距24
-            bottom: 32,
-            zIndex: 10000,
-            background: copilotOpen ? '#23272e' : '#222c38',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 6,
-            width: 40,
-            height: 40,
-            boxShadow: copilotOpen ? '0 2px 8px #0006' : '0 1px 4px #0003',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'background 0.2s,right 0.2s',
+            right: copilotOpen ? 350 : 24,
           }}
           title={copilotOpen ? '关闭 Copilot 侧边栏' : '打开 Copilot 侧边栏'}
           onClick={() => setCopilotOpen(v => !v)}
         >
-          {/* VSCode 风格的侧边栏图标 */}
-          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-            <rect x="2" y="2" width="6" height="18" rx="2" fill="#0078d4"/>
-            <rect x="10" y="2" width="10" height="18" rx="2" fill="#444"/>
-            <rect x="12.5" y="5" width="5" height="2" rx="1" fill="#888"/>
-            <rect x="12.5" y="9" width="5" height="2" rx="1" fill="#888"/>
-            <rect x="12.5" y="13" width="5" height="2" rx="1" fill="#888"/>
+          {/* Copilot 风格图标 (Sparkles) */}
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" />
           </svg>
         </button>
 
@@ -257,6 +302,7 @@ function App() {
           rowHeight={layoutHeight / (9 * alpha)}
           width={layoutWidth}
           draggableHandle=".panel-header"
+          draggableCancel="input, textarea, select, .nodrag"
           style={{ height: "100%", width: '100%', minWidth: 0 }}
           onDragStop={() => updateRect()} // Update rect when dragging stops
           onResizeStop={() => updateRect()} // Update rect when resizing stops
@@ -264,7 +310,7 @@ function App() {
           <div
             key="video"
             style={{
-              background: "#222",
+              background: "var(--ant-color-bg-container)",
               borderRadius: 16,
               boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
               overflow: "hidden",
@@ -274,7 +320,7 @@ function App() {
           >
             <div className="panel-header" style={{ 
               cursor: "move", 
-              background: "#23272e", 
+              background: "var(--ant-color-primary)", 
               color: "#fff", 
               padding: "8px 16px", 
               fontWeight: "bold", 
@@ -298,8 +344,40 @@ function App() {
             </div>
            
           </div>
+          <div key="timeline" style={{
+              background: "var(--ant-color-bg-container)",
+              borderRadius: 16,
+              boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden"
+          }}>
+             <div className="panel-header" style={{
+                  cursor: "move",
+                  background: "var(--ant-color-primary)",
+                  color: "#fff",
+                  padding: "8px 16px",
+                  fontWeight: "bold",
+                  borderTopLeftRadius: 16,
+                  borderTopRightRadius: 16,
+                  flex: "0 0 auto"
+              }}>
+                  视频进度
+              </div>
+              <div style={{ flex: 1, minHeight: 0 }}>
+                  <VideoTimeline 
+                    videoRef={videoRef} 
+                    videoUrl={videoUrl} 
+                    subtitles={subtitles}
+                    onSubtitleSelect={handleSubtitleSelect}
+                    onSubtitleUpdate={handleSubtitleUpdate}
+                    onSubtitleDelete={handleSubtitleDelete}
+                    selectedSubtitleIds={selectedSubtitleIds}
+                  />
+              </div>
+          </div>
           <div key="subtitle" className="subtitle-panel" style={{
-            background: "#23272e", 
+            background: "var(--ant-color-bg-container)", 
             borderRadius: 16, 
             boxShadow: "0 4px 24px rgba(0,0,0,0.18)", 
             display: "flex",
@@ -309,7 +387,7 @@ function App() {
           }}>
             <div className="panel-header" style={{
               cursor: "move", 
-              background: "#353a42", 
+              background: "var(--ant-color-primary)", 
               color: "#fff", 
               padding: "8px 16px", 
               fontWeight: "bold", 
@@ -325,12 +403,15 @@ function App() {
                 setSubtitles={setSubtitles}
                 styles={styles}
                 selectedStyle={selectedStyle}
+                selectedIds={selectedSubtitleIds}
+                setSelectedIds={setSelectedSubtitleIds}
+                videoRef={videoRef}
               />
             </div>
           
           </div>
           <div key="style" style={{
-              background: "#23272e",
+              background: "var(--ant-color-bg-container)",
               borderRadius: 16,
               boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
               display: "flex",
@@ -339,7 +420,7 @@ function App() {
           }}>
               <div className="panel-header" style={{
                   cursor: "move",
-                  background: "#353a42",
+                  background: "var(--ant-color-primary)",
                   color: "#fff",
                   padding: "8px 16px",
                   fontWeight: "bold",
@@ -379,6 +460,19 @@ function App() {
       </footer> */}
     </div>
   );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AuthGuard />
+    </AuthProvider>
+  );
+}
+
+function AuthGuard() {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <MainApp /> : <Login />;
 }
 
 export default App;

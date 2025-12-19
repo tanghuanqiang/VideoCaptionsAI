@@ -1,22 +1,247 @@
-.video-timeline {
-  background: #fff;
-  padding: 12px 24px;
-  border-top: 1px solid #eee;
-  box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
+.video-timeline-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--ant-color-bg-container);
+  color: var(--ant-color-text);
+  user-select: none;
+  overflow: hidden;
 }
-.timeline-bar {
+
+.timeline-controls {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+  gap: 16px;
+  flex: 0 0 auto;
+}
+
+.control-group {
   display: flex;
   align-items: center;
-  margin-bottom: 8px;
+  gap: 16px;
+  justify-self: center;
 }
-.timeline-thumb {
+
+.time-display {
+  font-family: monospace;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  justify-self: start;
+}
+
+.zoom-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
+  font-size: 12px;
+  color: var(--ant-color-text-secondary);
+}
+
+.zoom-control input[type="range"] {
   width: 80px;
-  height: 45px;
-  object-fit: cover;
-  margin-right: 6px;
-  border-radius: 4px;
-  border: 1px solid #ddd;
 }
-.timeline-slider {
+
+.timeline-scroll-area {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  position: relative;
+  background: var(--ant-color-bg-layout);
+}
+
+.timeline-scroll-area::-webkit-scrollbar {
+  height: 8px;
+}
+
+.timeline-scroll-area::-webkit-scrollbar-track {
+  background: var(--ant-color-fill-tertiary);
+}
+
+.timeline-scroll-area::-webkit-scrollbar-thumb {
+  background: var(--ant-color-text-quaternary);
+  border-radius: 4px;
+}
+
+.timeline-content {
+  height: 100%;
+  position: relative;
+  cursor: pointer;
+  padding-top: 20px; /* Space for cursor head */
+}
+
+.video-track {
+  position: relative;
+  height: 80px;
+  background-color: #003333; /* Dark Teal Background */
+  border: 2px solid #008080; /* Teal Border */
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 0 10px; /* Margin for safety */
+  box-sizing: border-box;
+}
+
+.track-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 2px 6px;
+  background: rgba(0, 51, 51, 0.8);
+  color: #fff;
+  font-size: 11px;
+  z-index: 5;
+  border-bottom-right-radius: 4px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.timeline-thumbnails {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 50%; /* Top half for thumbnails */
+  display: flex;
+  pointer-events: none;
+  align-items: stretch; /* Stretch to fill height */
+}
+
+.timeline-thumbnail-item {
+  height: 100%; /* Fill the container height */
+  background-position: left center;
+  background-repeat: no-repeat;
+  opacity: 1;
+  border-right: 1px solid rgba(255,255,255,0.2);
+}
+
+.track-waveform {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 50%; /* Bottom half for waveform */
+  background: #004d4d;
+  opacity: 0.8;
+  pointer-events: none;
+  /* Simple dummy waveform pattern */
+  background-image: linear-gradient(180deg, transparent 45%, #00b3b3 45%, #00b3b3 55%, transparent 55%);
+  background-size: 10px 100%;
+}
+
+.timeline-cursor {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.cursor-head {
+  position: absolute;
+  top: 0;
+  left: -6px;
+  width: 0; 
+  height: 0; 
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid var(--ant-color-primary);
+}
+
+.cursor-line {
+  position: absolute;
+  top: 0;
+  left: -1px;
+  width: 2px;
+  height: 100%;
+  background: var(--ant-color-primary);
+  box-shadow: 0 0 4px rgba(0,0,0,0.5);
+}
+
+/* Subtitle Track Container */
+.subtitle-track-container {
+  position: relative;
+  margin: 10px 10px;
+  min-height: 200px; /* Allow space for multiple tracks */
+  /* background: var(--ant-color-fill-quaternary); */
+  border-radius: 4px;
+  /* overflow: hidden;  Don't hide overflow so we can see dragged items if needed, but usually we want to contain them */
+}
+
+.subtitle-block {
+  position: absolute;
+  height: 36px; /* Fixed height for blocks */
+  background: var(--ant-color-primary);
+  border-radius: 4px;
+  overflow: visible; /* Allow handles to be seen/grabbed easily */
+  cursor: grab;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  opacity: 0.85;
+  transition: background-color 0.2s, box-shadow 0.2s; /* Don't transition left/width during drag for performance */
+  min-width: 10px;
+  box-sizing: border-box;
+}
+
+.subtitle-block:active {
+  cursor: grabbing;
+}
+
+.subtitle-block:hover {
+  opacity: 1;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.subtitle-block.selected {
+  background: var(--ant-color-warning);
+  border-color: #fff;
+  z-index: 11;
+  opacity: 1;
+  box-shadow: 0 0 0 2px rgba(250, 173, 20, 0.2);
+}
+
+.subtitle-text {
+  font-size: 12px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
   width: 100%;
 }
+
+.resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.0); /* Invisible hit area */
+  transition: background 0.2s;
+}
+
+.resize-handle:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.resize-handle.left {
+  left: 0;
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+
+.resize-handle.right {
+  right: 0;
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+

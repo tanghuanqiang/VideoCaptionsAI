@@ -73,54 +73,37 @@ export const asrTranscribeVideo = async (filePath: string | File): Promise<Subti
 
         // 临时使用：在设置好本地 Whisper.cpp 或其他方案前，先使用在线 API
         const formData = new FormData();
-        formData.append('video', file);        // 尝试多个可能的后端地址
-        const backendUrls = [
-            '/api/transcribe',  // 通过 Vite 代理
-            'http://127.0.0.1:8000/api/transcribe',
-            'http://localhost:8000/api/transcribe',
-            'http://127.0.0.1:5000/api/transcribe',
-            'http://localhost:5000/api/transcribe'
-        ];
+        formData.append('video', file);
+        
+        // Use configured backend URL or default to the proxy path
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || '/api/transcribe';
 
-        let lastError: Error | null = null;
+        try {
+            console.log(`Connecting to: ${backendUrl}`);
+            const response = await fetch(backendUrl, {
+                method: 'POST',
+                body: formData,
+            });
 
-        for (const url of backendUrls) {
-            try {
-                console.log(`尝试连接到: ${url}`);
-                const response = await fetch(url, {
-                    method: 'POST',
-                    body: formData,
-                });
+            if (response.ok) {
+                const result = await response.json() as { language: string, segments: Array<{start: number, end: number, text: string}> };
 
-                if (response.ok) {
-                    const result = await response.json() as { language: string, segments: Array<{start: number, end: number, text: string}> };
-
-                    return {
-                        language: result.language || 'zh',
-                        events: result.segments.map((segment, index) => ({
+                return {
+                    language: result.language || 'zh',
+                    events: result.segments.map((segment, index) => ({
                             id: index.toString(),
-                            start: segment.start,
-                            end: segment.end,
-                            text: segment.text.trim(),
-                            words: []
-                        }))
-                    };
-                } else {
-                    const error = await response.text();
-                    lastError = new Error(`后端响应错误: ${error}`);
-                }
-            } catch (error) {
-                lastError = error instanceof Error ? error : new Error(String(error));
-                console.log(`连接 ${url} 失败:`, lastError.message);
-            }
+                    start: segment.start,
+                    end: segment.end,
+                    text: segment.text.trim(),
+                }))
+            };
+        } else {
+            const errorText = await response.text();
+            throw new Error(`Backend response error: ${response.status} ${response.statusText} - ${errorText}`);
         }
-
-        // 如果所有尝试都失败了
-        throw new Error(`无法连接到后端服务。请确保后端服务正在运行在以下地址之一:\n${backendUrls.join('\n')}\n\n最后错误: ${lastError?.message || '未知错误'}`);
-
     } catch (error) {
-        console.error('字幕识别错误:', error);
-        throw new Error(`字幕识别失败: ${error instanceof Error ? error.message : String(error)}`);
+        console.error('Subtitle transcription error:', error);
+        throw new Error(`Subtitle transcription failed: ${error instanceof Error ? error.message : String(error)}`);
     }
 };
 

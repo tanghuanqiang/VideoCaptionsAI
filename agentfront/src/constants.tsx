@@ -1,4 +1,4 @@
-import type { AssStyle } from "./App";
+import type { AssStyle } from "./types/subtitleTypes";
 
 
 

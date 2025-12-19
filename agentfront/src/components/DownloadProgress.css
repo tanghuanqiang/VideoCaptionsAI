@@ -12,13 +12,14 @@
 }
 
 .download-progress-dialog {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  background: var(--ant-color-bg-elevated);
+  border-radius: var(--ant-border-radius);
+  box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05);
   min-width: 400px;
   max-width: 500px;
   overflow: hidden;
   animation: slideIn 0.3s ease-out;
+  color: var(--ant-color-text);
 }
 
 .download-progress-dialog.minimized {
@@ -45,9 +46,11 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  padding: 16px 24px;
+  background: var(--ant-color-bg-container);
+  color: var(--ant-color-text);
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+
   font-weight: 600;
 }
 

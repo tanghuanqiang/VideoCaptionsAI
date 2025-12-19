@@ -1,8 +1,14 @@
 langgraph>=0.2.128
 langchain-core
 langchain-openai
-whisper
+openai-whisper
 ffmpeg-python
 torch
 langchain_tavily
 fastapi
+python-multipart
+python-jose[cryptography]
+passlib
+bcrypt==4.0.1
+sqlalchemy
+uvicorn

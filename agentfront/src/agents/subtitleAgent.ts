@@ -59,10 +59,15 @@ const burnSubtitleTool = new DynamicStructuredTool({
 });
 
 // Model configuration
+const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+if (!apiKey) {
+    console.warn("VITE_OPENAI_API_KEY is not set. The agent will not function correctly.");
+}
+
 const llm = new ChatOpenAI({
     configuration: {
         baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-        apiKey: 'sk-b232aa165cb340e5b45d4fddc0ab287b',  // Update this
+        apiKey: apiKey || 'dummy-key', 
     },
     modelName: 'qwen-turbo',
     temperature: 0,

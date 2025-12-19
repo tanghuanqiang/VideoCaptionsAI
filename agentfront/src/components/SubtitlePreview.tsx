@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import type { AssStyle, Subtitle } from "../App";
+import type { AssStyle, Subtitle } from "../types/subtitleTypes";
 
 interface SubtitlePreviewProps {
   rect: { left: number; top: number; w: number; h: number; };
@@ -80,9 +80,12 @@ const SubtitlePreview: React.FC<SubtitlePreviewProps> = ({ rect, subtitles, styl
             // #BBGGRR 转换为 #RRGGBB
             const bgr = bgrColor.slice(1);
             if (bgr.length === 6) {
-              const bb = bgr.slice(0, 2);
+              // const bb = bgr.slice(0, 2);
+              // const gg = bgr.slice(2, 4);
+              // const rr = bgr.slice(4, 6);
+              const bb = bgr.slice(4, 6);
               const gg = bgr.slice(2, 4);
-              const rr = bgr.slice(4, 6);
+              const rr = bgr.slice(0, 2);
               return `#${rr}${gg}${bb}`;
             }
           }

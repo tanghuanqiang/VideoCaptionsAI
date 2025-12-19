@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./VideoSubs
+      dockerfile: Dockerfile
+    container_name: videosubs-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - WHISPER_MODEL=tiny
+      - WHISPER_DEVICE=cpu
+      - WHISPER_COMPUTE_TYPE=int8
+      - TORCH_THREADS=2
+      # Add other environment variables from your .env file here
+      # - TAVILY_API_KEY=your_key
+      # - LLM_API_KEY=your_key
+    volumes:
+      - ./VideoSubs/outputs:/app/outputs
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./agentfront
+      dockerfile: Dockerfile
+    container_name: videosubs-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

@@ -6,7 +6,7 @@ import shutil
 import codecs
 from typing import Any, Dict, List, Optional
 from unittest import result
-import whisper
+# import whisper  <-- Removed
 from fastapi import FastAPI, UploadFile, Form
 from fastapi.responses import JSONResponse
 from langchain_core.tools import tool
@@ -14,9 +14,10 @@ from fastapi import UploadFile, File
 from fastapi.responses import FileResponse
 import shutil
 from src.agent.Subs import AssStyle, SubtitleDoc, SubtitleEvent
+from src.utils.model_loader import get_whisper_model
 
 out_dir = "outputs"
-whisper_model = whisper.load_model("large-v3")
+# whisper_model = whisper.load_model("large-v3") <-- Removed
 # ----------------
 # 核心工具函数
 # ----------------
@@ -79,19 +80,23 @@ def asr_transcribe_video(media_path: str, lang: str = None) -> SubtitleDoc:
     返回:
         SubtitleDoc 对象
     """
-    result = whisper_model.transcribe(media_path, language=lang)
-    events = [
-        SubtitleEvent(
+    model = get_whisper_model()
+    print(f"Starting transcription for {media_path}...")
+    result = model.transcribe(media_path, language=lang)
+    detected_lang = result.get('language', 'unknown')
+    print(f"Transcription finished. Detected language: {detected_lang}")
+    
+    events = []
+    for i, seg in enumerate(result['segments']):
+        events.append(SubtitleEvent(
             id=str(i+1),
-            start=seg["start"],
-            end=seg["end"],
-            text=seg["text"],
+            start=seg['start'],
+            end=seg['end'],
+            text=seg['text'],
             style="Default"
-
-        )
-        for i, seg in enumerate(result["segments"])
-    ]
-    return SubtitleDoc(language=result.get("language", lang), events=events)
+        ))
+    
+    return SubtitleDoc(language=detected_lang, events=events)
 
 
 
