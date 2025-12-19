@@ -9,6 +9,13 @@
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  pointer-events: auto;
+}
+
+/* 当弹窗最小化时，遮罩层不阻挡背景点击 */
+.download-progress-overlay.minimized-mode {
+  background-color: transparent;
+  pointer-events: none;
 }
 
 .download-progress-dialog {
@@ -29,6 +36,7 @@
   min-width: 280px;
   max-width: 280px;
   transform: none;
+  pointer-events: auto;
 }
 
 @keyframes slideIn {

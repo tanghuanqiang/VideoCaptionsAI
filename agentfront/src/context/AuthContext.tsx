@@ -18,10 +18,24 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
+
+  const logout = () => {
+    console.log('Logout called');
+    localStorage.removeItem('token');
+    setToken(null);
+    setUser(null);
+  };
+
+  const login = (newToken: string) => {
+    console.log('Login called with token');
+    localStorage.setItem('token', newToken);
+    setToken(newToken);
+  };
 
   useEffect(() => {
     if (token) {
+      console.log('Fetching user info for token:', token);
       // Fetch user details
       fetch(`${import.meta.env.VITE_BACKEND_URL || '/api'}/users/me`, {
         headers: {
@@ -32,28 +46,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (res.ok) return res.json();
         throw new Error('Failed to fetch user');
       })
-      .then(userData => setUser(userData))
-      .catch(() => {
-        logout();
+      .then(userData => {
+        console.log('User data fetched:', userData);
+        setUser(userData);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch user, logging out:', err);
+        // 清除无效token
+        localStorage.removeItem('token');
+        setToken(null);
+        setUser(null);
       });
+    } else {
+      console.log('No token, user logged out');
+      setUser(null);
     }
   }, [token]);
 
-  const login = (newToken: string) => {
-    localStorage.setItem('token', newToken);
-    setToken(newToken);
-  };
-
-  const logout = () => {
-    localStorage.removeItem('token');
-    setToken(null);
-    setUser(null);
-  };
-
   return (
-    <AuthContext value={{ user, token, login, logout, isAuthenticated: !!token }}>
+    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token }}>
       {children}
-    </AuthContext>
+    </AuthContext.Provider>
   );
 };
 

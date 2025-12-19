@@ -10,6 +10,7 @@ interface DownloadProgressProps {
   onMinimize: () => void;
   isMinimized: boolean;
   errorMessage?: string;
+  estimatedDuration?: number;
 }
 
 const DownloadProgress: React.FC<DownloadProgressProps> = ({
@@ -20,7 +21,8 @@ const DownloadProgress: React.FC<DownloadProgressProps> = ({
   onCancel,
   onMinimize,
   isMinimized,
-  errorMessage
+  errorMessage,
+  estimatedDuration
 }) => {
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -92,34 +94,21 @@ const DownloadProgress: React.FC<DownloadProgressProps> = ({
   if (!isVisible) return null;
 
   const getStatusText = () => {
-    const displayProgress = smoothProgress; // 使用平滑进度
     switch (status) {
       case 'uploading': 
-        return `正在上传文件... (${displayProgress}% - 第1/3步)`;
-      case 'processing': {
-        // 根据处理进度提供更详细的状态信息（30-99%）
-        if (displayProgress < 45) {
-          return `正在分析视频文件... (${displayProgress}% - 第2/3步)`;
-        } else if (displayProgress < 60) {
-          return `正在处理字幕轨道... (${displayProgress}% - 第2/3步)`;
-        } else if (displayProgress < 75) {
-          return `正在渲染字幕到视频... (${displayProgress}% - 第2/3步)`;
-        } else if (displayProgress < 80) {
-          return `正在优化视频编码... (${displayProgress}% - 第2/3步)`;
-        } else if (displayProgress < 85) {
-          return `正在进行最终渲染... (${displayProgress}% - 第2/3步)`;
-        } else if (displayProgress < 95) {
-          return `正在完成处理，准备下载... (${displayProgress}% - 第2/3步)`;
+        return `正在上传视频...`;
+      case 'processing': 
+        if (estimatedDuration) {
+          return `上传成功，正在烧录字幕，请耐心等待...`;
         } else {
-          return `即将完成处理... (${displayProgress}% - 第2/3步)`;
+          return `正在本地烧录字幕... (${smoothProgress}%)`;
         }
-      }
       case 'downloading': 
-        return `正在下载... (${displayProgress}% - 第3/3步)`;
+        return `处理完成，准备下载...`;
       case 'completed': 
-        return '下载完成！';
+        return '视频导出完成！';
       case 'error': 
-        return '下载失败';
+        return '导出失败';
       default: 
         return '准备中...';
     }
@@ -138,12 +127,12 @@ const DownloadProgress: React.FC<DownloadProgressProps> = ({
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
-    <div className="download-progress-overlay">
+    <div className={`download-progress-overlay ${isMinimized ? 'minimized-mode' : ''}`}>
       <div className={`download-progress-dialog ${isMinimized ? 'minimized' : ''}`}>
         <div className="progress-header">
           <div className="progress-title">
@@ -177,24 +166,15 @@ const DownloadProgress: React.FC<DownloadProgressProps> = ({
               <div className="status-text">{getStatusText()}</div>
             </div>
 
-            <div className="progress-bar-container">
-              <div className="progress-bar">
-                <div 
-                  className="progress-fill" 
-                  style={{ 
-                    width: `${smoothProgress}%`,
-                    transition: 'width 0.3s ease-out' // 添加平滑过渡动画
-                  }}
-                ></div>
-              </div>
-              <div className="progress-text">{smoothProgress}%</div>
-            </div>
-
             <div className="progress-details">
               <div className="time-info">
                 <span>已用时间: {formatTime(timeElapsed)}</span>
-                {progress > 0 && progress < 100 && (
-                  <span>预计剩余: {formatTime(Math.floor((timeElapsed / progress) * (100 - progress)))}</span>
+                {estimatedDuration && status !== 'completed' && status !== 'error' && (
+                   <span>
+                     {Math.max(0, estimatedDuration - timeElapsed) > 0 
+                       ? `预计剩余: ${formatTime(Math.max(0, estimatedDuration - timeElapsed))}`
+                       : "即将完成，请耐心等待..."}
+                   </span>
                 )}
               </div>
             </div>
@@ -220,7 +200,7 @@ const DownloadProgress: React.FC<DownloadProgressProps> = ({
 
         {isMinimized && (
           <div className="minimized-content">
-            <span className="mini-progress">{smoothProgress}% - {getStatusText()}</span>
+            <span className="mini-progress">{getStatusText()}</span>
           </div>
         )}
       </div>

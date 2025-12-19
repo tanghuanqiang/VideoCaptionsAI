@@ -17,8 +17,42 @@
 .toolbar-title {
   font-size: 18px;
   font-weight: 600;
-  margin-right: 32px;
+  margin-right: 16px;
+  margin-left: 16px;
   color: var(--ant-color-text);
+}
+
+.user-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--ant-color-bg-layout);
+  border-radius: 4px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.user-name {
+  color: var(--ant-color-text-secondary);
+  font-size: 13px;
+}
+
+.logout-btn {
+  padding: 2px 8px;
+  font-size: 12px;
+  height: 24px;
+  background: var(--ant-color-error);
+  border: 1px solid var(--ant-color-error);
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.logout-btn:hover {
+  background: var(--ant-color-error-hover);
+  border-color: var(--ant-color-error-hover);
 }
 
 .toolbar-actions {

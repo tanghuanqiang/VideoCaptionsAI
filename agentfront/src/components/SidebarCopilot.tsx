@@ -92,6 +92,10 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
   // inactivity timer for SSE streaming debounce: clear sending only after no messages for this interval
   const inactivityTimerRef = useRef<number | null>(null);
   const INACTIVITY_MS = 900;
+  
+  // 上下文开关状态
+  const [includeSubtitles, setIncludeSubtitles] = useState(true);
+  const [includeStyles, setIncludeStyles] = useState(true);
 
   // SSE订阅
   // 挂载时，监听 SSE 并逐字追加消息
@@ -209,11 +213,16 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
     // 使用 FormData 发送文本和文件
     const formData = new FormData();
     formData.append("text", input);
-    // include subtitles/styles as JSON strings if available (from props)
-    if (subtitles && subtitles.length > 0) {
+    
+    // 根据开关决定是否包含字幕和样式上下文
+    const includeContext = includeSubtitles || includeStyles;
+    formData.append("include_context", includeContext.toString());
+    
+    // include subtitles/styles as JSON strings if available and enabled
+    if (includeSubtitles && subtitles && subtitles.length > 0) {
       formData.append("subtitles_json", JSON.stringify(subtitles));
     }
-    if (styles && styles.length > 0) {
+    if (includeStyles && styles && styles.length > 0) {
       formData.append("styles_json", JSON.stringify(styles));
     }
     // attach video file prop if provided
@@ -384,13 +393,60 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
         <div ref={messagesEndRef} />
       </div>
       <div className="sidebar-input">
-        <input
+        {/* 上下文开关 - 简化版 */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '8px', 
+          padding: '6px 10px', 
+          fontSize: '12px',
+          borderTop: '1px solid var(--ant-color-border)',
+          background: 'var(--ant-color-bg-container)',
+          flexWrap: 'wrap'
+        }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <input
+              type="checkbox"
+              checked={includeSubtitles}
+              onChange={(e) => setIncludeSubtitles(e.target.checked)}
+              style={{ cursor: 'pointer', margin: 0 }}
+            />
+            <span>#字幕</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <input
+              type="checkbox"
+              checked={includeStyles}
+              onChange={(e) => setIncludeStyles(e.target.checked)}
+              style={{ cursor: 'pointer', margin: 0 }}
+            />
+            <span>#样式</span>
+          </label>
+        </div>
+        <textarea
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            setInput(e.target.value);
+            // 自动调整高度
+            e.target.style.height = 'auto';
+            e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px';
+          }}
           placeholder="输入消息…"
-          onKeyDown={e => e.key === "Enter" && handleSend()}
+          onKeyDown={e => {
+            // Shift+Enter换行，Enter发送
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
           disabled={isSending}
-          style={isSending ? {opacity:0.6} : undefined}
+          style={{
+            ...isSending ? {opacity:0.6} : undefined,
+            minHeight: '36px',
+            maxHeight: '200px',
+            resize: 'none',
+            overflow: 'auto'
+          }}
+          rows={1}
         />
         <button onClick={handleSend} disabled={isSending} style={isSending ? {opacity:0.6,cursor:'not-allowed'} : undefined}>
           {isSending ? '发送中...' : '发送'}

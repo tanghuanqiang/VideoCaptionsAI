@@ -71,17 +71,18 @@ def probe_media(media_path: str) -> Dict[str, Any]:
 
 
 @tool
-def asr_transcribe_video(media_path: str, lang: str = None) -> SubtitleDoc:
+def asr_transcribe_video(media_path: str, lang: str = None, model_size: str = None) -> SubtitleDoc:
     """
     使用 Whisper 语音识别模型直接转写视频，输出分段字幕。
     参数:
         media_path: 视频文件路径
         lang: 识别语言（可选）
+        model_size: 模型大小 (tiny/base/small/medium)
     返回:
         SubtitleDoc 对象
     """
-    model = get_whisper_model()
-    print(f"Starting transcription for {media_path}...")
+    model = get_whisper_model(model_size)
+    print(f"Starting transcription for {media_path} with model {model_size or 'default'}...")
     result = model.transcribe(media_path, language=lang)
     detected_lang = result.get('language', 'unknown')
     print(f"Transcription finished. Detected language: {detected_lang}")

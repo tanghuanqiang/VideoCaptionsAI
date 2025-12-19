@@ -36,6 +36,8 @@
   color: var(--ant-color-text);
   height: 32px;
   transition: all 0.2s;
+  box-sizing: border-box;
+  display: block;
 }
 
 .form-group input:hover {
