@@ -5,14 +5,9 @@ import json
 import shutil
 import codecs
 from typing import Any, Dict, List, Optional
-from unittest import result
-# import whisper  <-- Removed
-from fastapi import FastAPI, UploadFile, Form
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, UploadFile, Form, File
+from fastapi.responses import JSONResponse, FileResponse
 from langchain_core.tools import tool
-from fastapi import UploadFile, File
-from fastapi.responses import FileResponse
-import shutil
 from src.agent.Subs import AssStyle, SubtitleDoc, SubtitleEvent
 from src.utils.model_loader import get_whisper_model
 
@@ -131,7 +126,7 @@ def format_ass(media_height: int, media_width: int, subtitle_doc: Dict[str, Any]
     """
     ass_path = os.path.join(out_dir, "out.ass")
     with codecs.open(ass_path, "w", encoding="utf-8") as f:
-        f.write("[Script Info]\nScriptType: v4.00+\nPlayResX: ${media_width}\nPlayResY: ${media_height}\n\n")
+        f.write(f"[Script Info]\nScriptType: v4.00+\nPlayResX: {media_width}\nPlayResY: {media_height}\n\n")
         f.write("[V4+ Styles]\n")
         f.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, "
                 "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
@@ -145,9 +140,10 @@ def format_ass(media_height: int, media_width: int, subtitle_doc: Dict[str, Any]
         else:
             f.write("Style: Default,Arial,64,&H00FFFFFF,&H000000FF,&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,1,0,2,10,10,10,1\n\n")
         f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
-        for ev in subtitle_doc["events"]:
-            text = ev["text"].replace('\n', ' ').replace('\r', ' ').replace('\ufeff', '')
-            style_name = getattr(ev, "style", "Default") if hasattr(ev, "style") else "Default"
+        for ev in subtitle_doc.get("events", []):
+            # ev is expected to be a dict-like object
+            text = (ev.get("text") if isinstance(ev, dict) else getattr(ev, "text", "")).replace('\n', ' ').replace('\r', ' ').replace('\ufeff', '')
+            style_name = ev.get("style", "Default") if isinstance(ev, dict) else getattr(ev, "style", "Default")
             f.write(f"Dialogue: 0,{format_time(ev['start'], ass=True)},{format_time(ev['end'], ass=True)},{style_name},,0,0,0,,{text}\n")
     return ass_path
 
@@ -163,34 +159,38 @@ def preview_mux(media_path: str, ass_path: str) -> str:
         预览视频文件路径
     """
     work_dir = os.path.dirname(media_path) or os.getcwd()
-    original_cwd = os.getcwd()
-    video_filename = os.path.basename(media_path)
-    ass_filename = "out.ass"
+    video_abs = os.path.abspath(media_path)
+    ass_abs = os.path.abspath(ass_path)
     out_filename = "preview.mp4"
     out_path = os.path.join(work_dir, out_filename)
-    dst_path = os.path.join(work_dir, ass_filename)
-    if os.path.abspath(ass_path) != os.path.abspath(dst_path):
-        shutil.copyfile(ass_path, dst_path)
-    # 调试输出
-    print("[preview_mux] ffmpeg working dir:", work_dir)
-    print("[preview_mux] ass file exists:", os.path.exists(dst_path))
-    print("[preview_mux] ass file path:", dst_path)
-    if not os.path.exists(dst_path):
-        raise FileNotFoundError(f"ASS file not found for ffmpeg: {dst_path}")
+
+    if not os.path.exists(ass_abs):
+        raise FileNotFoundError(f"ASS file not found for ffmpeg: {ass_abs}")
+
+    # FFmpeg filter path escaping for Windows
+    # 1. Replace \ with /
+    # 2. Escape : as \:
+    ass_path_escaped = ass_abs.replace('\\', '/').replace(':', '\\:')
+
+    cmd = [
+        "ffmpeg", "-y", "-i", video_abs,
+        "-vf", f"ass='{ass_path_escaped}'",
+        "-crf", "28", "-preset", "veryfast", out_path
+    ]
+    log_path = os.path.join(work_dir, "preview_ffmpeg.log")
     try:
-        os.chdir(work_dir)
-        cmd = [
-            "ffmpeg", "-y", "-i", video_filename,
-            "-vf", f"ass={ass_filename}",
-            "-crf", "28", "-preset", "veryfast", out_filename
-        ]
-        print("[preview_mux] ffmpeg cmd:", cmd)
-        subprocess.run(cmd, check=True)
+        proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        with open(log_path, "w", encoding="utf-8") as lf:
+            lf.write(proc.stdout or "")
+            lf.write('\n-----stderr-----\n')
+            lf.write(proc.stderr or "")
         return out_path
-    finally:
-        os.chdir(original_cwd)
-        # if os.path.exists(dst_path):
-        #     os.remove(dst_path)
+    except subprocess.CalledProcessError as e:
+        with open(log_path, "w", encoding="utf-8") as lf:
+            lf.write(e.stdout or "")
+            lf.write('\n-----stderr-----\n')
+            lf.write(e.stderr or str(e))
+        raise
 
 
 @tool
@@ -203,30 +203,37 @@ def final_hard_burn(media_height: int, media_width: int, media_path: str, ass_pa
     返回:
         硬字幕视频文件路径
     """
-    work_dir = os.path.dirname(media_path) or os.getcwd()
-    original_cwd = os.getcwd()
-    video_filename = os.path.basename(media_path)
+    media_abs = os.path.abspath(media_path)
+    ass_abs = os.path.abspath(ass_path)
     out_filename = "output.mp4"
-    # out_path = os.path.join(work_dir, out_filename)
-    # dst_path = os.path.join(work_dir, ass_filename)
     out_path = os.path.join(task_dir, out_filename)
-    # 调试输出
-    print("[final_hard_burn] ffmpeg working dir:", task_dir)
-    assname = os.path.basename(ass_path)
+    os.makedirs(task_dir, exist_ok=True)
+
+    if not os.path.exists(ass_abs):
+        raise FileNotFoundError(f"ASS file not found for ffmpeg: {ass_abs}")
+
+    # FFmpeg filter path escaping for Windows
+    ass_path_escaped = ass_abs.replace('\\', '/').replace(':', '\\:')
+
+    cmd = [
+        "ffmpeg", "-y", "-i", media_abs,
+        "-vf", f"ass='{ass_path_escaped}'",
+        "-c:v", "libx264", "-crf", "23", "-preset", "fast", out_path
+    ]
+    log_path = os.path.join(task_dir, "ffmpeg.log")
     try:
-        os.chdir(work_dir)
-        cmd = [
-            "ffmpeg", "-y", "-i", video_filename,
-            "-vf", f"ass={assname}:",
-            "-c:v", "libx264", "-crf", "23", "-preset", "fast", out_filename
-        ]
-        print("[final_hard_burn] ffmpeg cmd:", cmd)
-        subprocess.run(cmd, check=True)
+        proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        with open(log_path, "w", encoding="utf-8") as lf:
+            lf.write(proc.stdout or "")
+            lf.write('\n-----stderr-----\n')
+            lf.write(proc.stderr or "")
         return out_path
-    finally:
-        os.chdir(original_cwd)
-        # if os.path.exists(dst_path):
-        #     os.remove(dst_path)
+    except subprocess.CalledProcessError as e:
+        with open(log_path, "w", encoding="utf-8") as lf:
+            lf.write(e.stdout or "")
+            lf.write('\n-----stderr-----\n')
+            lf.write(e.stderr or str(e))
+        raise
 
 @tool
 def task_db(meta: Dict[str, Any]) -> str:

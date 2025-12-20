@@ -6,7 +6,7 @@ import DownloadProgress from "./DownloadProgress";
 import { useAuth } from "../context/AuthContext";
 import { toSRT, toASS, downloadFile } from "../utils/subtitleUtils";
 import { ffmpegService } from "../utils/ffmpegService";
-import { getRecommendedModeText } from "../utils/deviceDetection";
+// import { getRecommendedModeText } from "../utils/deviceDetection";
 
 
 interface ToolbarProps {
@@ -109,20 +109,8 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
       return;
     }
 
-    // 设备检测：获取推荐模式文案
-    const modeText = getRecommendedModeText(videoFile);
-    
-    // 让用户选择渲染模式
-    const choice = window.confirm(
-      `${modeText}\n\n` +
-      `[服务器] 速度快，需上传\n` +
-      `[本地] 保护隐私，但速度慢(约5倍时长)\n\n` +
-      `确定：服务器烧录\n` +
-      `取消：本地烧录`
-    );
-    
-    // choice: true = 后端, false = 前端
-    const useBackend = choice;
+    // 强制使用后端渲染
+    const useBackend = true;
 
     let fileName: string = "";
     try {
@@ -140,67 +128,13 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
     if (useBackend) {
       // 后端烧录模式
       await handleBackendBurn(fileName);
-    } else {
-      // 前端烧录模式
-      await handleFrontendBurn(fileName);
     }
   };
 
-  // 前端烧录逻辑
+  // 前端烧录逻辑 (已弃用)
   const handleFrontendBurn = async (fileName: string) => {
-    setDownloadProgress({
-      isVisible: true,
-      progress: 0,
-      status: 'processing',
-      fileName: fileName,
-      errorMessage: undefined,
-      isMinimized: false,
-    });
-
-    try {
-      // 生成ASS文件内容
-      const assFileContent = `[Script Info]\nScriptType: v4.00+\nPlayResX:${videoWidth || 1920}\nPlayResY:${videoHeight || 1080}\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n${styles.map(style => `Style: ${style.Name},${style.FontName},${style.FontSize},${toAssColor(style.PrimaryColour || "#000000", style.PrimaryAlpha)},${toAssColor(style.SecondaryColour || "#000000", style.SecondaryAlpha)},${toAssColor(style.OutlineColour || "#000000",style.OutlineAlpha)},${toAssColor(style.BackColour || "#000000",style.BackAlpha)},${style.Bold ? 1 : 0},${style.Italic ? 1 : 0},${style.Underline ? 1 : 0},${style.StrikeOut ? 1 : 0},${style.ScaleX},${style.ScaleY},${style.Spacing},${style.Angle},${style.BorderStyle},${style.Outline},${style.Shadow},${style.Alignment},${style.MarginL},${style.MarginR},${style.MarginV},${style.Encoding}`).join('\n')}\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${subtitles.map(sub => `Dialogue: 0,${sub.start},${sub.end},${sub.style},,0,0,0,,${sub.text}`).join('\n')}`;
-
-      // 使用前端ffmpeg烧录字幕
-      console.log("开始前端字幕烧录...");
-      const outputBlob = await ffmpegService.burnSubtitles(
-        videoFile!,
-        assFileContent,
-        (progress) => {
-          setDownloadProgress(prev => ({
-            ...prev,
-            progress,
-            status: 'processing'
-          }));
-        }
-      );
-
-      // 下载文件
-      const downloadUrl = URL.createObjectURL(outputBlob);
-      const downloadLink = document.createElement('a');
-      downloadLink.href = downloadUrl;
-      downloadLink.download = fileName;
-      downloadLink.style.display = 'none';
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
-      URL.revokeObjectURL(downloadUrl);
-
-      setDownloadProgress(prev => ({
-        ...prev,
-        status: 'completed',
-        progress: 100,
-      }));
-
-      console.log("字幕烧录完成！");
-    } catch (error) {
-      console.error("导出视频失败:", error);
-      setDownloadProgress(prev => ({
-        ...prev,
-        status: 'error',
-        errorMessage: error instanceof Error ? error.message : '导出失败',
-      }));
-    }
+    alert("前端渲染功能暂时不可用，请使用后端渲染。");
+    return;
   };
 
   // 后端烧录逻辑

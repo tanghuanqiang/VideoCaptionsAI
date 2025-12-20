@@ -48,8 +48,18 @@ const SubtitlePreview: React.FC<SubtitlePreviewProps> = ({ rect, subtitles, styl
 
   
   function timeToSeconds(time: string): number {
-    const [h, m, s] = time.split(":");
-    return parseInt(h) * 3600 + parseInt(m) * 60 + parseFloat(s);
+    if (typeof time === 'number') return time;
+    // support formats: H:MM:SS(.ms) or HH:MM:SS,ms or seconds as string
+    if (/^\d+(?:\.\d+)?$/.test(time)) return parseFloat(time);
+    const cleaned = time.replace(',', '.');
+    const parts = cleaned.split(":");
+    if (parts.length === 3) {
+      const h = parseInt(parts[0] || '0', 10);
+      const m = parseInt(parts[1] || '0', 10);
+      const s = parseFloat(parts[2] || '0');
+      return h * 3600 + m * 60 + s;
+    }
+    return parseFloat(cleaned) || 0;
   }
 
   // 根据ASS文件的PlayRes来计算缩放比例

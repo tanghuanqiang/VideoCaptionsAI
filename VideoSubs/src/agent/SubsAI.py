@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 from typing import Annotated, TypedDict
 from langchain_tavily import TavilySearch
 import torch
-# import whisper
 from src.tools.subtitle_tools import (
     probe_media,
     asr_transcribe_video,

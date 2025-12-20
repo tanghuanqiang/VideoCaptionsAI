@@ -52,7 +52,12 @@ class FFmpegService {
                     // Always convert to Blob URLs to avoid Vite importing from /public directly
                     const coreURL = await toBlobURL(`${src.baseURL}/ffmpeg-core.js`, 'text/javascript');
                     const wasmURL = await toBlobURL(`${src.baseURL}/ffmpeg-core.wasm`, 'application/wasm');
-                    await this.ffmpeg.load({ coreURL, wasmURL });
+                    await this.ffmpeg.load({ 
+                        coreURL, 
+                        wasmURL,
+                        // @ts-ignore
+                        env: { FONTCONFIG_FILE: '/fonts.conf' }
+                    });
                     loaded = true;
                     console.log(`FFmpeg 从 ${src.label} 加载成功`);
                     break;
@@ -124,12 +129,93 @@ class FFmpegService {
         }
     }
 
+    private async loadFonts() {
+        if (!this.ffmpeg) return;
+        
+        try {
+            // Create fonts directory
+            try {
+                await this.ffmpeg.createDir('/fonts');
+            } catch (e) {
+                // Directory might already exist
+            }
+            
+            // Load font file
+            const fontUrl = `${import.meta.env.BASE_URL || '/'}fonts/NotoSansSC-Regular.woff`;
+            console.log(`Loading font from ${fontUrl}...`);
+            const fontData = await fetchFile(fontUrl);
+            await this.ffmpeg.writeFile('/fonts/NotoSansSC-Regular.woff', fontData);
+            
+            // Create fonts.conf
+            const fontConfig = `<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <dir>/fonts</dir>
+  <cachedir>/tmp/fontconfig</cachedir>
+  <config></config>
+  <match target="pattern">
+    <test qual="any" name="family"><string>Arial</string></test>
+    <edit name="family" mode="assign" binding="same"><string>Noto Sans SC</string></edit>
+  </match>
+  <match target="pattern">
+    <test qual="any" name="family"><string>sans-serif</string></test>
+    <edit name="family" mode="assign" binding="same"><string>Noto Sans SC</string></edit>
+  </match>
+  <match target="pattern">
+    <test qual="any" name="family"><string>Microsoft YaHei</string></test>
+    <edit name="family" mode="assign" binding="same"><string>Noto Sans SC</string></edit>
+  </match>
+  <match target="pattern">
+    <test qual="any" name="family"><string>SimHei</string></test>
+    <edit name="family" mode="assign" binding="same"><string>Noto Sans SC</string></edit>
+  </match>
+  <match target="pattern">
+    <test qual="any" name="family"><string>Heiti SC</string></test>
+    <edit name="family" mode="assign" binding="same"><string>Noto Sans SC</string></edit>
+  </match>
+  <match target="pattern">
+    <test qual="any" name="family"><string>Default</string></test>
+    <edit name="family" mode="assign" binding="same"><string>Noto Sans SC</string></edit>
+  </match>
+  <!-- Fallback for any font -->
+  <match target="pattern">
+    <edit name="family" mode="append" binding="strong"><string>Noto Sans SC</string></edit>
+  </match>
+</fontconfig>`;
+            await this.ffmpeg.writeFile('/fonts.conf', fontConfig);
+            
+            // Try to write to default locations as fallback
+            try {
+                await this.ffmpeg.createDir('/etc');
+                await this.ffmpeg.createDir('/etc/fonts');
+                await this.ffmpeg.writeFile('/etc/fonts/fonts.conf', fontConfig);
+            } catch (e) {
+                // Ignore if directories exist or fail
+            }
+
+            // Verify files
+            console.log('Verifying font files...');
+            const fontsDir = await this.ffmpeg.listDir('/fonts');
+            console.log('Files in /fonts:', fontsDir);
+            try {
+                const etcFontsDir = await this.ffmpeg.listDir('/etc/fonts');
+                console.log('Files in /etc/fonts:', etcFontsDir);
+            } catch (e) {}
+
+            console.log('Fonts loaded and configured.');
+        } catch (error) {
+            console.error('Failed to load fonts:', error);
+            // Don't throw, try to proceed
+        }
+    }
+
     async burnSubtitles(
         videoFile: File,
         assContent: string,
         onProgress?: (progress: number) => void
     ): Promise<Blob> {
         const ffmpeg = await this.init();
+        await this.loadFonts();
 
         try {
             const inputName = 'input.mp4';
@@ -146,19 +232,23 @@ class FFmpegService {
             // Write files to FFmpeg virtual FS
             console.log('Writing files to FFmpeg FS...');
             await ffmpeg.writeFile(inputName, await fetchFile(videoFile));
-            await ffmpeg.writeFile(assName, assContent);
+            // write ass content as Uint8Array
+            const enc = new TextEncoder();
+            await ffmpeg.writeFile(assName, enc.encode(assContent));
 
             // Burn subtitles
             console.log('Burning subtitles into video...');
-            await ffmpeg.exec([
+            const args = [
                 '-i', inputName,
-                '-vf', `ass=${assName}`,
+                '-vf', `ass=${assName}:fontsdir=/fonts`,
                 '-c:v', 'libx264',
                 '-preset', 'ultrafast',
                 '-crf', '23',
                 '-c:a', 'copy',
                 outputName
-            ]);
+            ];
+            console.log('FFmpeg command:', args.join(' '));
+            await ffmpeg.exec(args);
 
             // Read output file
             console.log('Reading output...');
@@ -170,7 +260,7 @@ class FFmpegService {
             await ffmpeg.deleteFile(outputName);
 
             // Handle both Uint8Array and string types
-            const blobData = data instanceof Uint8Array ? data.buffer as ArrayBuffer : new TextEncoder().encode(data).buffer;
+            const blobData = data instanceof Uint8Array ? data.buffer as ArrayBuffer : new TextEncoder().encode(String(data)).buffer;
             return new Blob([blobData], { type: 'video/mp4' });
         } catch (error) {
             console.error('Subtitle burning failed:', error);
