@@ -173,7 +173,7 @@ function MainApp() {
     { i: "video", x: 0, y: 0, w: 7*alpha, h: 4*alpha, minW: 3*alpha, minH: 2*alpha },
     { i: "timeline", x: 0, y: 4*alpha, w: 12*alpha, h: 2*alpha, minW: 3*alpha, minH: 1*alpha },
     { i: "subtitle", x: 7*alpha, y: 0, w: 5*alpha, h: 4*alpha, minW: 2*alpha, minH: 2*alpha },
-    { i: "style", x: 12*alpha, y: 0, w: 4*alpha, h: 6*alpha, minW: 2*alpha, minH: 2*alpha },
+    { i: "style", x: 12*alpha, y: 0, w: 4*alpha, h: 7*alpha, minW: 2*alpha, minH: 2*alpha },
   ];
   const videoUrl = useMemo(() => videoFile ? URL.createObjectURL(videoFile) : "", [videoFile]);
 
@@ -261,6 +261,23 @@ function MainApp() {
             
             const layered = calculateLayers(formatted);
             setSubtitles(layered);
+
+            if (resp.recommended_style) {
+              console.log("应用推荐样式:", resp.recommended_style);
+              setStyles(prev => {
+                const newStyle = resp.recommended_style!;
+                // 确保 ID 存在
+                if (!newStyle.id) newStyle.id = newStyle.Name;
+                
+                const exists = prev.find(s => s.Name === newStyle.Name);
+                if (exists) {
+                  return prev.map(s => s.Name === newStyle.Name ? newStyle : s);
+                } else {
+                  return [...prev, newStyle];
+                }
+              });
+              setSelectedStyle(resp.recommended_style.Name);
+            }
           }}
           styles={styles}
           subtitles={subtitles}
@@ -268,6 +285,8 @@ function MainApp() {
           toggleTheme={toggleTheme}
           playResX={playResX}
           playResY={playResY}
+          copilotOpen={copilotOpen}
+          toggleCopilot={() => setCopilotOpen(v => !v)}
         />
       </header>
       {/* 预览字幕 */}
@@ -280,20 +299,7 @@ function MainApp() {
         playResY={playResY}  
       />
       <main className="main-content">
-        {/* Copilot 侧边栏开关按钮 */}
-        <button
-          className={`copilot-toggle-btn ${copilotOpen ? 'open' : ''}`}
-          style={{
-            right: copilotOpen ? 350 : 24,
-          }}
-          title={copilotOpen ? '关闭 Copilot 侧边栏' : '打开 Copilot 侧边栏'}
-          onClick={() => setCopilotOpen(v => !v)}
-        >
-          {/* Copilot 风格图标 (Sparkles) */}
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" />
-          </svg>
-        </button>
+        {/* Copilot 侧边栏开关按钮已移动到 Toolbar */}
 
         <GridLayout
           className="layout"

@@ -12,3 +12,4 @@ passlib
 bcrypt==4.0.1
 sqlalchemy
 uvicorn
+prometheus-client

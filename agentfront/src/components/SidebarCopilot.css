@@ -1,9 +1,9 @@
 .sidebar-copilot {
   position: fixed;
   right: 0;
-  top: 0;
+  top: 56px;
   width: 350px;
-  height: 100vh;
+  height: calc(100vh - 56px);
   background: var(--ant-color-bg-container);
   border-left: 1px solid var(--ant-color-border-secondary);
   display: flex;

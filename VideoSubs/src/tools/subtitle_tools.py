@@ -4,7 +4,8 @@ import subprocess
 import json
 import shutil
 import codecs
-from typing import Any, Dict, List, Optional
+import re
+from typing import Any, Dict, List, Optional, Callable
 from fastapi import FastAPI, UploadFile, Form, File
 from fastapi.responses import JSONResponse, FileResponse
 from langchain_core.tools import tool
@@ -132,7 +133,7 @@ def format_ass(media_height: int, media_width: int, subtitle_doc: Dict[str, Any]
                 "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
         if styles:
             for style in styles:
-                f.write(f"Style: {style.Name},{style.Fontname},{style.Fontsize},{style.PrimaryColour},{style.SecondaryColour or '&H000000FF'},"
+                f.write(f"Style: {style.Name},{style.FontName},{style.FontSize},{style.PrimaryColour},{style.SecondaryColour or '&H000000FF'},"
                         f"{style.OutlineColour or '&H00000000'},{style.BackColour or '&H64000000'},{-1 if style.Bold else 0},{1 if style.Italic else 0},"
                         f"{1 if style.Underline else 0},{1 if style.StrikeOut else 0},{style.ScaleX or 100},{style.ScaleY or 100},"
                         f"{style.Spacing or 0},{style.Angle or 0},{style.BorderStyle or 1},{style.Outline or 1},{style.Shadow or 0},"
@@ -179,7 +180,7 @@ def preview_mux(media_path: str, ass_path: str) -> str:
     ]
     log_path = os.path.join(work_dir, "preview_ffmpeg.log")
     try:
-        proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        proc = subprocess.run(cmd, check=True, capture_output=True, text=True, encoding="utf-8", errors="replace")
         with open(log_path, "w", encoding="utf-8") as lf:
             lf.write(proc.stdout or "")
             lf.write('\n-----stderr-----\n')
@@ -197,11 +198,13 @@ def preview_mux(media_path: str, ass_path: str) -> str:
 def final_hard_burn(media_height: int, media_width: int, media_path: str, ass_path: str, task_dir: str) -> str:
     """
     生成硬字幕视频，ASS 文件复制到视频目录，ffmpeg 合成输出。
-    参数:
-        media_path: 视频文件路径
-        ass_path: ASS 字幕文件路径
-    返回:
-        硬字幕视频文件路径
+    """
+    return run_ffmpeg_burn(media_height, media_width, media_path, ass_path, task_dir)
+
+
+def run_ffmpeg_burn(media_height: int, media_width: int, media_path: str, ass_path: str, task_dir: str, progress_callback: Optional[Callable[[int], None]] = None) -> str:
+    """
+    执行 FFmpeg 烧录逻辑，支持进度回调
     """
     media_abs = os.path.abspath(media_path)
     ass_abs = os.path.abspath(ass_path)
@@ -221,19 +224,77 @@ def final_hard_burn(media_height: int, media_width: int, media_path: str, ass_pa
         "-c:v", "libx264", "-crf", "23", "-preset", "fast", out_path
     ]
     log_path = os.path.join(task_dir, "ffmpeg.log")
+    
+    print(f"Running FFmpeg: {' '.join(cmd)}")
+    
     try:
-        proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
-        with open(log_path, "w", encoding="utf-8") as lf:
-            lf.write(proc.stdout or "")
-            lf.write('\n-----stderr-----\n')
-            lf.write(proc.stderr or "")
+        # 使用 Popen 以便实时读取输出
+        process = subprocess.Popen(
+            cmd, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE, 
+            universal_newlines=True,
+            encoding="utf-8",
+            errors="replace"
+        )
+        
+        duration_sec = 0
+        log_file = open(log_path, "w", encoding="utf-8")
+        
+        while True:
+            # 读取 stderr (FFmpeg 进度输出在 stderr)
+            line = process.stderr.readline()
+            if not line and process.poll() is not None:
+                break
+            
+            if line:
+                log_file.write(line)
+                log_file.flush()
+                
+                # 解析总时长 Duration: 00:00:10.50
+                if "Duration" in line and duration_sec == 0:
+                    match = re.search(r"Duration: (\d{2}):(\d{2}):(\d{2}\.\d{2})", line)
+                    if match:
+                        h, m, s = map(float, match.groups())
+                        duration_sec = h*3600 + m*60 + s
+                        print(f"Video Duration: {duration_sec}s")
+                
+                # 解析当前时间 time=00:00:05.12
+                if "time=" in line and duration_sec > 0:
+                    match = re.search(r"time=(\d{2}):(\d{2}):(\d{2}\.\d{2})", line)
+                    if match:
+                        h, m, s = map(float, match.groups())
+                        current_sec = h*3600 + m*60 + s
+                        percent = int((current_sec / duration_sec) * 100)
+                        percent = max(0, min(99, percent)) # 限制在 0-99
+                        if progress_callback:
+                            progress_callback(percent)
+        
+        log_file.close()
+        
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(process.returncode, cmd)
+            
         return out_path
-    except subprocess.CalledProcessError as e:
-        with open(log_path, "w", encoding="utf-8") as lf:
-            lf.write(e.stdout or "")
-            lf.write('\n-----stderr-----\n')
-            lf.write(e.stderr or str(e))
-        raise
+    except Exception as e:
+        # 确保日志文件关闭
+        try:
+            log_file.close()
+        except:
+            pass
+        raise e
+
+@tool
+def final_hard_burn(media_height: int, media_width: int, media_path: str, ass_path: str, task_dir: str) -> str:
+    """
+    生成硬字幕视频，ASS 文件复制到视频目录，ffmpeg 合成输出。
+    参数:
+        media_path: 视频文件路径
+        ass_path: ASS 字幕文件路径
+    返回:
+        硬字幕视频文件路径
+    """
+    return run_ffmpeg_burn(media_height, media_width, media_path, ass_path, task_dir)
 
 @tool
 def task_db(meta: Dict[str, Any]) -> str:

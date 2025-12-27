@@ -107,10 +107,6 @@ const SubtitleStylePanel: React.FC<Props> = ({ styles, setStyles, selectedStyle,
                         <div className="edit-panel">
                             <div className="edit-panel-header">
                                 <h3>编辑样式: {editStyle.Name}</h3>
-                                <div className="edit-panel-actions">
-                                    <button className="cancel" onClick={() => setEditStyle(null)}>取消</button>
-                                    <button onClick={handleSave}>保存</button>
-                                </div>
                             </div>
                             
                             <div className="style-form">
@@ -276,6 +272,10 @@ const SubtitleStylePanel: React.FC<Props> = ({ styles, setStyles, selectedStyle,
                                             </select>
                                         </div>
                                     </div>
+                                </div>
+                                <div className="edit-panel-actions" style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                    <button className="cancel" onClick={() => setEditStyle(null)}>取消</button>
+                                    <button onClick={handleSave}>保存</button>
                                 </div>
                             </div>
                         </div>

@@ -40,6 +40,15 @@ const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef, videoUrl, subti
   const animationFrameRef = useRef<number>();
   const [isDragging, setIsDragging] = useState(false);
   
+  // Scrollbar Refs
+  const scrollbarHandleRef = useRef<HTMLDivElement>(null);
+  const scrollbarTrackRef = useRef<HTMLDivElement>(null);
+  const scrollbarDragRef = useRef<{
+      isDragging: boolean;
+      startX: number;
+      startScrollLeft: number;
+  } | null>(null);
+
   // Subtitle Dragging State
   const dragRef = useRef<{
       isDragging: boolean;
@@ -199,6 +208,26 @@ const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef, videoUrl, subti
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [togglePlay, stepFrame]);
+
+  const updateScrollbar = useCallback(() => {
+      if (!timelineRef.current || !scrollbarHandleRef.current) return;
+      const container = timelineRef.current;
+      const scrollLeft = container.scrollLeft;
+      const clientWidth = container.clientWidth;
+      const scrollWidth = container.scrollWidth; 
+
+      if (scrollWidth <= clientWidth) {
+          scrollbarHandleRef.current.style.width = '100%';
+          scrollbarHandleRef.current.style.left = '0%';
+          // scrollbarHandleRef.current.style.display = 'none'; 
+      } else {
+          scrollbarHandleRef.current.style.display = 'block';
+          const handleWidthPercent = (clientWidth / scrollWidth) * 100;
+          const handleLeftPercent = (scrollLeft / scrollWidth) * 100;
+          scrollbarHandleRef.current.style.width = `${handleWidthPercent}%`;
+          scrollbarHandleRef.current.style.left = `${handleLeftPercent}%`;
+      }
+  }, []);
 
   const updateCursorAndScroll = useCallback(() => {
       const video = videoRef.current;
@@ -365,21 +394,35 @@ const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef, videoUrl, subti
     if (!container) return;
     
     const handleScroll = () => {
-        requestAnimationFrame(updateVisibleRange);
+        requestAnimationFrame(() => {
+            updateVisibleRange();
+            updateScrollbar();
+        });
     };
     
     container.addEventListener('scroll', handleScroll);
     // 初始计算
     updateVisibleRange();
+    updateScrollbar();
     
     // 监听窗口大小变化
-    window.addEventListener('resize', updateVisibleRange);
+    const handleResize = () => {
+        updateVisibleRange();
+        updateScrollbar();
+    };
+    window.addEventListener('resize', handleResize);
     
     return () => {
         container.removeEventListener('scroll', handleScroll);
-        window.removeEventListener('resize', updateVisibleRange);
+        window.removeEventListener('resize', handleResize);
     };
-  }, [updateVisibleRange]);
+  }, [updateVisibleRange, updateScrollbar]);
+
+  // Zoom change should also trigger update
+  useEffect(() => {
+      updateVisibleRange();
+      updateScrollbar();
+  }, [zoom, updateVisibleRange, updateScrollbar]);
 
   // 缩略图生成队列处理
   const processQueue = useCallback(async () => {
@@ -647,6 +690,25 @@ const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef, videoUrl, subti
 
   useEffect(() => {
       const handleGlobalMouseMove = (e: MouseEvent) => {
+          // Handle Scrollbar Dragging
+          if (scrollbarDragRef.current?.isDragging && timelineRef.current && scrollbarTrackRef.current) {
+              const { startX, startScrollLeft } = scrollbarDragRef.current;
+              const deltaX = e.clientX - startX;
+              
+              const container = timelineRef.current;
+              const trackRect = scrollbarTrackRef.current.getBoundingClientRect();
+              const scrollWidth = container.scrollWidth;
+              
+              // Calculate scroll delta based on track width
+              // The handle moves across the track. 
+              // Movement of 1px on track corresponds to (scrollWidth / trackWidth) px of scroll
+              const ratio = scrollWidth / trackRect.width;
+              const deltaScroll = deltaX * ratio;
+              
+              container.scrollLeft = startScrollLeft + deltaScroll;
+              return;
+          }
+
           if (!dragRef.current?.isDragging || !timelineRef.current) return;
           
           const { type, startX, startY, originalStart, originalEnd, originalLayer, subtitleId } = dragRef.current;
@@ -695,6 +757,13 @@ const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef, videoUrl, subti
       };
       
       const handleGlobalMouseUp = () => {
+          if (scrollbarDragRef.current?.isDragging) {
+              scrollbarDragRef.current = null;
+              if (scrollbarHandleRef.current) {
+                  scrollbarHandleRef.current.classList.remove('active');
+              }
+          }
+
           if (dragRef.current?.isDragging) {
               // Final commit (not transient)
               const { subtitleId, originalStart, originalEnd, originalLayer } = dragRef.current;
@@ -721,6 +790,37 @@ const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef, videoUrl, subti
           document.removeEventListener('mouseup', handleGlobalMouseUp);
       };
   }, [duration, zoom, subtitles, onSubtitleUpdate]);
+
+  const handleScrollbarMouseDown = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (!timelineRef.current) return;
+      
+      scrollbarDragRef.current = {
+          isDragging: true,
+          startX: e.clientX,
+          startScrollLeft: timelineRef.current.scrollLeft
+      };
+      
+      if (scrollbarHandleRef.current) {
+          scrollbarHandleRef.current.classList.add('active');
+      }
+  };
+
+  const handleScrollbarTrackMouseDown = (e: React.MouseEvent) => {
+      if (e.target === scrollbarHandleRef.current) return; // Ignore if clicked on handle
+      if (!timelineRef.current || !scrollbarTrackRef.current) return;
+      
+      const trackRect = scrollbarTrackRef.current.getBoundingClientRect();
+      const clickX = e.clientX - trackRect.left;
+      const percent = clickX / trackRect.width;
+      
+      const container = timelineRef.current;
+      // Center the view on the click
+      const targetScrollLeft = (percent * container.scrollWidth) - (container.clientWidth / 2);
+      
+      container.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
+  };
 
   return (
     <div className="video-timeline-container">
@@ -842,6 +942,20 @@ const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef, videoUrl, subti
                 <div className="cursor-line"></div>
             </div>
         </div>
+      </div>
+      
+      <div className="timeline-slider-container">
+          <div 
+              className="timeline-slider-track" 
+              ref={scrollbarTrackRef}
+              onMouseDown={handleScrollbarTrackMouseDown}
+          >
+              <div 
+                  className="timeline-slider-handle" 
+                  ref={scrollbarHandleRef}
+                  onMouseDown={handleScrollbarMouseDown}
+              />
+          </div>
       </div>
     </div>
   );

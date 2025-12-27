@@ -13,8 +13,8 @@ class SubtitleEvent(BaseModel):
 
 class AssStyle(BaseModel):
     Name: str
-    Fontname: str
-    Fontsize: float
+    FontName: str
+    FontSize: float
     PrimaryColour: str
     SecondaryColour: Optional[str] = None
     OutlineColour: Optional[str] = None
@@ -35,9 +35,14 @@ class AssStyle(BaseModel):
     MarginR: Optional[int] = None
     MarginV: Optional[int] = None
     Encoding: Optional[int] = None      # 0:ANSI, 1:Default 等
+    PrimaryAlpha: Optional[int] = None
+    SecondaryAlpha: Optional[int] = None
+    OutlineAlpha: Optional[int] = None
+    BackAlpha: Optional[int] = None
 
 class SubtitleDoc(BaseModel):
     language: Optional[str] = None
     resolution: Optional[Dict[str, int]] = None
     fps: Optional[float] = None
     events: Optional[List[SubtitleEvent]] = None
+    recommended_style: Optional[AssStyle] = None

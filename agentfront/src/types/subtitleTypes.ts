@@ -72,5 +72,6 @@ export type ASRResponse = {
     style?: string;
     speaker?: string;
   }>;
+  recommended_style?: AssStyle;
 };
 

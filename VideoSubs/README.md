@@ -34,13 +34,28 @@
 **环境与安装**
 
 - 要求：`Python 3.12.11`，`ffmpeg` 可执行文件需在 `PATH`。
-- 可选：GPU + CUDA 用于加速 Whisper（需安装对应的 `torch`）。
+- 推荐环境：使用 Conda 环境 `langgraph`。
+- 硬件支持：已针对 RTX 50 系列 (Blackwell) 显卡进行适配。
 
 安装依赖：
 
 ```powershell
+# 激活环境
+conda activate langgraph
+
+# 安装依赖
 pip install -e .
+
+# [关键] RTX 50 系列 (5070/5080/5090) 需安装 PyTorch Nightly (CUDA 12.8+)
+pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128 --no-cache-dir
 ```
+
+**快速启动**
+
+使用提供的脚本一键启动后端（自动激活环境）：
+
+- Windows (PowerShell): `.\run_backend.ps1`
+- Windows (CMD): `run_backend.bat`
 
 依赖已在 `pyproject.toml` / `requirements.txt` 中声明（Whisper、langgraph、langchain、ffmpeg-python、torch 等）。
 

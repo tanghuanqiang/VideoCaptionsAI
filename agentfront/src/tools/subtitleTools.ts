@@ -73,10 +73,10 @@ export const asrTranscribeVideo = async (filePath: string | File): Promise<Subti
 
         // 临时使用：在设置好本地 Whisper.cpp 或其他方案前，先使用在线 API
         const formData = new FormData();
-        formData.append('video', file);
+        formData.append('file', file);
         
         // Use configured backend URL or default to the proxy path
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || '/api/transcribe';
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || '/api/asr/';
 
         try {
             console.log(`Connecting to: ${backendUrl}`);
@@ -84,6 +84,10 @@ export const asrTranscribeVideo = async (filePath: string | File): Promise<Subti
                 method: 'POST',
                 body: formData,
             });
+
+            if (response.status === 413) {
+                throw new Error("文件过大，超过服务器限制");
+            }
 
             if (response.ok) {
                 const result = await response.json() as { language: string, segments: Array<{start: number, end: number, text: string}> };

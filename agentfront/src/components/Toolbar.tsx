@@ -20,9 +20,11 @@ interface ToolbarProps {
   toggleTheme: () => void;
   playResX?: number;
   playResY?: number;
+  copilotOpen: boolean;
+  toggleCopilot: () => void;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSubtitlesUpdate, styles, subtitles, theme, toggleTheme, playResX = 1920, playResY = 1080 }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSubtitlesUpdate, styles, subtitles, theme, toggleTheme, playResX = 1920, playResY = 1080, copilotOpen, toggleCopilot }) => {
   const { token, logout } = useAuth();
   const [recognizing, setRecognizing] = useState(false);
   const [videoHeight, setVideoHeight] = useState<number | null>(null);
@@ -205,6 +207,11 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
         };
 
         xhr.onload = () => {
+          if (xhr.status === 413) {
+            reject(new Error('文件过大，超过服务器限制'));
+            return;
+          }
+          
           if (xhr.status >= 200 && xhr.status < 300) {
             try {
               const response = JSON.parse(xhr.responseText);
@@ -213,7 +220,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
               reject(new Error('Invalid JSON response'));
             }
           } else {
-            reject(new Error(`上传失败: ${xhr.statusText}`));
+            reject(new Error(`上传失败: ${xhr.status} ${xhr.statusText}`));
           }
         };
 
@@ -286,6 +293,20 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
         const taskInfo = await response.json();
         console.log(`任务状态: ${taskInfo.status}, 后端进度: ${taskInfo.progress}%`);
 
+        // 更新进度条（如果后端有真实进度，则使用后端进度，否则保持前端估算）
+        if (taskInfo.status === 'processing' && taskInfo.progress > 0) {
+          // 清除前端的估算定时器，改用后端真实进度
+          if (progressInterval) {
+            clearInterval(progressInterval);
+            progressInterval = null;
+          }
+          setDownloadProgress(prev => ({
+            ...prev,
+            progress: Math.max(prev.progress, taskInfo.progress), // 确保进度不倒退
+            status: 'processing'
+          }));
+        }
+
         if (taskInfo.status === 'completed') {
           // 任务完成
           isCompleted = true;
@@ -329,38 +350,23 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
   // 从后端下载烧录完成的视频
   const downloadFromBackend = async (taskId: string, fileName: string) => {
     try {
-      setDownloadProgress(prev => ({ ...prev, progress: 90, status: 'downloading' }));
+      setDownloadProgress(prev => ({ ...prev, progress: 100, status: 'completed' }));
 
-      const response = await fetch(`/api/burn/download/${taskId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`下载失败: ${response.statusText}`);
-      }
-
-      const blob = await response.blob();
-      const downloadUrl = URL.createObjectURL(blob);
+      // 使用带 Token 的 URL 直接触发浏览器下载，避免 fetch/blob 的 CORS 和内存问题
+      const encodedFileName = encodeURIComponent(fileName);
+      const downloadUrl = `/api/burn/download/${taskId}?token=${token}&filename=${encodedFileName}`;
+      
       const downloadLink = document.createElement('a');
       downloadLink.href = downloadUrl;
-      downloadLink.download = fileName;
+      downloadLink.download = fileName; // 浏览器可能会优先使用 Content-Disposition
       downloadLink.style.display = 'none';
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
-      URL.revokeObjectURL(downloadUrl);
 
-      setDownloadProgress(prev => ({
-        ...prev,
-        status: 'completed',
-        progress: 100,
-      }));
-
-      console.log("视频下载完成！");
+      console.log("已触发视频下载");
     } catch (error) {
-      console.error('下载视频失败:', error);
+      console.error('下载触发失败:', error);
       setDownloadProgress(prev => ({
         ...prev,
         status: 'error',
@@ -402,6 +408,8 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
       const formData = new FormData();
       formData.append("file", fileToUpload);
       formData.append("quality", asrQuality);
+      if (videoWidth) formData.append("width", videoWidth.toString());
+      if (videoHeight) formData.append("height", videoHeight.toString());
       
       const resp = await fetch("/api/asr/", { 
         method: "POST", 
@@ -410,7 +418,16 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
           "Authorization": `Bearer ${token}`
         }
       });
-      if (!resp.ok) throw new Error("识别失败");
+      
+      if (resp.status === 413) {
+        throw new Error("文件过大，超过服务器限制");
+      }
+      
+      if (!resp.ok) {
+        const errText = await resp.text();
+        throw new Error(`识别失败: ${resp.status} ${errText}`);
+      }
+      
       const data = await resp.json();
       const secondsToTimeStr = (seconds: number) => {
         if (typeof seconds !== "number" || isNaN(seconds)) return "00:00:00.00";
@@ -434,6 +451,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
         resolution: data.resolution || "",
         fps: data.fps || "",
         events: formatted,
+        recommended_style: data.recommended_style,
       };
       onSubtitlesUpdate(asrResponse);
     } catch (e) {
@@ -562,6 +580,28 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
                 </div>
             )}
           </div>
+
+          {/* Copilot Toggle Button */}
+          <button
+            className={`copilot-toggle-btn ${copilotOpen ? 'open' : ''}`}
+            style={{
+              position: 'static',
+              margin: '0 12px',
+              width: '36px', 
+              height: '36px',
+              borderRadius: '8px',
+              padding: 0,
+              minWidth: '36px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)', // Keep some shadow
+            }}
+            title={copilotOpen ? '关闭 Copilot 侧边栏' : '打开 Copilot 侧边栏'}
+            onClick={toggleCopilot}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" />
+            </svg>
+          </button>
+
           <button
             type="button"
             className="toolbar-btn"
