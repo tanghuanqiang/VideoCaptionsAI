@@ -40,7 +40,11 @@ async def get_current_user_download(
     return user
 
 @router.get("/burn/download/{task_id}")
-async def download_burn_result(task_id: str, current_user: User = Depends(get_current_user_download)):
+async def download_burn_result(
+    task_id: str, 
+    filename: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user_download)
+):
     """下载烧录完成的视频"""
     task = burn_queue.get_task(task_id)
     if not task:
@@ -56,10 +60,13 @@ async def download_burn_result(task_id: str, current_user: User = Depends(get_cu
     if not os.path.exists(output_path):
         raise HTTPException(status_code=404, detail="输出文件不存在")
     
+    # Use provided filename or fallback to actual filename
+    download_filename = filename if filename else os.path.basename(output_path)
+    
     return FileResponse(
         output_path, 
         media_type="video/mp4", 
-        filename=os.path.basename(output_path),
+        filename=download_filename,
         headers={
             "Cross-Origin-Resource-Policy": "cross-origin",
             "Access-Control-Expose-Headers": "Content-Disposition"

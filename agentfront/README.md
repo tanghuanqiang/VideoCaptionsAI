@@ -34,14 +34,7 @@
 - pnpm (推荐) 或 yarn
 - Rust (仅开发桌面端需要)
 
-### 方式一：Docker Compose (推荐)
-在项目根目录运行：
-```bash
-docker-compose up --build
-```
-访问 `http://localhost:80` 即可使用 Web 版。
-
-### 方式二：本地开发
+### 启动步骤
 
 1. **安装依赖**
    ```bash

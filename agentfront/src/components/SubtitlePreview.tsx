@@ -25,8 +25,8 @@ const SubtitlePreview: React.FC<SubtitlePreviewProps> = ({ rect, subtitles, styl
     const handleTimeUpdate = () => {
       const currentTime = videoElement.currentTime || 0;
       const active = subtitles.filter((sub) => {
-        const start = timeToSeconds(sub.start);
-        const end = timeToSeconds(sub.end);
+        const start = typeof sub.start === 'number' ? sub.start : timeToSeconds(sub.start);
+        const end = typeof sub.end === 'number' ? sub.end : timeToSeconds(sub.end);
         return currentTime >= start && currentTime <= end;
       });
       setActiveSubs(active);

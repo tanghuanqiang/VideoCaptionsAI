@@ -31,8 +31,11 @@ LLM_MODEL_NAME = os.environ.get("LLM_MODEL_NAME", "qwen-turbo")
 if not TAVILY_API_KEY:
     # keep behavior permissive but warn the user at runtime
     print("Warning: TAVILY_API_KEY not set. Tavily search may fail.")
+    TAVILY_API_KEY = "missing-tavily-key"
+
 if not LLM_API_KEY:
     print("Warning: LLM_API_KEY not set. LLM calls may fail or require other auth methods.")
+    LLM_API_KEY = "missing-llm-key"
 
 Model = {
     "llm": ChatOpenAI(

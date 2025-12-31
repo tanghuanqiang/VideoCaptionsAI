@@ -287,7 +287,7 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
           const text = msg.text;
           const blockRegex = /```(subtitle|style)\s*([\s\S]*?)```/g;
           let lastIndex = 0;
-          const elements = [];
+          const elements: React.ReactNode[] = [];
           let match;
           let blockIdx = 0;
           while ((match = blockRegex.exec(text)) !== null) {

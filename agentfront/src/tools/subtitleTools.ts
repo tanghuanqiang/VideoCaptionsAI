@@ -95,15 +95,19 @@ export const asrTranscribeVideo = async (filePath: string | File): Promise<Subti
                 return {
                     language: result.language || 'zh',
                     events: result.segments.map((segment, index) => ({
-                            id: index.toString(),
-                    start: segment.start,
-                    end: segment.end,
-                    text: segment.text.trim(),
-                }))
-            };
-        } else {
-            const errorText = await response.text();
-            throw new Error(`Backend response error: ${response.status} ${response.statusText} - ${errorText}`);
+                        id: index.toString(),
+                        start: segment.start,
+                        end: segment.end,
+                        text: segment.text.trim(),
+                    }))
+                };
+            } else {
+                const errorText = await response.text();
+                throw new Error(`Backend response error: ${response.status} ${response.statusText} - ${errorText}`);
+            }
+        } catch (error) {
+            console.error('Subtitle transcription error:', error);
+            throw new Error(`Subtitle transcription failed: ${error instanceof Error ? error.message : String(error)}`);
         }
     } catch (error) {
         console.error('Subtitle transcription error:', error);

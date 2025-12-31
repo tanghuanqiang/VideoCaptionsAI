@@ -6,6 +6,10 @@ import DownloadProgress from "./DownloadProgress";
 import { useAuth } from "../context/AuthContext";
 import { toSRT, toASS, downloadFile } from "../utils/subtitleUtils";
 import { ffmpegService } from "../utils/ffmpegService";
+import { driver } from "driver.js";
+import "driver.js/dist/driver.css";
+import "./DriverDarkTheme.css";
+import { basicWorkflowSteps, editingShortcutsSteps, stylingSteps } from "../utils/tutorialSteps";
 // import { getRecommendedModeText } from "../utils/deviceDetection";
 
 
@@ -25,7 +29,7 @@ interface ToolbarProps {
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSubtitlesUpdate, styles, subtitles, theme, toggleTheme, playResX = 1920, playResY = 1080, copilotOpen, toggleCopilot }) => {
-  const { token, logout } = useAuth();
+  const { token, logout, user } = useAuth();
   const [recognizing, setRecognizing] = useState(false);
   const [videoHeight, setVideoHeight] = useState<number | null>(null);
   const [videoWidth, setVideoWidth] = useState<number | null>(null);
@@ -33,6 +37,28 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [asrQuality, setAsrQuality] = useState<'standard' | 'high' | 'professional'>('standard');
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  
+  const [showUserPopup, setShowUserPopup] = useState(false);
+  const [showTutorialMenu, setShowTutorialMenu] = useState(false);
+  const userPopupRef = useRef<HTMLDivElement>(null);
+  const tutorialMenuRef = useRef<HTMLDivElement>(null);
+
+  const startTutorial = (type: 'basic' | 'shortcuts' | 'styling') => {
+    setShowTutorialMenu(false);
+    let steps = basicWorkflowSteps;
+    if (type === 'shortcuts') steps = editingShortcutsSteps;
+    if (type === 'styling') steps = stylingSteps;
+
+    const driverObj = driver({
+      showProgress: true,
+      steps: steps,
+      popoverClass: 'tutorial-popover',
+      nextBtnText: '下一步',
+      prevBtnText: '上一步',
+      doneBtnText: '完成',
+    });
+    driverObj.drive();
+  };
 
   const [downloadProgress, setDownloadProgress] = useState<{
     isVisible: boolean;
@@ -66,11 +92,17 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
     }
   }, [videoFile]);
 
-  // Close export menu when clicking outside
+  // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
         setShowExportMenu(false);
+      }
+      if (userPopupRef.current && !userPopupRef.current.contains(event.target as Node)) {
+        setShowUserPopup(false);
+      }
+      if (tutorialMenuRef.current && !tutorialMenuRef.current.contains(event.target as Node)) {
+        setShowTutorialMenu(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -467,24 +499,58 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
     <>
       <div className="toolbar">
         {/* 登录状态显示 - 移到最左边 */}
-        <div className="user-status">
-          <span className="user-name">👤 {token ? '已登录' : '未登录'}</span>
-          {token && (
-            <button 
-              className="logout-btn" 
-              onClick={() => {
-                if (window.confirm('确定要退出登录吗？')) {
-                  logout();
-                }
-              }}
-              title="退出登录"
-            >
-              退出
-            </button>
+        <div 
+          className="user-status" 
+          onClick={() => token && setShowUserPopup(!showUserPopup)}
+          ref={userPopupRef}
+        >
+          <span className="user-name">👤 {token ? (user?.username || '已登录') : '未登录'}</span>
+          {showUserPopup && token && (
+            <div className="user-popup">
+              <div className="user-popup-name">{user?.username || 'User'}</div>
+              <button 
+                className="logout-btn" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (window.confirm('确定要退出登录吗？')) {
+                    logout();
+                  }
+                }}
+                title="退出登录"
+              >
+                退出登录
+              </button>
+            </div>
           )}
         </div>
         <span className="toolbar-title">{title}</span>
         <div className="toolbar-actions toolbar-actions-left">
+          {/* Tutorial Button */}
+          <div style={{ position: 'relative' }} ref={tutorialMenuRef}>
+            <button
+              className="toolbar-btn"
+              style={{ minWidth: 'auto', padding: '0 12px', gap: '6px', whiteSpace: 'nowrap' }}
+              onClick={() => setShowTutorialMenu(!showTutorialMenu)}
+              title="使用教程"
+            >
+              <span>💡</span>
+              <span>使用教程</span>
+            </button>
+            {showTutorialMenu && (
+              <div className="tutorial-menu" style={{ left: 0, right: 'auto' }}>
+                <div className="tutorial-menu-item" onClick={() => startTutorial('basic')}>
+                  <span className="tutorial-icon">🚀</span> 基础流程教学
+                </div>
+                <div className="tutorial-menu-item" onClick={() => startTutorial('shortcuts')}>
+                  <span className="tutorial-icon">⌨️</span> 编辑与快捷键
+                </div>
+                <div className="tutorial-menu-item" onClick={() => startTutorial('styling')}>
+                  <span className="tutorial-icon">🎨</span> 样式与预览
+                </div>
+              </div>
+            )}
+          </div>
+
           <label htmlFor="video-upload" className="toolbar-btn">
             <span>导入视频</span>
             <input

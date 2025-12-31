@@ -1,4 +1,8 @@
 import asyncio
+import warnings
+# Suppress specific warnings from libraries
+warnings.filterwarnings("ignore", category=UserWarning, module="langchain_tavily")
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, StreamingResponse

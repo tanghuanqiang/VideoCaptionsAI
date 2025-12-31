@@ -220,7 +220,7 @@ function MainApp() {
     const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Delete' || e.key === 'Backspace') {
             // Check if input is active
-            const active = document.activeElement;
+            const active = document.activeElement as HTMLElement;
             if (active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA' || active?.isContentEditable) {
                 return;
             }

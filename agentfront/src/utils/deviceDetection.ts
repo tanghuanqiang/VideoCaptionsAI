@@ -91,7 +91,7 @@ export function getRecommendedModeText(videoFile: File): string {
   const capabilities = detectDeviceCapabilities();
   
   if (useBackend) {
-    const reasons = [];
+    const reasons: string[] = [];
     if (capabilities.isMobile) reasons.push('移动设备');
     if (capabilities.isLowMemory) reasons.push('内存较低');
     if (videoSizeMB > 500) reasons.push('视频文件过大');

@@ -1,0 +1,67 @@
+/* Driver.js tutorial popover overrides (dark theme)
+   We force a white popover background for tutorials, regardless of app theme.
+   This targets the custom `popoverClass: 'tutorial-popover'`.
+*/
+html[data-theme='dark'] .tutorial-popover {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #333333 !important;
+  border: 1px solid #e0e0e0 !important;
+}
+
+html[data-theme='dark'] .tutorial-popover .driver-popover-title,
+html[data-theme='dark'] .tutorial-popover .driver-popover-description,
+html[data-theme='dark'] .tutorial-popover .driver-popover-footer,
+html[data-theme='dark'] .tutorial-popover .driver-popover-progress-text,
+html[data-theme='dark'] .tutorial-popover .driver-popover-progress {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+}
+
+html[data-theme='dark'] .tutorial-popover .driver-popover-title {
+  color: #000000 !important;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+html[data-theme='dark'] .tutorial-popover .driver-popover-description {
+  color: #666666 !important;
+}
+
+html[data-theme='dark'] .tutorial-popover button {
+  background-color: #f0f0f0 !important;
+  color: #333333 !important;
+  border: 1px solid #d9d9d9 !important;
+  text-shadow: none;
+}
+
+html[data-theme='dark'] .tutorial-popover button:hover {
+  background-color: #e6e6e6 !important;
+  color: #000000 !important;
+  border-color: #bfbfbf !important;
+}
+
+html[data-theme='dark'] .tutorial-popover .driver-popover-close-btn {
+  color: #999999 !important;
+}
+
+html[data-theme='dark'] .tutorial-popover .driver-popover-close-btn:hover {
+  color: #333333 !important;
+}
+
+/* Arrows - Force White */
+html[data-theme='dark'] .tutorial-popover .driver-popover-arrow-side-left.driver-popover-arrow {
+  border-left-color: #ffffff !important;
+}
+
+html[data-theme='dark'] .tutorial-popover .driver-popover-arrow-side-right.driver-popover-arrow {
+  border-right-color: #ffffff !important;
+}
+
+html[data-theme='dark'] .tutorial-popover .driver-popover-arrow-side-top.driver-popover-arrow {
+  border-top-color: #ffffff !important;
+}
+
+html[data-theme='dark'] .tutorial-popover .driver-popover-arrow-side-bottom.driver-popover-arrow {
+  border-bottom-color: #ffffff !important;
+}

@@ -80,7 +80,7 @@ const DownloadProgress: React.FC<DownloadProgressProps> = ({
   }, [progress, isVisible, lastProgress]);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (isVisible && startTime && status !== 'completed' && status !== 'error') {
       interval = setInterval(() => {
         setTimeElapsed(Math.floor((Date.now() - startTime) / 1000));

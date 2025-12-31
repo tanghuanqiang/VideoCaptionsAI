@@ -24,14 +24,7 @@ VideoSubs 是 VideoCaptionsAI 的后端服务，负责处理所有繁重的音�
 - FFmpeg (必须添加到系统 PATH)
 - NVIDIA GPU (可选，推荐用于加速 Whisper)
 
-### 方式一：Docker Compose (推荐)
-在项目根目录运行：
-```bash
-docker-compose up --build
-```
-后端服务将在 `http://localhost:8000` 启动。
-
-### 方式二：本地开发
+### 启动步骤
 
 1. **创建虚拟环境**
    ```bash

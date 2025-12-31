@@ -78,8 +78,18 @@ export const calculateLayers = (subtitles: Subtitle[]): Subtitle[] => {
 
 export const toSRT = (subtitles: Subtitle[]): string => {
     return subtitles.map((sub, index) => {
-        const start = sub.start.replace('.', ',');
-        const end = sub.end.replace('.', ',');
+        const formatTime = (t: string | number) => {
+            if (typeof t === 'number') {
+                const hours = Math.floor(t / 3600);
+                const minutes = Math.floor((t % 3600) / 60);
+                const seconds = Math.floor(t % 60);
+                const ms = Math.floor((t % 1) * 1000);
+                return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
+            }
+            return t.replace('.', ',');
+        };
+        const start = formatTime(sub.start);
+        const end = formatTime(sub.end);
         return `${index + 1}\n${start} --> ${end}\n${sub.text}\n`;
     }).join('\n');
 };
@@ -103,7 +113,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     const events = subtitles.map(sub => {
         // Convert time format 00:00:00.00 to 0:00:00.00
-        const formatAssTime = (t: string) => {
+        const formatAssTime = (t: string | number) => {
+            if (typeof t === 'number') {
+                // Convert seconds to H:MM:SS.cc
+                const hours = Math.floor(t / 3600);
+                const minutes = Math.floor((t % 3600) / 60);
+                const seconds = (t % 60).toFixed(2);
+                return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.padStart(5, '0')}`;
+            }
             const parts = t.split(':');
             const h = parseInt(parts[0]);
             return `${h}:${parts[1]}:${parts[2]}`;

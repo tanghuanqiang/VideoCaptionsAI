@@ -37,7 +37,7 @@ const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef, videoUrl, subti
   const timelineRef = useRef<HTMLDivElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
   const currentTimeRef = useRef<HTMLSpanElement>(null);
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number>(0);
   const [isDragging, setIsDragging] = useState(false);
   
   // Scrollbar Refs
@@ -94,9 +94,9 @@ const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef, videoUrl, subti
             const sampleSize = Math.floor(sampleRate / samplesPerSec);
             const channelData = audioBuffer.getChannelData(0); // 取第一个声道
             
-            const peaks = [];
+            const peaks: number[] = [];
             for (let i = 0; i < width; i++) {
-                const start = i * sampleSize;
+                const start = Math.floor(i * sampleSize);
                 const end = start + sampleSize;
                 let max = 0;
                 for (let j = start; j < end; j++) {
