@@ -11,6 +11,9 @@
   --ant-color-text-tertiary: rgba(255, 255, 255, 0.25);
   --ant-color-border: #424242;
   --ant-color-border-secondary: #303030;
+  --ant-color-warning: #faad14;
+  --ant-color-error: #ff4d4f;
+  --ant-color-success: #52c41a;
   --ant-border-radius: 6px;
   --ant-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   
@@ -41,6 +44,9 @@
   --ant-color-text-tertiary: rgba(0, 0, 0, 0.25);
   --ant-color-border: #d9d9d9;
   --ant-color-border-secondary: #f0f0f0;
+  --ant-color-warning: #faad14;
+  --ant-color-error: #ff4d4f;
+  --ant-color-success: #52c41a;
   
   color-scheme: light;
 }

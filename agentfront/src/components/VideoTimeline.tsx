@@ -924,7 +924,7 @@ const VideoTimeline: React.FC<VideoTimelineProps> = ({ videoRef, videoUrl, subti
                                 className="resize-handle left" 
                                 onMouseDown={(e) => handleSubtitleMouseDown(e, sub, 'resize-left')}
                             />
-                            <div className="subtitle-text">{sub.text}</div>
+                            <div className="timeline-subtitle-text">{sub.text}</div>
                             <div 
                                 className="resize-handle right" 
                                 onMouseDown={(e) => handleSubtitleMouseDown(e, sub, 'resize-right')}

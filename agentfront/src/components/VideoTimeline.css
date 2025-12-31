@@ -206,7 +206,7 @@
   box-shadow: 0 0 0 2px rgba(250, 173, 20, 0.2);
 }
 
-.subtitle-text {
+.timeline-subtitle-text {
   font-size: 12px;
   color: #fff;
   white-space: nowrap;
@@ -216,6 +216,11 @@
   font-weight: 500;
   text-shadow: 0 1px 2px rgba(0,0,0,0.3);
   width: 100%;
+}
+
+.subtitle-block.selected .timeline-subtitle-text {
+  color: rgba(0, 0, 0, 0.88);
+  text-shadow: none;
 }
 
 .resize-handle {
