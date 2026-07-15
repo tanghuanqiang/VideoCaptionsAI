@@ -45,14 +45,14 @@ if whisper_assets.is_dir():
 else:
     print(f'WARNING: whisper_assets not found at {whisper_assets}, skipping')
 
-# Icon (required)
+# Icon (optional)
 icon = _PROJECT_DIR / 'icon.ico'
 if icon.is_file():
     datas.append(('icon.ico', '.'))
 else:
     print(f'WARNING: icon.ico not found at {icon}')
 
-# .env (optional - gitignored)
+# .env (optional)
 for _env in ['.env', '.env.example']:
     if (_PROJECT_DIR / _env).is_file():
         datas.append((_env, '.'))
@@ -69,17 +69,17 @@ a = Analysis(
         'uvicorn.lifespan.on',
         'starlette.middleware.cors', 'anyio._backends._asyncio',
         'sqlalchemy.ext.declarative', 'sqlalchemy.dialects.sqlite',
-        'passlib.handlers.bcrypt', 'python_jose', 'cryptography',
-        'torch', 'torchaudio', 'whisper', 'openai_whisper',
-        'tiktoken_ext.openai_public', 'numpy.random',
-        'langchain_core', 'langchain_openai', 'langgraph.prebuilt',
-        'langgraph.checkpoint.sqlite', 'langgraph.checkpoint.memory',
-        'langgraph.store.memory', 'langgraph_runtime_inmem',
-        'langchain_community', 'langchain_text_splitters', 'langchain_tavily',
-        'pydantic.deprecated', 'python_multipart', 'prometheus_client',
-        'tavily', 'ffmpeg_python', 'imageio_ffmpeg',
-        'python_dotenv', 'PIL.Image', 'tqdm', 'regex._regex',
-        'pystray', 'PIL.Image',
+        'passlib.handlers.bcrypt', 'jenum', 'jose', 'cryptography',
+        'torch', 'whisper', 'tiktoken_ext.openai_public',
+        'numpy.random', 'numpy.core.multiarray',
+        'langchain_core', 'langchain_openai',
+        'langgraph.prebuilt', 'langgraph.checkpoint.memory',
+        'langgraph.store.memory',
+        'langchain_community', 'langchain_text_splitters',
+        'langchain_tavily', 'tavily',
+        'pydantic.deprecated', 'multipart', 'prometheus_client',
+        'dotenv', 'PIL.Image', 'tqdm', 'regex._regex',
+        'pystray',
         'unittest.mock', 'ctypes', 'logging.handlers',
     ],
     hookspath=[],
@@ -113,7 +113,7 @@ exe = EXE(
     upx=False,
     console=False,
     target_arch=None,
-    icon='icon.ico',
+    icon='icon.ico' if icon.is_file() else None,
 )
 
 coll = COLLECT(
