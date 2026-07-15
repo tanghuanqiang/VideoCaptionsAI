@@ -6,20 +6,19 @@ import sys
 import os
 from pathlib import Path
 
-# ---- Early startup logging ----
-if getattr(sys, "frozen", False):
-    _STARTUP_LOG = Path(sys.executable).parent / "startup.log"
-else:
-    _STARTUP_LOG = Path(__file__).resolve().parent / "startup.log"
+def _setup_logging():
+    if getattr(sys, "frozen", False):
+        _STARTUP_LOG = Path(sys.executable).parent / "startup.log"
+    else:
+        _STARTUP_LOG = Path(__file__).resolve().parent / "startup.log"
+    try:
+        _startup_fp = open(str(_STARTUP_LOG), "w", encoding="utf-8", buffering=1)
+        sys.stdout = _startup_fp
+        sys.stderr = _startup_fp
+    except Exception:
+        pass
+    print("VideoCaptionsAI starting...", flush=True)
 
-try:
-    _startup_fp = open(str(_STARTUP_LOG), "w", encoding="utf-8", buffering=1)
-    sys.stdout = _startup_fp
-    sys.stderr = _startup_fp
-except Exception:
-    pass
-
-print("VideoCaptionsAI starting...", flush=True)
 
 import subprocess
 import threading
@@ -181,6 +180,7 @@ def create_tray_icon():
     return icon
 
 def main():
+    _setup_logging()
     log.info("=" * 50)
     log.info("  VideoCaptionsAI v1.0.0 - Port %d", PORT)
     log.info("=" * 50)
