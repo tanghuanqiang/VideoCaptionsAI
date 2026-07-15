@@ -1,16 +1,44 @@
+# ---- Core ----
+fastapi>=0.109
+uvicorn[standard]>=0.25
+sqlalchemy>=1.4
+pydantic>=2.0
+
+# ---- Auth (bypassed, but imported) ----
+python-jose[cryptography]>=3.3
+passlib[bcrypt]>=1.7
+bcrypt>=4.0
+cryptography
+
+# ---- File handling ----
+python-multipart>=0.0.6
+aiofiles>=23.0
+
+# ---- Speech Recognition ----
+openai-whisper>=20231117
+torch>=2.0
+numpy>=1.24
+
+# ---- AI Copilot ----
 langgraph>=0.2.128
-langchain-core
-langchain-openai
-openai-whisper
-ffmpeg-python
-torch
-langchain_tavily
-fastapi
-python-multipart
-python-jose[cryptography]
-passlib
-bcrypt==4.0.1
-sqlalchemy
-uvicorn
+langchain-core>=0.1
+langchain-openai>=0.0.5
+langchain-tavily>=0.0.1
+
+# ---- Desktop / Tray ----
+pystray>=0.19
+Pillow>=10.0
+
+# ---- Build ----
+pyinstaller>=6.0
+
+# ---- Monitoring ----
 prometheus-client
-python-dotenv
+
+# ---- Dev / Test ----
+pytest>=8.0
+pytest-cov>=4.0
+requests>=2.28
+
+# ---- Utilities ----
+python-dotenv>=1.0

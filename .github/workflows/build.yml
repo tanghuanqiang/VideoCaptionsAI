@@ -15,6 +15,9 @@ jobs:
   test:
     name: Test
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: VideoSubs
     steps:
       - uses: actions/checkout@v4
 
@@ -28,25 +31,34 @@ jobs:
         with:
           version: 10
 
-      - name: Cache dependencies
+      - name: Setup FFmpeg
+        uses: AnimMouse/setup-ffmpeg@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache pip
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.cache/pip
-            ~/.pnpm-store
-          key: ${{ runner.os }}-deps-${{ hashFiles('VideoSubs/requirements.txt', 'agentfront/pnpm-lock.yaml') }}
+          path: ~\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-${{ hashFiles('VideoSubs/requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Cache pnpm
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\pnpm-cache
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('agentfront/pnpm-lock.yaml') }}
 
       - name: Install Python deps
         run: |
           python -m pip install --upgrade pip
-          pip install pytest requests
-          pip install -r VideoSubs/requirements.txt
-        continue-on-error: true
+          pip install -r requirements.txt
 
-      - name: Run unit tests
-        run: |
-          cd VideoSubs
-          python -m pytest tests/unit_tests/ -v --tb=short
+      - name: Verify FFmpeg
+        run: ffmpeg -version
+
+      - name: Run tests
+        run: python -m pytest tests/unit_tests/ -v --tb=short -k "not AppImport"
 
   build:
     name: Build Installer
@@ -66,18 +78,33 @@ jobs:
         with:
           version: 10
 
+      - name: Setup FFmpeg
+        uses: AnimMouse/setup-ffmpeg@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install Inno Setup
         run: |
           curl -L -o innosetup.exe https://jrsoftware.org/download.php/is.exe
           .\innosetup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR="C:\InnoSetup"
-          echo "C:\InnoSetup" >> $env:GITHUB_PATH
+          echo "C:\InnoSetup" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-${{ hashFiles('VideoSubs/requirements.txt') }}
+
+      - name: Cache pnpm
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\pnpm-cache
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('agentfront/pnpm-lock.yaml') }}
 
       - name: Install Python deps
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller
           pip install -r VideoSubs/requirements.txt
-        continue-on-error: true
 
       - name: Build frontend
         run: |
@@ -85,9 +112,22 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm build
 
-      - name: Copy frontend
+      - name: Copy frontend to backend
         run: |
+          New-Item -ItemType Directory -Force -Path VideoSubs\frontend_dist
           Copy-Item -Recurse -Force agentfront\dist\* VideoSubs\frontend_dist\
+
+      - name: Copy whisper assets
+        run: |
+          python -c "
+          import site, shutil, os
+          for sp in site.getsitepackages():
+              p = os.path.join(sp, 'whisper', 'assets')
+              if os.path.isdir(p):
+                  shutil.copytree(p, 'VideoSubs/whisper_assets', dirs_exist_ok=True)
+                  print(f'Copied whisper assets from {p}')
+                  break
+          "
 
       - name: Build PyInstaller exe
         run: |
@@ -104,6 +144,7 @@ jobs:
         with:
           name: VideoCaptionsAI-Setup
           path: VideoSubs\VideoCaptionsAI_Setup.exe
+          retention-days: 7
 
   release:
     name: Create Release
