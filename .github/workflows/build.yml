@@ -87,19 +87,31 @@ jobs:
         shell: bash
         run: |
           cd VideoSubs
-          python -m PyInstaller build_exe.spec --noconfirm
+          python -m PyInstaller build_exe.spec --noconfirm 2>&1 | tee pyinst_log.txt || true
+          echo "PyInstaller exit code: ${PIPESTATUS=0}"
+
+      - name: Upload PyInstaller log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyinstaller-log
+          path: VideoSubs/pyinst_log.txt
+          retention-days: 3
 
       - name: Build Inno Setup installer
+        if: always()
         shell: bash
         run: |
           cd VideoSubs
-          iscc installer.iss
+          iscc installer.iss || echo "Inno Setup skipped"
 
       - name: Upload installer
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: VideoCaptionsAI-Setup
           path: VideoSubs/VideoCaptionsAI_Setup.exe
+          if-no-files-found: ignore
           retention-days: 7
 
   release:
