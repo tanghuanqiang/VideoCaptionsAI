@@ -76,14 +76,7 @@ jobs:
         shell: bash
         run: |
           pip install -r VideoSubs/requirements.txt
-          python -c "
-import site, shutil, os
-for sp in site.getsitepackages():
-    p = os.path.join(sp, 'whisper', 'assets')
-    if os.path.isdir(p):
-        shutil.copytree(p, 'VideoSubs/whisper_assets', dirs_exist_ok=True)
-        break
-"
+          python -c "import site, shutil, os; [(shutil.copytree(os.path.join(sp, 'whisper', 'assets'), 'VideoSubs/whisper_assets', dirs_exist_ok=True), print('Copied')) for sp in site.getsitepackages() if os.path.isdir(os.path.join(sp, 'whisper', 'assets'))]"
 
       - name: Build frontend
         shell: bash
@@ -114,7 +107,7 @@ for sp in site.getsitepackages():
         uses: actions/upload-artifact@v4
         with:
           name: VideoCaptionsAI-Setup
-          path: VideoSubs\\VideoCaptionsAI_Setup.exe
+          path: VideoSubs/VideoCaptionsAI_Setup.exe
           retention-days: 7
 
   release:
