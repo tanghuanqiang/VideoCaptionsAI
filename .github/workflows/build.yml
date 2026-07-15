@@ -15,9 +15,6 @@ jobs:
   test:
     name: Test
     runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: VideoSubs
     steps:
       - uses: actions/checkout@v4
 
@@ -26,11 +23,12 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install test deps (minimal)
-        run: pip install pytest
-
       - name: Run tests
-        run: python -m pytest tests/unit_tests/ -v --tb=short
+        shell: bash
+        run: |
+          cd VideoSubs
+          pip install pytest
+          python -m pytest tests/unit_tests/ -v --tb=long
 
   build:
     name: Build Installer
@@ -56,11 +54,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Inno Setup
-        shell: pwsh
+        shell: bash
         run: |
           curl -L -o innosetup.exe https://jrsoftware.org/download.php/is.exe
-          .\innosetup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR="C:\InnoSetup"
-          echo "C:\InnoSetup" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+          ./innosetup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR="C:\InnoSetup"
+          echo "C:\InnoSetup" >> $GITHUB_PATH
 
       - name: Cache pip
         uses: actions/cache@v4
@@ -75,39 +73,39 @@ jobs:
           key: ${{ runner.os }}-pnpm-${{ hashFiles('agentfront/pnpm-lock.yaml') }}
 
       - name: Install Python deps
-        run: pip install -r VideoSubs/requirements.txt
-
-      - name: Copy whisper assets
-        shell: pwsh
+        shell: bash
         run: |
+          pip install -r VideoSubs/requirements.txt
           python -c "
           import site, shutil, os
           for sp in site.getsitepackages():
               p = os.path.join(sp, 'whisper', 'assets')
               if os.path.isdir(p):
                   shutil.copytree(p, 'VideoSubs/whisper_assets', dirs_exist_ok=True)
-                  print(f'Copied whisper assets from {p}')
                   break
           "
 
       - name: Build frontend
+        shell: bash
         run: |
           cd agentfront
           pnpm install --frozen-lockfile
           pnpm build
 
       - name: Copy frontend
-        shell: pwsh
+        shell: bash
         run: |
-          New-Item -ItemType Directory -Force -Path VideoSubs\frontend_dist
-          Copy-Item -Recurse -Force agentfront\dist\* VideoSubs\frontend_dist\
+          mkdir -p VideoSubs/frontend_dist
+          cp -r agentfront/dist/* VideoSubs/frontend_dist/
 
       - name: Build PyInstaller exe
+        shell: bash
         run: |
           cd VideoSubs
           pyinstaller build_exe.spec --noconfirm
 
       - name: Build Inno Setup installer
+        shell: bash
         run: |
           cd VideoSubs
           iscc installer.iss
@@ -128,9 +126,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: VideoCaptionsAI-Setup
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v2
         with:
           files: VideoCaptionsAI_Setup.exe
           draft: false
