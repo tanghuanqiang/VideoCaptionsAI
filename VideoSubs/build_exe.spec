@@ -7,7 +7,7 @@ import os
 import sys
 from pathlib import Path
 
-_PROJECT_DIR = Path(os.path.dirname(os.path.abspath(SPECPATH)))
+_PROJECT_DIR = Path(os.path.abspath(SPECPATH))
 
 # Dynamically find FFmpeg/DLL binaries path
 _BINARY_PATHS = []
