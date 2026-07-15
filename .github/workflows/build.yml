@@ -92,10 +92,29 @@ jobs:
           cp -r agentfront/dist/* VideoSubs/frontend_dist/
 
       - name: Build PyInstaller exe
+        id: pyinstaller
         shell: bash
         run: |
           cd VideoSubs
-          python -m PyInstaller build_exe.spec --noconfirm
+          python -m PyInstaller build_exe.spec --noconfirm --log-level=INFO 2>&1 | tee pyinst_log.txt
+          echo "PYI_EXIT=$PIPESTATUS" >> $GITHUB_ENV
+        continue-on-error: true
+
+      - name: Upload PyInstaller log
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyinstaller-log
+          path: VideoSubs/pyinst_log.txt
+          retention-days: 3
+
+      - name: Check PyInstaller result
+        shell: bash
+        run: |
+          if [ "$PYI_EXIT" != "0" ]; then
+            echo "PyInstaller failed with exit code $PYI_EXIT"
+            tail -100 VideoSubs/pyinst_log.txt
+            exit 1
+          fi
 
       - name: Build Inno Setup installer
         shell: bash
