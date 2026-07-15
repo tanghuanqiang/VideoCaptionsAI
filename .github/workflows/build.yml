@@ -45,13 +45,13 @@ jobs:
         shell: bash
         run: |
           # Get version from git tag, or use default
-          V=$(git describe --tags --abrev=0 || echo "v1.0.0")
+          V=$(git describe --tags --abbrev=0 || echo "v1.0.0")
           # Remove 'v' prefix for Inno Setup
           V_num=${V#v}
           echo "VERSION=$V_num"
           echo "V=$V"
-          echo "VERSION=$V_num" >> $GIFHUB_OUTPUT
-          echo "CleanVersion=${V_num}" >> $GIFHUB_ENV
+          echo "VERSION=$V_num" >> $GITHUB_OUTPUT
+          echo "CleanVersion=${V_num}" >> $GITHUB_ENV
 
       - name: Setup Python
         uses: actions/setup-python@v5
