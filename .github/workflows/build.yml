@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           cd VideoSubs
-          pip install -r requirements.txt
+          pip install pytest
           python -m pytest tests/unit_tests/ -v --tb=long
 
   build:
