@@ -29,14 +29,32 @@ for _root in ['C:\\ffmpeg', 'C:\\Program Files\\ffmpeg', os.path.expanduser('~\\
         _BINARY_PATHS.append((_bin, '.'))
 
 # Build data list conditionally
-datas = [
-    ('frontend_dist', 'frontend_dist'),
-    ('whisper_assets', 'whisper/assets'),
-    ('icon.ico', '.'),
-]
-# .env is optional (gitignored) - use .env.example as fallback
+datas = []
+
+# Frontend dist (required)
+frontend = _PROJECT_DIR / 'frontend_dist'
+if frontend.is_dir():
+    datas.append(('frontend_dist', 'frontend_dist'))
+else:
+    raise FileNotFoundError(f'Frontend dist not found at {frontend}')
+
+# Whisper assets (optional - created by CI build step)
+whisper_assets = _PROJECT_DIR / 'whisper_assets'
+if whisper_assets.is_dir():
+    datas.append(('whisper_assets', 'whisper/assets'))
+else:
+    print(f'WARNING: whisper_assets not found at {whisper_assets}, skipping')
+
+# Icon (required)
+icon = _PROJECT_DIR / 'icon.ico'
+if icon.is_file():
+    datas.append(('icon.ico', '.'))
+else:
+    print(f'WARNING: icon.ico not found at {icon}')
+
+# .env (optional - gitignored)
 for _env in ['.env', '.env.example']:
-    if os.path.isfile(_PROJECT_DIR / _env):
+    if (_PROJECT_DIR / _env).is_file():
         datas.append((_env, '.'))
         break
 
@@ -71,7 +89,7 @@ a = Analysis(
         'tkinter', 'PyQt5', 'PyQt6', 'PySide2', 'PySide6', 'wx',
         'pytest', 'mypy', 'ruff', 'isort', 'black', 'flake8',
         'IPython', 'jupyter', 'notebook', 'ipykernel',
-        'scipy', 'pandas', 'symxy', 'statsmodels',
+        'scipy', 'pandas', 'sympy', 'statsmodels',
         'matplotlib', 'seaborn', 'plotly', 'bokeh',
         'tornado', 'twisted',
         'nose', 'coverage',

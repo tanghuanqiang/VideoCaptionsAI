@@ -57,23 +57,16 @@ jobs:
         shell: powershell
         run: choco install innosetup -y --no-progress --limit-output
 
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~\AppData\Local\pip\Cache
-          key: ${{ runner.os }}-pip-${{ hashFiles('VideoSubs/requirements.txt') }}
-
-      - name: Cache pnpm
-        uses: actions/cache@v4
-        with:
-          path: ~\AppData\Local\pnpm-cache
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('agentfront/pnpm-lock.yaml') }}
-
       - name: Install Python deps
         shell: bash
         run: |
           pip install -r VideoSubs/requirements.txt
+          echo "Checking pyinstaller..."
+          python -c "import PyInstaller; print(f'PyInstaller {PyInstaller.__version__}')"
           python -c "import site, shutil, os; [(shutil.copytree(os.path.join(sp, 'whisper', 'assets'), 'VideoSubs/whisper_assets', dirs_exist_ok=True), print('Copied')) for sp in site.getsitepackages() if os.path.isdir(os.path.join(sp, 'whisper', 'assets'))]"
+          echo "Contents of VideoSubs/:"
+          ls -la VideoSubs/whisper_assets/ || echo "whisper_assets not found"
+          ls -la VideoSubs/frontend_dist/ || echo "frontend_dist not found yet"
 
       - name: Build frontend
         shell: bash
@@ -87,12 +80,14 @@ jobs:
         run: |
           mkdir -p VideoSubs/frontend_dist
           cp -r agentfront/dist/* VideoSubs/frontend_dist/
+          echo "Frontend dist contents:"
+          ls -la VideoSubs/frontend_dist/
 
       - name: Build PyInstaller exe
         shell: bash
         run: |
           cd VideoSubs
-          pyinstaller build_exe.spec --noconfirm
+          python -m PyInstaller build_exe.spec --noconfirm
 
       - name: Build Inno Setup installer
         shell: bash
