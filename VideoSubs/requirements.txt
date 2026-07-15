@@ -30,7 +30,7 @@ pystray>=0.19
 Pillow>=10.0
 
 # ---- Build ----
-pyinstaller>=6.0
+pyinstaller==6.21.0
 
 # ---- Monitoring ----
 prometheus-client

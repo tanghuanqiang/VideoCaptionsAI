@@ -58,7 +58,10 @@ for _env in ['.env', '.env.example']:
         datas.append((_env, '.'))
         break
 
-a = Analysis(
+# Wrap Analysis in try/except for better error reporting
+import traceback as _tb_pyi
+try:
+    a = Analysis(
     ['main_exe.py'],
     pathex=[str(_PROJECT_DIR)],
     binaries=_BINARY_PATHS,
@@ -99,6 +102,11 @@ a = Analysis(
     win_private_assemblies=False,
     noarchive=False,
 )
+except Exception as _pyi_err:
+    import sys as _sys_pyi
+    _tb_pyi.print_exc()
+    print(f"FATAL PyInstaller Analysis error: {_pyi_err}", file=_sys_pyi.stderr)
+    _sys_pyi.exit(1)
 
 pyz = PYZ(a.pure, a.zipped_data)
 

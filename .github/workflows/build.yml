@@ -96,7 +96,7 @@ jobs:
         shell: bash
         run: |
           cd VideoSubs
-          python -m PyInstaller build_exe.spec --noconfirm --log-level=INFO 2>&1 | tee pyinst_log.txt
+          python -m PyInstaller build_exe.spec --noconfirm --log-level=DEBUG 2>&1 | tee pyinst_log.txt
           echo "PYI_EXIT=$PIPESTATUS" >> $GITHUB_ENV
         continue-on-error: true
 
@@ -149,3 +149,5 @@ jobs:
           files: VideoCaptionsAI_*.exe
           draft: false
           generate_release_notes: true
+
+
