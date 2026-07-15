@@ -1,38 +1,43 @@
 """
 API endpoint tests — server must be running.
-Skipped in CI (no server available).
+All imports are lazy to avoid dependency issues in CI.
 """
 import os
 import pytest
-import requests
-
-BASE_URL = os.environ.get("TEST_BASE_URL", "http://127.0.0.1:8000")
 
 
-def server_ready():
+def _server_ready():
+    """Check if test server is running."""
     import time
-    for _ in range(3):
-        try:
-            r = requests.get(f"{BASE_URL}/", timeout=2)
-            return r.status_code == 200
-        except Exception:
-            time.sleep(1)
+    try:
+        import requests
+        for _ in range(3):
+            try:
+                r = requests.get("http://127.0.0.1:8000/", timeout=2)
+                if r.status_code == 200:
+                    return True
+            except Exception:
+                time.sleep(1)
+    except ImportError:
+        pass
     return False
 
 
-@pytest.mark.skipif(not server_ready(), reason="Server not running")
+@pytest.mark.skipif(not _server_ready(), reason="Server not running or requests unavailable")
 class TestAPI:
     def test_root(self):
-        r = requests.get(f"{BASE_URL}/")
+        import requests
+        r = requests.get("http://127.0.0.1:8000/")
         assert r.status_code == 200
 
     def test_config_get(self):
-        r = requests.get(f"{BASE_URL}/api/config")
+        import requests
+        r = requests.get("http://127.0.0.1:8000/api/config")
         assert r.status_code == 200
-        data = r.json()
-        assert "llm_api_base" in data
+        assert "llm_api_base" in r.json()
 
     def test_copilot_sse(self):
-        r = requests.get(f"{BASE_URL}/api/copilot/sse?token=bypass", stream=True)
+        import requests
+        r = requests.get("http://127.0.0.1:8000/api/copilot/sse?token=bypass", stream=True)
         assert r.status_code == 200
         r.close()
