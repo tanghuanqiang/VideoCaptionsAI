@@ -37,6 +37,21 @@ jobs:
     if: github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set version
+        id: version
+        shell: bash
+        run: |
+          # Get version from git tag, or use default
+          V=$(git describe --tags --abrev=0 || echo "v1.0.0")
+          # Remove 'v' prefix for Inno Setup
+          V_num=${V#v}
+          echo "VERSION=$V_num"
+          echo "V=$V"
+          echo "VERSION=$V_num" >> $GIFHUB_OUTPUT
+          echo "CleanVersion=${V_num}" >> $GIFHUB_ENV
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -61,12 +76,7 @@ jobs:
         shell: bash
         run: |
           pip install -r VideoSubs/requirements.txt
-          echo "Checking pyinstaller..."
-          python -c "import PyInstaller; print(f'PyInstaller {PyInstaller.__version__}')"
           python -c "import site, shutil, os; [(shutil.copytree(os.path.join(sp, 'whisper', 'assets'), 'VideoSubs/whisper_assets', dirs_exist_ok=True), print('Copied')) for sp in site.getsitepackages() if os.path.isdir(os.path.join(sp, 'whisper', 'assets'))]"
-          echo "Contents of VideoSubs/:"
-          ls -la VideoSubs/whisper_assets/ || echo "whisper_assets not found"
-          ls -la VideoSubs/frontend_dist/ || echo "frontend_dist not found yet"
 
       - name: Build frontend
         shell: bash
@@ -80,38 +90,30 @@ jobs:
         run: |
           mkdir -p VideoSubs/frontend_dist
           cp -r agentfront/dist/* VideoSubs/frontend_dist/
-          echo "Frontend dist contents:"
-          ls -la VideoSubs/frontend_dist/
 
       - name: Build PyInstaller exe
         shell: bash
         run: |
           cd VideoSubs
-          python -m PyInstaller build_exe.spec --noconfirm 2>&1 | tee pyinst_log.txt || true
-          echo "PyInstaller exit code: ${PIPESTATUS=0}"
-
-      - name: Upload PyInstaller log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pyinstaller-log
-          path: VideoSubs/pyinst_log.txt
-          retention-days: 3
+          python -m PyInstaller build_exe.spec --noconfirm
 
       - name: Build Inno Setup installer
-        if: always()
         shell: bash
         run: |
           cd VideoSubs
-          iscc installer.iss || echo "Inno Setup skipped"
+          # Update version in installer.iss before build
+          sed -i "s/^AppVersion=.*\\$/AppVersion=$VERSION/" installer.iss
+          iscc installer.iss
+          # Rename to include version
+          mv VideoCaptionsAI_Setup.exe VideoCaptionsAI_$VERSION.exe
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
 
       - name: Upload installer
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: VideoCaptionsAI-Setup
-          path: VideoSubs/VideoCaptionsAI_Setup.exe
-          if-no-files-found: ignore
+          path: VideoSubs/VideoCaptionsAI_*.exe
           retention-days: 7
 
   release:
@@ -125,6 +127,6 @@ jobs:
           name: VideoCaptionsAI-Setup
       - uses: softprops/action-gh-release@v2
         with:
-          files: VideoCaptionsAI_Setup.exe
+          files: VideoCaptionsAI_*.exe
           draft: false
           generate_release_notes: true
