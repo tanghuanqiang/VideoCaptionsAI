@@ -200,7 +200,10 @@ async def api_asr(
             "message": "ASR任务已提交，请使用task_id查询状态"
         })
 
-    result = asr_transcribe_video.invoke({"media_path": path, "model_size": model_size})
+    # Run in thread to avoid blocking the event loop
+    import asyncio
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, lambda: asr_transcribe_video.invoke({"media_path": path, "model_size": model_size}))
     
     # 生成推荐样式
     if width and height:

@@ -37,3 +37,28 @@ static/*.tmp
 
 # Build artifacts
 build/
+
+# Config & runtime files
+config.json
+app.log
+app.pid
+app.port
+startup.log
+video_subs.db
+
+# LangGraph checkpoints (may contain API keys)
+.langgraph_api/
+
+# Build artifacts
+dist/
+build/
+build_exe/
+
+# Installer output
+VideoCaptionsAI_Setup.exe
+VideoCaptionsAI_Setup.msi
+build_msi.py
+
+# Python build
+agent.egg-info/
+*.egg-info/

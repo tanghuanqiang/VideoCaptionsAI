@@ -1,7 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
-import { useAuth } from "../context/AuthContext";
 import "./SidebarCopilot.css";
 import type { Subtitle, AssStyle } from "../types/subtitleTypes";
 export interface Message {
@@ -82,7 +81,8 @@ const parseMaybeJson = (src: string): unknown | null => {
 };
 
 const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, setSubtitles, setStyles, subtitles, styles, videoFile }) => {
-  const { token, logout } = useAuth();
+  // Auth bypass - no login required
+  const token = "bypass";
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [isSending, setIsSending] = useState(false);
@@ -103,6 +103,16 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
   // Track hidden previews by block content signature so Cancel persists
   const [hiddenSubtitleSigs, setHiddenSubtitleSigs] = useState<string[]>([]);
   const [hiddenStyleSigs, setHiddenStyleSigs] = useState<string[]>([]);
+
+  // Settings panel
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [apiKey, setApiKey] = useState("");
+  const [apiBase, setApiBase] = useState("https://api.openai.com/v1");
+  const [modelName, setModelName] = useState("gpt-4o");
+  const [tavilyKey, setTavilyKey] = useState("");
+  const [savingSettings, setSavingSettings] = useState(false);
+
   // editable content for codeblocks, keyed by `${msg.id}-${type}-${blockIdx}`
   const [editingContent, setEditingContent] = useState<Record<string, string>>({});
 
@@ -193,6 +203,31 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
     };
   }, [setMessages]);
 
+  // Load settings on mount
+  useEffect(() => {
+    fetch("/api/config")
+      .then(r => r.json())
+      .then(cfg => {
+        setApiKey(cfg.llm_api_key || "");
+        setApiBase(cfg.llm_api_base || "https://api.openai.com/v1");
+        setModelName(cfg.llm_model_name || "gpt-4o");
+        setTavilyKey(cfg.tavily_api_key || "");
+        setSettingsLoaded(true);
+      })
+      .catch(() => setSettingsLoaded(true));
+  }, []);
+
+  // Auto-show welcome if no API key
+  useEffect(() => {
+    if (settingsLoaded && !apiKey && messages.length === 0) {
+      setMessages([{
+        id: 'welcome',
+        text: 'Welcome! I can help with: speech-to-text, subtitle editing, style adjustment, video burning.\n\nClick the gear icon (top-right) to configure your OpenAI-compatible API.',
+        role: 'assistant'
+      }]);
+    }
+  }, [settingsLoaded, apiKey, messages.length]);
+
   // keep messagesRef updated for the timeout callback
   useEffect(() => { messagesRef.current = messages; }, [messages]);
 
@@ -200,6 +235,24 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const saveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      await fetch("/api/config", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          llm_api_key: apiKey,
+          llm_api_base: apiBase,
+          llm_model_name: modelName,
+          tavily_api_key: tavilyKey,
+        }),
+      });
+      setShowSettings(false);
+    } catch(e) { console.error("Save config failed", e); }
+    setSavingSettings(false);
+  };
 
   // 发送消息（支持多文件上传）
   const handleSend = async () => {
@@ -244,7 +297,6 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
         // 不需要设置 Content-Type，fetch 会自动处理
       });
       if (res.status === 401) {
-          logout();
       }
     } catch (err) {
       console.warn('send failed', err);
@@ -263,18 +315,50 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
     <div className="sidebar-copilot">
       <div className="sidebar-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
         <span>Copilot</span>
-        <button
-          style={{marginLeft:'auto',background:'#23272e',color:'#fff',border:'none',borderRadius:4,padding:'4px 12px',cursor:'pointer'}}
-          onClick={() => setMessages([])}
-          title="新建对话"
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{verticalAlign:'middle',marginRight:4}}>
-            <rect x="8" y="3" width="2" height="12" rx="1" fill="#b3e5fc"/>
-            <rect x="3" y="8" width="12" height="2" rx="1" fill="#b3e5fc"/>
-          </svg>
-          New Chat
-        </button>
+        <div style={{display:'flex',gap:6,alignItems:'center'}}>
+          <button
+            className={!apiKey && settingsLoaded ? "gear-pulse" : ""}
+            style={{background:showSettings?'#3a7bd5':(!apiKey&&settingsLoaded?'#e67e22':'#23272e'),color:'#fff',border:'none',borderRadius:4,padding:'4px 8px',cursor:'pointer',fontSize:16,lineHeight:1}}
+            onClick={() => setShowSettings(!showSettings)}
+            title="API 设置"
+          >⚙</button>
+          <button
+            style={{background:'#23272e',color:'#fff',border:'none',borderRadius:4,padding:'4px 12px',cursor:'pointer'}}
+            onClick={() => setMessages([])}
+            title="新建对话"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{verticalAlign:'middle',marginRight:4}}>
+              <rect x="8" y="3" width="2" height="12" rx="1" fill="#b3e5fc"/>
+              <rect x="3" y="8" width="12" height="2" rx="1" fill="#b3e5fc"/>
+            </svg>
+            New Chat
+          </button>
+        </div>
       </div>
+      {showSettings && (
+        <div style={{padding:'12px',borderBottom:'1px solid #333',background:'#1a1d24'}}>
+          <div style={{fontWeight:600,marginBottom:10,fontSize:13,color:'#ccc'}}>Copilot API Settings</div>
+          <div style={{marginBottom:8}}>
+            <label style={{fontSize:11,color:'#888',display:'block',marginBottom:2}}>API Base URL</label>
+            <input value={apiBase} onChange={e=>setApiBase(e.target.value)} placeholder="https://api.openai.com/v1" style={{width:'100%',padding:'6px 8px',background:'#0d1117',border:'1px solid #333',borderRadius:4,color:'#e0e0e0',fontSize:12}} />
+          </div>
+          <div style={{marginBottom:8}}>
+            <label style={{fontSize:11,color:'#888',display:'block',marginBottom:2}}>API Key</label>
+            <input type="password" value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="sk-..." style={{width:'100%',padding:'6px 8px',background:'#0d1117',border:'1px solid #333',borderRadius:4,color:'#e0e0e0',fontSize:12}} />
+          </div>
+          <div style={{marginBottom:8}}>
+            <label style={{fontSize:11,color:'#888',display:'block',marginBottom:2}}>Model Name</label>
+            <input value={modelName} onChange={e=>setModelName(e.target.value)} placeholder="gpt-4o" style={{width:'100%',padding:'6px 8px',background:'#0d1117',border:'1px solid #333',borderRadius:4,color:'#e0e0e0',fontSize:12}} />
+          </div>
+          <div style={{marginBottom:10}}>
+            <label style={{fontSize:11,color:'#888',display:'block',marginBottom:2}}>Tavily API Key (optional)</label>
+            <input type="password" value={tavilyKey} onChange={e=>setTavilyKey(e.target.value)} placeholder="tvly-..." style={{width:'100%',padding:'6px 8px',background:'#0d1117',border:'1px solid #333',borderRadius:4,color:'#e0e0e0',fontSize:12}} />
+          </div>
+          <button onClick={saveSettings} disabled={savingSettings} style={{width:'100%',padding:'8px',background:'#3a7bd5',color:'#fff',border:'none',borderRadius:4,cursor:'pointer',fontSize:13,fontWeight:600}}>
+            {savingSettings ? 'Saving...' : 'Save & Reload'}
+          </button>
+        </div>
+      )}
       <div className="sidebar-files">
         <input type="file" multiple onChange={handleFileChange} />
         {files.map((file) => (

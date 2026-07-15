@@ -3,7 +3,6 @@ import "./Toolbar.css";
 import type { ASRResponse, Subtitle, AssStyle, SubtitleEvent } from "../types/subtitleTypes";
 import toAssColor from "../utils/toAssColor";
 import DownloadProgress from "./DownloadProgress";
-import { useAuth } from "../context/AuthContext";
 import { toSRT, toASS, downloadFile } from "../utils/subtitleUtils";
 import { ffmpegService } from "../utils/ffmpegService";
 import { driver } from "driver.js";
@@ -26,10 +25,12 @@ interface ToolbarProps {
   playResY?: number;
   copilotOpen: boolean;
   toggleCopilot: () => void;
+  currentPage: "editor" | "history";
+  setCurrentPage: (page: "editor" | "history") => void;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSubtitlesUpdate, styles, subtitles, theme, toggleTheme, playResX = 1920, playResY = 1080, copilotOpen, toggleCopilot }) => {
-  const { token, logout, user } = useAuth();
+const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSubtitlesUpdate, styles, subtitles, theme, toggleTheme, playResX = 1920, playResY = 1080, copilotOpen, toggleCopilot, currentPage, setCurrentPage }) => {
+  // Auth removed - no login required
   const [recognizing, setRecognizing] = useState(false);
   const [videoHeight, setVideoHeight] = useState<number | null>(null);
   const [videoWidth, setVideoWidth] = useState<number | null>(null);
@@ -38,9 +39,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
   const [asrQuality, setAsrQuality] = useState<'standard' | 'high' | 'professional'>('standard');
   const exportMenuRef = useRef<HTMLDivElement>(null);
   
-  const [showUserPopup, setShowUserPopup] = useState(false);
   const [showTutorialMenu, setShowTutorialMenu] = useState(false);
-  const userPopupRef = useRef<HTMLDivElement>(null);
   const tutorialMenuRef = useRef<HTMLDivElement>(null);
 
   const startTutorial = (type: 'basic' | 'shortcuts' | 'styling') => {
@@ -97,9 +96,6 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
     const handleClickOutside = (event: MouseEvent) => {
       if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
         setShowExportMenu(false);
-      }
-      if (userPopupRef.current && !userPopupRef.current.contains(event.target as Node)) {
-        setShowUserPopup(false);
       }
       if (tutorialMenuRef.current && !tutorialMenuRef.current.contains(event.target as Node)) {
         setShowTutorialMenu(false);
@@ -207,8 +203,10 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
     });
 
     try {
+      const toAssTime = (t: string | number) => { let s: number; if (typeof t === "number") { s = t; } else { const parts = String(t).split(':'); if (parts.length === 3) { const hh = parseInt(parts[0]) || 0; const mm = parseInt(parts[1]) || 0; const ss = parseFloat((parts[2] || '0').replace(',', '.')) || 0; s = hh * 3600 + mm * 60 + ss; } else { s = parseFloat(String(t)) || 0; } } const h = Math.floor(s/3600); const m = Math.floor((s%3600)/60); const sec = Math.floor(s%60); const cs = Math.round((s-Math.floor(s))*100); return h+":"+String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0")+"."+String(cs).padStart(2,"0"); };
+
       // 生成ASS文件内容
-      const assFileContent = `[Script Info]\nScriptType: v4.00+\nPlayResX:${videoWidth || 1920}\nPlayResY:${videoHeight || 1080}\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n${styles.map(style => `Style: ${style.Name},${style.FontName},${style.FontSize},${toAssColor(style.PrimaryColour || "#000000", style.PrimaryAlpha)},${toAssColor(style.SecondaryColour || "#000000", style.SecondaryAlpha)},${toAssColor(style.OutlineColour || "#000000",style.OutlineAlpha)},${toAssColor(style.BackColour || "#000000",style.BackAlpha)},${style.Bold ? 1 : 0},${style.Italic ? 1 : 0},${style.Underline ? 1 : 0},${style.StrikeOut ? 1 : 0},${style.ScaleX},${style.ScaleY},${style.Spacing},${style.Angle},${style.BorderStyle},${style.Outline},${style.Shadow},${style.Alignment},${style.MarginL},${style.MarginR},${style.MarginV},${style.Encoding}`).join('\n')}\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${subtitles.map(sub => `Dialogue: 0,${sub.start},${sub.end},${sub.style},,0,0,0,,${sub.text}`).join('\n')}`;
+      const assFileContent = `[Script Info]\nScriptType: v4.00+\nPlayResX:${videoWidth || 1920}\nPlayResY:${videoHeight || 1080}\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n${styles.map(style => `Style: ${style.Name},${style.FontName},${style.FontSize},${toAssColor(style.PrimaryColour || "#000000", style.PrimaryAlpha)},${toAssColor(style.SecondaryColour || "#000000", style.SecondaryAlpha)},${toAssColor(style.OutlineColour || "#000000",style.OutlineAlpha)},${toAssColor(style.BackColour || "#000000",style.BackAlpha)},${style.Bold ? -1 : 0},${style.Italic ? -1 : 0},${style.Underline ? -1 : 0},${style.StrikeOut ? -1 : 0},${style.ScaleX},${style.ScaleY},${style.Spacing},${style.Angle},${style.BorderStyle},${style.Outline},${style.Shadow},${style.Alignment},${style.MarginL},${style.MarginR},${style.MarginV},${style.Encoding}`).join('\n')}\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${subtitles.map(sub => `Dialogue: 0,${toAssTime(sub.start)},${toAssTime(sub.end)},${sub.style||"Default"},,0,0,0,,${sub.text}`).join('\n')}`;
 
       // 上传文件到后端
       const formData = new FormData();
@@ -221,9 +219,6 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
       const result = await new Promise<any>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/api/burn/');
-        if (token) {
-          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        }
 
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
@@ -312,11 +307,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
 
     const poll = async (): Promise<void> => {
       try {
-        const response = await fetch(`/api/burn/task/${taskId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
+        const response = await fetch(`/api/burn/task/${taskId}`);
 
         if (!response.ok) {
           throw new Error(`查询任务状态失败: ${response.statusText}`);
@@ -386,7 +377,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
 
       // 使用带 Token 的 URL 直接触发浏览器下载，避免 fetch/blob 的 CORS 和内存问题
       const encodedFileName = encodeURIComponent(fileName);
-      const downloadUrl = `/api/burn/download/${taskId}?token=${token}&filename=${encodedFileName}`;
+      const downloadUrl = `/api/burn/download/${taskId}?filename=${encodedFileName}`;
       
       const downloadLink = document.createElement('a');
       downloadLink.href = downloadUrl;
@@ -446,9 +437,6 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
       const resp = await fetch("/api/asr/", { 
         method: "POST", 
         body: formData,
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
       });
       
       if (resp.status === 413) {
@@ -498,31 +486,6 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
   return (
     <>
       <div className="toolbar">
-        {/* 登录状态显示 - 移到最左边 */}
-        <div 
-          className="user-status" 
-          onClick={() => token && setShowUserPopup(!showUserPopup)}
-          ref={userPopupRef}
-        >
-          <span className="user-name">👤 {token ? (user?.username || '已登录') : '未登录'}</span>
-          {showUserPopup && token && (
-            <div className="user-popup">
-              <div className="user-popup-name">{user?.username || 'User'}</div>
-              <button 
-                className="logout-btn" 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (window.confirm('确定要退出登录吗？')) {
-                    logout();
-                  }
-                }}
-                title="退出登录"
-              >
-                退出登录
-              </button>
-            </div>
-          )}
-        </div>
         <span className="toolbar-title">{title}</span>
         <div className="toolbar-actions toolbar-actions-left">
           {/* Tutorial Button */}
@@ -550,6 +513,18 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
               </div>
             )}
           </div>
+          <button
+            className="toolbar-btn"
+            style={{ minWidth: "130px", padding: "0 14px", gap: "6px", whiteSpace: "nowrap", flexShrink: 0 }}
+            onClick={() => setCurrentPage(currentPage === "editor" ? "history" : "editor")}
+            title={currentPage === "editor" ? "查看历史记录" : "返回编辑器"}
+          >
+            {currentPage === "editor" ? (
+              <><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>历史记录</span></>
+            ) : (
+              <><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg><span>返回编辑器</span></>
+            )}
+          </button>
 
           <label htmlFor="video-upload" className="toolbar-btn">
             <span>导入视频</span>

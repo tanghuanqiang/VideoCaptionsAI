@@ -1,4 +1,4 @@
-# subtitle_tools.py
+﻿# subtitle_tools.py
 import os
 import subprocess
 import json
@@ -12,6 +12,10 @@ from langchain_core.tools import tool
 from src.agent.Subs import AssStyle, SubtitleDoc, SubtitleEvent
 from src.utils.model_loader import get_whisper_model
 
+# Windows: prevent subprocess from spawning console windows
+import sys as _sys
+_CREATE_NO_WINDOW = 0x08000000 if _sys.platform == "win32" else 0
+
 out_dir = "outputs"
 # whisper_model = whisper.load_model("large-v3") <-- Removed
 # ----------------
@@ -20,27 +24,25 @@ out_dir = "outputs"
 @tool
 def probe_media(media_path: str) -> Dict[str, Any]:
     """
-    使用 ffprobe 获取媒体文件的时长、编码等信息。
+    使用 ffprobe 获取媒体文件的时长、编码等信息�?
     参数:
         media_path: 媒体文件路径
     返回:
         媒体信息字典
     """
-    # 将工作目录设置为媒体文件所在目录（如果没有目录则使用当前工作目录）
-    work_dir = os.path.dirname(media_path) or os.getcwd()
-    original_cwd = os.getcwd()
-    if work_dir and os.path.isdir(work_dir):
-        os.chdir(work_dir)
-    filename = os.path.basename(media_path)
+    # Use absolute path to avoid Unicode path issues with subprocess on Windows
+    abs_path = os.path.abspath(media_path)
     cmd = [
         "ffprobe", "-v", "error",
         "-show_entries", "format=duration:stream=index,codec_name,codec_type,width,height",
-        "-of", "json", filename
+        "-of", "json", abs_path
     ]
-    # 强制使用 utf-8 解码并在遇到非法字符时替换，避免 Windows 默认 gbk 导致的 UnicodeDecodeError
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True, encoding="utf-8", errors="replace")
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, encoding="utf-8", errors="replace", creationflags=_CREATE_NO_WINDOW)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"ffprobe failed (exit {e.returncode}) for: {abs_path}\\nSTDERR: {e.stderr}\\nSTDOUT: {e.stdout}") from e
     info = json.loads(result.stdout)
-    # 解析分辨率
+    # 解析分辨�?
     width = None
     height = None
     for stream in info.get("streams", []):
@@ -55,7 +57,7 @@ def probe_media(media_path: str) -> Dict[str, Any]:
         "streams": info.get("streams", []),
         "format": info.get("format", {})
     }
-    # 恢复原始工作目录（如果之前切换过）
+    # 恢复原始工作目录（如果之前切换过�?
     try:
         if os.getcwd() != original_cwd:
             os.chdir(original_cwd)
@@ -69,7 +71,7 @@ def probe_media(media_path: str) -> Dict[str, Any]:
 @tool
 def asr_transcribe_video(media_path: str, lang: str = None, model_size: str = None) -> SubtitleDoc:
     """
-    使用 Whisper 语音识别模型直接转写视频，输出分段字幕。
+    使用 Whisper 语音识别模型直接转写视频，输出分段字幕�?
     参数:
         media_path: 视频文件路径
         lang: 识别语言（可选）
@@ -100,9 +102,9 @@ def asr_transcribe_video(media_path: str, lang: str = None, model_size: str = No
 @tool
 def format_srt(subtitle_doc: Dict[str, Any], ) -> str:
     """
-    将字幕结构体格式化为 SRT 文件。
+    将字幕结构体格式化为 SRT 文件�?
     参数:
-        subtitle_doc: 字幕结构体
+        subtitle_doc: 字幕结构�?
     返回:
         SRT 文件路径
     """
@@ -118,9 +120,9 @@ def format_srt(subtitle_doc: Dict[str, Any], ) -> str:
 @tool
 def format_ass(media_height: int, media_width: int, subtitle_doc: Dict[str, Any], styles: Optional[List[AssStyle]] = None) -> str:
     """
-    将字幕结构体格式化为 ASS 文件。
+    将字幕结构体格式化为 ASS 文件�?
     参数:
-        subtitle_doc: 字幕结构体
+        subtitle_doc: 字幕结构�?
         styles: ASS 样式列表（可选）
     返回:
         ASS 文件路径
@@ -133,9 +135,9 @@ def format_ass(media_height: int, media_width: int, subtitle_doc: Dict[str, Any]
                 "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
         if styles:
             for style in styles:
-                f.write(f"Style: {style.Name},{style.FontName},{style.FontSize},{style.PrimaryColour},{style.SecondaryColour or '&H000000FF'},"
-                        f"{style.OutlineColour or '&H00000000'},{style.BackColour or '&H64000000'},{-1 if style.Bold else 0},{1 if style.Italic else 0},"
-                        f"{1 if style.Underline else 0},{1 if style.StrikeOut else 0},{style.ScaleX or 100},{style.ScaleY or 100},"
+                f.write(f"Style: {style.Name},{style.FontName},{style.FontSize},{_hex_to_ass_color(style.PrimaryColour, style.PrimaryAlpha or 0)},{_hex_to_ass_color(style.SecondaryColour, style.SecondaryAlpha or 0)},"
+                        f"{_hex_to_ass_color(style.OutlineColour, style.OutlineAlpha or 0)},{_hex_to_ass_color(style.BackColour, style.BackAlpha or 0)},{-1 if style.Bold else 0},{-1 if style.Italic else 0},"
+                        f"{-1 if style.Underline else 0},{-1 if style.StrikeOut else 0},{style.ScaleX or 100},{style.ScaleY or 100},"
                         f"{style.Spacing or 0},{style.Angle or 0},{style.BorderStyle or 1},{style.Outline or 1},{style.Shadow or 0},"
                         f"{style.Alignment or 2},{style.MarginL or 10},{style.MarginR or 10},{style.MarginV or 10},{style.Encoding or 1}\n")
         else:
@@ -152,7 +154,7 @@ def format_ass(media_height: int, media_width: int, subtitle_doc: Dict[str, Any]
 @tool
 def preview_mux(media_path: str, ass_path: str) -> str:
     """
-    生成带字幕预览视频，ASS 文件复制到视频目录，ffmpeg 合成预览。
+    生成带字幕预览视频，ASS 文件复制到视频目录，ffmpeg 合成预览�?
     参数:
         media_path: 视频文件路径
         ass_path: ASS 字幕文件路径
@@ -165,13 +167,15 @@ def preview_mux(media_path: str, ass_path: str) -> str:
     out_filename = "preview.mp4"
     out_path = os.path.join(work_dir, out_filename)
 
+    if not os.path.exists(media_abs):
+        raise FileNotFoundError(f"Media file not found for ffmpeg: {media_abs}")
     if not os.path.exists(ass_abs):
         raise FileNotFoundError(f"ASS file not found for ffmpeg: {ass_abs}")
 
     # FFmpeg filter path escaping for Windows
     # 1. Replace \ with /
     # 2. Escape : as \:
-    ass_path_escaped = ass_abs.replace('\\', '/').replace(':', '\\:')
+    ass_path_escaped = ass_abs.replace("\\", "/").replace(":", "\\:")
 
     cmd = [
         "ffmpeg", "-y", "-i", video_abs,
@@ -180,7 +184,7 @@ def preview_mux(media_path: str, ass_path: str) -> str:
     ]
     log_path = os.path.join(work_dir, "preview_ffmpeg.log")
     try:
-        proc = subprocess.run(cmd, check=True, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        proc = subprocess.run(cmd, check=True, capture_output=True, text=True, encoding="utf-8", errors="replace", creationflags=_CREATE_NO_WINDOW)
         with open(log_path, "w", encoding="utf-8") as lf:
             lf.write(proc.stdout or "")
             lf.write('\n-----stderr-----\n')
@@ -197,14 +201,14 @@ def preview_mux(media_path: str, ass_path: str) -> str:
 @tool
 def final_hard_burn(media_height: int, media_width: int, media_path: str, ass_path: str, task_dir: str) -> str:
     """
-    生成硬字幕视频，ASS 文件复制到视频目录，ffmpeg 合成输出。
+    生成硬字幕视频，ASS 文件复制到视频目录，ffmpeg 合成输出�?
     """
     return run_ffmpeg_burn(media_height, media_width, media_path, ass_path, task_dir)
 
 
 def run_ffmpeg_burn(media_height: int, media_width: int, media_path: str, ass_path: str, task_dir: str, progress_callback: Optional[Callable[[int], None]] = None) -> str:
     """
-    执行 FFmpeg 烧录逻辑，支持进度回调
+    执行 FFmpeg 烧录逻辑，支持进度回�?
     """
     media_abs = os.path.abspath(media_path)
     ass_abs = os.path.abspath(ass_path)
@@ -212,20 +216,26 @@ def run_ffmpeg_burn(media_height: int, media_width: int, media_path: str, ass_pa
     out_path = os.path.join(task_dir, out_filename)
     os.makedirs(task_dir, exist_ok=True)
 
+    if not os.path.exists(media_abs):
+        raise FileNotFoundError(f"Media file not found for ffmpeg: {media_abs}")
     if not os.path.exists(ass_abs):
         raise FileNotFoundError(f"ASS file not found for ffmpeg: {ass_abs}")
 
     # FFmpeg filter path escaping for Windows
-    ass_path_escaped = ass_abs.replace('\\', '/').replace(':', '\\:')
+    ass_path_escaped = ass_abs.replace("\\", "/").replace(":", "\\:")
 
     cmd = [
         "ffmpeg", "-y", "-i", media_abs,
         "-vf", f"ass='{ass_path_escaped}'",
-        "-c:v", "libx264", "-crf", "23", "-preset", "fast", out_path
+        "-c:v", "libx264", "-crf", "23", "-preset", "fast", "-c:a", "aac", "-b:a", "128k", out_path
     ]
     log_path = os.path.join(task_dir, "ffmpeg.log")
     
     print(f"Running FFmpeg: {' '.join(cmd)}")
+
+    # Initialize progress tracking variables
+    duration_sec = 0.0
+    log_file = None
     
     try:
         # 使用 Popen 以便实时读取输出
@@ -235,14 +245,13 @@ def run_ffmpeg_burn(media_height: int, media_width: int, media_path: str, ass_pa
             stderr=subprocess.PIPE, 
             universal_newlines=True,
             encoding="utf-8",
-            errors="replace"
+            errors="replace",
+            creationflags=_CREATE_NO_WINDOW
         )
-        
-        duration_sec = 0
         log_file = open(log_path, "w", encoding="utf-8")
         
         while True:
-            # 读取 stderr (FFmpeg 进度输出在 stderr)
+            # 读取 stderr (FFmpeg 进度输出�?stderr)
             line = process.stderr.readline()
             if not line and process.poll() is not None:
                 break
@@ -251,7 +260,7 @@ def run_ffmpeg_burn(media_height: int, media_width: int, media_path: str, ass_pa
                 log_file.write(line)
                 log_file.flush()
                 
-                # 解析总时长 Duration: 00:00:10.50
+                # 解析总时�?Duration: 00:00:10.50
                 if "Duration" in line and duration_sec == 0:
                     match = re.search(r"Duration: (\d{2}):(\d{2}):(\d{2}\.\d{2})", line)
                     if match:
@@ -266,7 +275,7 @@ def run_ffmpeg_burn(media_height: int, media_width: int, media_path: str, ass_pa
                         h, m, s = map(float, match.groups())
                         current_sec = h*3600 + m*60 + s
                         percent = int((current_sec / duration_sec) * 100)
-                        percent = max(0, min(99, percent)) # 限制在 0-99
+                        percent = max(0, min(99, percent)) # 限制�?0-99
                         if progress_callback:
                             progress_callback(percent)
         
@@ -278,32 +287,33 @@ def run_ffmpeg_burn(media_height: int, media_width: int, media_path: str, ass_pa
         return out_path
     except Exception as e:
         # 确保日志文件关闭
-        try:
-            log_file.close()
-        except:
-            pass
+        if log_file is not None:
+            try:
+                log_file.close()
+            except:
+                pass
         raise e
 
 @tool
 def final_hard_burn(media_height: int, media_width: int, media_path: str, ass_path: str, task_dir: str) -> str:
     """
-    生成硬字幕视频，ASS 文件复制到视频目录，ffmpeg 合成输出。
+    生成硬字幕视频，ASS 文件复制到视频目录，ffmpeg 合成输出�?
     参数:
         media_path: 视频文件路径
         ass_path: ASS 字幕文件路径
     返回:
-        硬字幕视频文件路径
+        硬字幕视频文件路�?
     """
     return run_ffmpeg_burn(media_height, media_width, media_path, ass_path, task_dir)
 
 @tool
 def task_db(meta: Dict[str, Any]) -> str:
     """
-    记录任务信息到 tasks.json，并返回任务 ID。
+    记录任务信息�?tasks.json，并返回任务 ID�?
     参数:
-        meta: 任务元信息字典
+        meta: 任务元信息字�?
     返回:
-        任务 ID（字符串）
+        任务 ID（字符串�?
     """
     db_path = os.path.join("outputs", "tasks.json")
     if os.path.exists(db_path):
@@ -320,10 +330,10 @@ def task_db(meta: Dict[str, Any]) -> str:
 @tool
 def final_soft_mux(media_path: str, sub_path: str) -> str:
     """
-    将字幕以软字幕形式封装到视频容器中（默认 MKV）。
+    将字幕以软字幕形式封装到视频容器中（默认 MKV）�?
     参数:
         media_path: 视频文件路径
-        sub_path: 字幕文件路径（SRT/ASS/VTT）
+        sub_path: 字幕文件路径（SRT/ASS/VTT�?
     返回:
         输出视频路径（带软字幕，可开关）
     """
@@ -332,14 +342,14 @@ def final_soft_mux(media_path: str, sub_path: str) -> str:
         "ffmpeg", "-y", "-i", media_path, "-i", sub_path,
         "-c", "copy", "-c:s", "srt", out_path
     ]
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, creationflags=_CREATE_NO_WINDOW)
     return out_path
 
 
 @tool
 def auto_subtitle_pipeline(media_path: str, lang: str = None) -> Dict[str, str]:
     """
-    自动完成字幕生成流程（提取音频 → ASR → 生成 SRT/ASS）。
+    自动完成字幕生成流程（提取音�?�?ASR �?生成 SRT/ASS）�?
     参数:
         media_path: 视频文件路径
         lang: 识别语言（可选）
@@ -357,6 +367,17 @@ def auto_subtitle_pipeline(media_path: str, lang: str = None) -> Dict[str, str]:
 # ----------------
 # Helpers
 # ----------------
+def _hex_to_ass_color(hex_color: str, alpha: int = 0) -> str:
+    """Convert hex #RRGGBB and CSS alpha (0-255) to ASS &HAABBGGRR format.
+    ASS alpha: 00=opaque, FF=transparent."""
+    if not hex_color or not hex_color.startswith("#"):
+        return "&H00000000"
+    r = hex_color[1:3]
+    g = hex_color[3:5]
+    b = hex_color[5:7]
+    ass_alpha = hex(255 - alpha)[2:].upper().zfill(2)
+    return f"&H{ass_alpha}{b}{g}{r}"
+
 def format_time(t: float, ass: bool = False) -> str:
     h = int(t // 3600)
     m = int((t % 3600) // 60)

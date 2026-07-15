@@ -1,11 +1,11 @@
-import os
+﻿import os
 import uuid
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
 from src.db import User
 from src.auth import get_current_user
-from src.config import OUTPUTS_DIR
+import src.config as _config
 from src.utils.task_queue import burn_queue
 
 router = APIRouter()
@@ -15,16 +15,20 @@ async def api_burn(file: UploadFile = File(...), ass_file: UploadFile = File(...
     """硬字幕烧录 - 异步任务模式"""
     try:
         task_id = str(uuid.uuid4())[:8]
-        task_dir = os.path.join(OUTPUTS_DIR, task_id)
+        task_dir = os.path.join(_config.OUTPUTS_DIR, task_id)
         os.makedirs(task_dir, exist_ok=True)
 
         # 保存上传的文件
         media_path = os.path.join(task_dir, file.filename)
         with open(media_path, "wb") as f:
             f.write(await file.read())
+        media_size = os.path.getsize(media_path)
+        print(f"[BURN] Media saved: {media_path} ({media_size} bytes, exists={os.path.exists(media_path)})")
         ass_path = os.path.join(task_dir, ass_file.filename)
         with open(ass_path, "wb") as f:
             f.write(await ass_file.read())
+        ass_size = os.path.getsize(ass_path)
+        print(f"[BURN] ASS saved: {ass_path} ({ass_size} bytes, exists={os.path.exists(ass_path)})")
         
         print(f"Files saved: {media_path}, {ass_path}")
         

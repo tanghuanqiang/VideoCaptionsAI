@@ -1,13 +1,13 @@
-import React from "react"; // Ensure React is imported for React.memo
-// import type { Subtitle, AssStyle } from "../App";
+﻿import React from "react"; // Ensure React is imported for React.memo
 
 interface VideoPanelProps {
   videoUrl: string;
   updateRect: () => void;
   videoRef: React.RefObject<HTMLVideoElement | null>;
+  children?: React.ReactNode;
 }
 
-const VideoPanel: React.FC<VideoPanelProps> = ({ videoUrl, updateRect, videoRef }) => {
+const VideoPanel: React.FC<VideoPanelProps> = ({ videoUrl, updateRect, videoRef, children }) => {
   return (
     <div
       style={{
@@ -33,10 +33,20 @@ const VideoPanel: React.FC<VideoPanelProps> = ({ videoUrl, updateRect, videoRef 
             }}
             onLoadedData={updateRect}
           />
+          <div
+            id="subtitle-overlay-container"
+            style={{
+              position: "absolute",
+              inset: 0,
+              pointerEvents: "none",
+              zIndex: 10,
+            }}
+          />
         </>
       ) : (
         <div style={{ color: "#666" }}>请选择视频文件</div>
       )}
+      {children}
     </div>
   );
 };

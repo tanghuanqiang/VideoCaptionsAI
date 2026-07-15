@@ -1,4 +1,4 @@
-import os
+﻿import os
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse, FileResponse
@@ -23,7 +23,7 @@ async def get_burn_task_status(task_id: str, current_user: User = Depends(get_cu
     if task.status == TaskStatus.COMPLETED and task.result:
         output_path = task.result.get("output_path")
         if output_path and os.path.exists(output_path):
-            task_info["download_url"] = f"/burn/download/{task_id}"
+            task_info["download_url"] = f"/api/burn/download/{task_id}"
     
     return JSONResponse(task_info)
 
@@ -43,7 +43,7 @@ async def get_current_user_download(
 async def download_burn_result(
     task_id: str, 
     filename: Optional[str] = Query(None),
-    current_user: User = Depends(get_current_user_download)
+    current_user: User = Depends(get_current_user)
 ):
     """下载烧录完成的视频"""
     task = burn_queue.get_task(task_id)

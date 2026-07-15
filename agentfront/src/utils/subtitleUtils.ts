@@ -1,4 +1,5 @@
 import type { Subtitle } from '../types/subtitleTypes';
+import toAssColor from './toAssColor';
 
 export const parseTime = (time: string | number): number => {
     if (typeof time === 'number') return time;
@@ -105,7 +106,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-${styles.map(s => `Style: ${s.Name},${s.Fontname},${s.Fontsize},${s.PrimaryColour},${s.SecondaryColour},${s.OutlineColour},${s.BackColour},${s.Bold},${s.Italic},${s.Underline},${s.StrikeOut},${s.ScaleX},${s.ScaleY},${s.Spacing},${s.Angle},${s.BorderStyle},${s.Outline},${s.Shadow},${s.Alignment},${s.MarginL},${s.MarginR},${s.MarginV},${s.Encoding}`).join('\n')}
+${styles.map(s => `Style: ${s.Name},${s.FontName},${s.FontSize},${toAssColor(s.PrimaryColour || "#FFFFFF", s.PrimaryAlpha)},${toAssColor(s.SecondaryColour || "#000000", s.SecondaryAlpha)},${toAssColor(s.OutlineColour || "#000000", s.OutlineAlpha)},${toAssColor(s.BackColour || "#000000", s.BackAlpha)},${s.Bold ? -1 : 0},${s.Italic ? -1 : 0},${s.Underline ? -1 : 0},${s.StrikeOut ? -1 : 0},${s.ScaleX ?? 100},${s.ScaleY ?? 100},${s.Spacing || 0},${s.Angle || 0},${s.BorderStyle ?? 1},${s.Outline ?? 1},${s.Shadow || 0},${s.Alignment ?? 2},${s.MarginL ?? 10},${s.MarginR ?? 10},${s.MarginV ?? 10},${s.Encoding ?? 1}`).join('\n')}
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

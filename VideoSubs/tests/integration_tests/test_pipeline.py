@@ -1,30 +1,62 @@
-import requests
+"""
+Integration test for VideoCaptionsAI pipeline.
+Requires a test video file and running server.
+"""
+import os
+import sys
+import json
+import pytest
 
-API_URL = "http://127.0.0.1:8000/pipeline/"  # 你的 FastAPI 运行地址
-VIDEO_FILE = "F:\\LangGraph\\VideoSubs\\testc.mp4"  # 替换成你本地的视频文件
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-def test_pipeline():
-    with open(VIDEO_FILE, "rb") as f:
-        files = {"file": (VIDEO_FILE, f, "video/mp4")}
-        data = {
-            "lang": "zh",      # 语言（en/zh/...）
-            "max_len": 20      # 每句最大长度
+TEST_VIDEO = os.environ.get("TEST_VIDEO_PATH", "")
+
+
+@pytest.mark.skipif(not TEST_VIDEO or not os.path.exists(TEST_VIDEO),
+                    reason="No test video provided (set TEST_VIDEO_PATH env var)")
+class TestPipeline:
+    def test_probe_media(self):
+        from src.tools.subtitle_tools import probe_media
+        result = probe_media.invoke({"media_path": TEST_VIDEO})
+        assert "duration" in result
+        assert result.get("width") is not None
+        assert result.get("height") is not None
+
+    def test_format_time_functions(self):
+        from src.tools.subtitle_tools import format_time
+        assert format_time(0, ass=False) == "00:00:00,000"
+        assert format_time(0, ass=True) == "0:00:00.00"
+
+    def test_ass_export(self):
+        from src.tools.subtitle_tools import format_ass
+        from src.agent.Subs import SubtitleDoc, SubtitleEvent
+        doc = SubtitleDoc(
+            language="en",
+            events=[
+                SubtitleEvent(id="1", start=0, end=5, text="Hello", style="Default"),
+                SubtitleEvent(id="2", start=5, end=10, text="World", style="Default"),
+            ]
+        )
+        path = format_ass.invoke({
+            "media_height": 1080,
+            "media_width": 1920,
+            "subtitle_doc": doc.dict(),
+        })
+        assert os.path.exists(path)
+        content = open(path, 'r', encoding='utf-8').read()
+        assert "Hello" in content
+        assert "World" in content
+        os.remove(path)
+
+    def test_srt_export(self):
+        from src.tools.subtitle_tools import format_srt
+        doc = {
+            "events": [
+                {"start": 0, "end": 5, "text": "Test"},
+            ]
         }
-        resp = requests.post(API_URL, files=files, data=data)
-
-    if resp.status_code == 200:
-        result = resp.json()
-        print("✅ Pipeline 成功运行！\n")
-        print("🎬 媒体信息:", result["media_info"])
-        print("🎧 音频路径:", result["audio_path"])
-        print("📝 字幕样例:", result["subs_sample"])
-        print("📄 SRT 文件:", result["srt_path"])
-        print("📄 ASS 文件:", result["ass_path"])
-        print("👀 预览视频:", result["preview_video"])
-        print("🔥 硬字幕视频:", result["final_video"])
-    else:
-        print("❌ 失败:", resp.status_code, resp.text)
-
-
-if __name__ == "__main__":
-    test_pipeline()
+        path = format_srt.invoke({"subtitle_doc": doc})
+        assert os.path.exists(path)
+        content = open(path, 'r', encoding='utf-8').read()
+        assert "Test" in content
+        os.remove(path)

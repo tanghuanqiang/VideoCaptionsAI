@@ -10,6 +10,8 @@ def burn_task_handler(media_path: str, ass_path: str, task_dir: str, progress_ca
     try:
         # 探测视频信息
         media_info = probe_media.invoke({"media_path": media_path})
+        print(f"[BURN-HANDLER] probe_media called with: {media_path}")
+        print(f"[BURN-HANDLER] File exists: {os.path.exists(media_path)}, size: {os.path.getsize(media_path) if os.path.exists(media_path) else 0}")
         media_height = media_info.get("height")
         media_width = media_info.get("width")
         
@@ -25,9 +27,6 @@ def burn_task_handler(media_path: str, ass_path: str, task_dir: str, progress_ca
         
         return {"output_path": result}
     except Exception as e:
-        # 清理临时文件
-        if os.path.exists(task_dir):
-            shutil.rmtree(task_dir, ignore_errors=True)
         raise e
 
 def asr_task_handler(media_path: str, model_size: str, lang: Optional[str] = None):

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'; // Added useCallback
+﻿import { useEffect, useMemo, useRef, useState, useCallback } from 'react'; // Added useCallback
 // import reactLogo from './assets/react.svg'
 // import viteLogo from '/vite.svg'
 import './App.css'
@@ -20,14 +20,14 @@ import SidebarCopilot from './components/SidebarCopilot';
 import type { Message } from './components/SidebarCopilot';
 import type { AssStyle, Subtitle, ASRResponse } from './types/subtitleTypes';
 
-import { AuthProvider, useAuth } from './context/AuthContext';
-import Login from './pages/Login';
 import { calculateLayers } from './utils/subtitleUtils';
 import { useHistory } from './hooks/useHistory';
 
 function MainApp() {
   // Copilot 侧边栏开关
   const [copilotOpen, setCopilotOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => localStorage.getItem('onboarding_done') !== 'true');
+  const dismissOnboarding = () => { setShowOnboarding(false); localStorage.setItem('onboarding_done', 'true'); };
   // Copilot 消息历史
   const [copilotMessages, setCopilotMessages] = useState<Message[]>([]);
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -53,7 +53,8 @@ function MainApp() {
   const [playResY, setPlayResY] = useState<number>(1080);
 
   // 主题状态管理
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => { const s = localStorage.getItem('theme'); return (s === 'dark' || s === 'light') ? s : 'dark'; });
+  const [currentPage, setCurrentPage] = useState<'editor' | 'history'>('editor');
 
   // Keyboard shortcuts for Undo/Redo
   useEffect(() => {
@@ -75,7 +76,11 @@ function MainApp() {
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+    setTheme(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('theme', next);
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -168,6 +173,10 @@ function MainApp() {
   const [styles, setStyles] = useState<AssStyle[]>([defaultStyle]);
   const [selectedStyle, setSelectedStyle] = useState<string>(styles[0].Name);
   // 拖拽布局配置
+  const handleStyleUpdate = useCallback((styleName: string, updates: Partial<AssStyle>) => {
+    setStyles(prev => prev.map(s => s.Name === styleName ? { ...s, ...updates } : s));
+  }, []);
+
   const alpha = 5;
   const layout = [
     { i: "video", x: 0, y: 0, w: 7*alpha, h: 4*alpha, minW: 3*alpha, minH: 2*alpha },
@@ -241,6 +250,18 @@ function MainApp() {
 
   return (
     <div className="app-container">
+      {showOnboarding && (
+        <div style={{background:"linear-gradient(135deg,#1a1a2e,#16213e)",color:"#e0e0e0",padding:"14px 24px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"2px solid #3a7bd5"}}>
+          <div style={{display:"flex",alignItems:"center",gap:16}}>
+            <span style={{fontSize:24}}>??</span>
+            <div>
+              <div style={{fontWeight:"bold",fontSize:16,marginBottom:4}}>Welcome to VideoCaptionsAI!</div>
+              <div style={{fontSize:13,color:"#999",lineHeight:1.6}}>3 steps: Upload video ? Speech-to-text ? Edit &amp; export. Copilot in sidebar for AI help.</div>
+            </div>
+          </div>
+          <button onClick={dismissOnboarding} style={{background:"transparent",border:"1px solid #555",color:"#999",borderRadius:4,padding:"6px 16px",cursor:"pointer",fontSize:13}}>Got it</button>
+        </div>
+      )}
       <header>
         <Toolbar
           title="AI字幕识别生成器"
@@ -287,6 +308,8 @@ function MainApp() {
           playResY={playResY}
           copilotOpen={copilotOpen}
           toggleCopilot={() => setCopilotOpen(v => !v)}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
         />
       </header>
       {/* 预览字幕 */}
@@ -297,6 +320,7 @@ function MainApp() {
         videoRef={videoRef} 
         playResX={playResX}  
         playResY={playResY}  
+        onStyleUpdate={handleStyleUpdate}
       />
       <main className="main-content">
         {/* Copilot 侧边栏开关按钮已移动到 Toolbar */}
@@ -469,16 +493,8 @@ function MainApp() {
 }
 
 function App() {
-  return (
-    <AuthProvider>
-      <AuthGuard />
-    </AuthProvider>
-  );
+  return <MainApp />;
 }
 
-function AuthGuard() {
-  const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <MainApp /> : <Login />;
-}
 
 export default App;

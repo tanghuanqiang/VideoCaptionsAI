@@ -115,6 +115,10 @@ class TaskQueue:
         print(f"Registered handler for task type: {task_type}")
 
     async def start(self):
+        """Start the task queue processor."""
+        # Recreate queue in the current event loop
+        self.queue = asyncio.Queue()
+        # Load persisted state
         """启动任务队列处理器"""
         # 恢复状态
         self.load_state()
@@ -174,7 +178,7 @@ class TaskQueue:
             try:
                 # 更新 Metrics
                 if PROMETHEUS_AVAILABLE:
-                    self.metric_queue_size.set(self.queue.qsize())
+                    self.metric_queue_size.set((self.queue.qsize() if self.queue else 0))
                     self.metric_active_tasks.set(self.active_tasks)
 
                 # 检查并发限制
@@ -296,7 +300,7 @@ class TaskQueue:
     
     def get_queue_status(self) -> Dict[str, Any]:
         return {
-            "queue_size": self.queue.qsize(),
+            "queue_size": (self.queue.qsize() if self.queue else 0),
             "active_tasks": self.active_tasks,
             "total_tasks": len(self.tasks),
             "max_concurrent": self.max_concurrent,
