@@ -92,12 +92,11 @@ jobs:
           cp -r agentfront/dist/* VideoSubs/frontend_dist/
 
       - name: Build PyInstaller exe
-        shell: bash
+        shell: pwsh
         run: |
-          cd VideoSubs
-          set -o pipefail
-          python -m PyInstaller build_exe.spec --noconfirm --log-level=WARN 2>&1 | tee pyinst_log.txt
-          echo "PyInstaller exit: $?"
+          Set-Location VideoSubs
+          python -m PyInstaller build_exe.spec --noconfirm --log-level=WARN *>&1 | Tee-Object -FilePath pyinst_log.txt
+          Write-Host "PyInstaller exit: $LASTEXITCODE"
         continue-on-error: true
 
       - name: Upload PyInstaller log
@@ -109,20 +108,21 @@ jobs:
           retention-days: 3
 
       - name: Check PyInstaller result
-        shell: bash
+        shell: pwsh
         run: |
-          cd VideoSubs
-          if grep -q "Build complete" pyinst_log.txt 2>/dev/null; then
-            echo "BUILD SUCCESS"
-          elif grep -qiE "error|traceback|fatal" pyinst_log.txt 2>/dev/null; then
-            echo "BUILD FAILED - errors found:"
-            grep -iE "error|traceback|fatal" pyinst_log.txt | tail -20
+          Set-Location VideoSubs
+          $log = Get-Content pyinst_log.txt -Raw -ErrorAction SilentlyContinue
+          if ($log -match "Build complete") {
+            Write-Host "BUILD SUCCESS"
+          } elseif ($log -match "(?i)error|traceback|fatal") {
+            Write-Host "BUILD FAILED - errors found:"
+            $log -split "`n" | Select-String -Pattern "(?i)error|traceback|fatal" | Select-Object -Last 20
             exit 1
-          else
-            echo "BUILD FAILED - unknown reason. Last 100 lines:"
-            tail -100 pyinst_log.txt
+          } else {
+            Write-Host "BUILD FAILED - last 100 lines:"
+            Get-Content pyinst_log.txt -Tail 100
             exit 1
-          fi
+          }
 
       - name: Build Inno Setup installer
         shell: bash
