@@ -95,34 +95,22 @@ jobs:
         shell: pwsh
         run: |
           Set-Location VideoSubs
-          python -m PyInstaller build_exe.spec --noconfirm --log-level=WARN *>&1 | Tee-Object -FilePath pyinst_log.txt
-          Write-Host "PyInstaller exit: $LASTEXITCODE"
-        continue-on-error: true
+          pyinstaller build_exe.spec --noconfirm --log-level=WARN *>&1 | Tee-Object -FilePath pyinst_log.txt
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "PyInstaller FAILED (exit $LASTEXITCODE). Log:"
+            Get-Content pyinst_log.txt -Tail 80
+            exit 1
+          }
+          Write-Host "PyInstaller completed successfully"
 
       - name: Upload PyInstaller log
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pyinstaller-log
           path: VideoSubs/pyinst_log.txt
           if-no-files-found: warn
           retention-days: 3
-
-      - name: Check PyInstaller result
-        shell: pwsh
-        run: |
-          Set-Location VideoSubs
-          $log = Get-Content pyinst_log.txt -Raw -ErrorAction SilentlyContinue
-          if ($log -match "Build complete") {
-            Write-Host "BUILD SUCCESS"
-          } elseif ($log -match "(?i)error|traceback|fatal") {
-            Write-Host "BUILD FAILED - errors found:"
-            $log -split "`n" | Select-String -Pattern "(?i)error|traceback|fatal" | Select-Object -Last 20
-            exit 1
-          } else {
-            Write-Host "BUILD FAILED - last 100 lines:"
-            Get-Content pyinst_log.txt -Tail 100
-            exit 1
-          }
 
       - name: Build Inno Setup installer
         shell: bash
