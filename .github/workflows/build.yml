@@ -95,32 +95,15 @@ jobs:
         shell: pwsh
         run: |
           Set-Location VideoSubs
-          $ErrorActionPreference = "Continue"
-          try {
-            pyinstaller build_exe.spec --noconfirm --log-level=WARN 2>&1 | ForEach-Object { $_; Add-Content -Path pyinst_log.txt -Value $_ }
-            if ($LASTEXITCODE -ne 0) {
-              Write-Host "PyInstaller exit code: $LASTEXITCODE"
-              Write-Host "=== ERRORS FOUND ==="
-              Select-String -Path pyinst_log.txt -Pattern "Error|Traceback|FATAL|ModuleNotFound|FileNotFound" -CaseSensitive:$false | Select-Object -Last 20
-              Write-Host "=== LAST 150 LINES ==="
-              Get-Content pyinst_log.txt -Tail 150
-              exit 1
-            }
-            Write-Host "PyInstaller completed successfully"
-          } catch {
-            Write-Host "PyInstaller threw exception: $_"
-            Get-Content pyinst_log.txt -Tail 80
+          pyinstaller build_exe.spec --noconfirm --log-level=WARN
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "PyInstaller FAILED with exit code $LASTEXITCODE"
             exit 1
           }
-
-      - name: Upload PyInstaller log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pyinstaller-log
-          path: VideoSubs/pyinst_log.txt
-          if-no-files-found: warn
-          retention-days: 3
+          Write-Host "PyInstaller build successful!"
+          Write-Host "Dist contents:"
+          Get-ChildItem dist/VideoCaptionsAI -Recurse -File | Measure-Object -Property Length -Sum | ForEach-Object { Write-Host "Total: $([math]::Round($_.Sum/1MB, 0)) MB" }
+          Get-ChildItem dist/VideoCaptionsAI/VideoCaptionsAI.exe -ErrorAction SilentlyContinue | Write-Host
 
       - name: Build Inno Setup installer
         shell: bash
