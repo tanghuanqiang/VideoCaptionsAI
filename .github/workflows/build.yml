@@ -95,13 +95,23 @@ jobs:
         shell: pwsh
         run: |
           Set-Location VideoSubs
-          pyinstaller build_exe.spec --noconfirm --log-level=WARN *>&1 | Tee-Object -FilePath pyinst_log.txt
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "PyInstaller FAILED (exit $LASTEXITCODE). Last 80 lines of log:"
+          $ErrorActionPreference = "Continue"
+          try {
+            pyinstaller build_exe.spec --noconfirm --log-level=WARN 2>&1 | ForEach-Object { $_; Add-Content -Path pyinst_log.txt -Value $_ }
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "PyInstaller exit code: $LASTEXITCODE"
+              Write-Host "=== ERRORS FOUND ==="
+              Select-String -Path pyinst_log.txt -Pattern "Error|Traceback|FATAL|ModuleNotFound|FileNotFound" -CaseSensitive:$false | Select-Object -Last 20
+              Write-Host "=== LAST 150 LINES ==="
+              Get-Content pyinst_log.txt -Tail 150
+              exit 1
+            }
+            Write-Host "PyInstaller completed successfully"
+          } catch {
+            Write-Host "PyInstaller threw exception: $_"
             Get-Content pyinst_log.txt -Tail 80
             exit 1
           }
-          Write-Host "PyInstaller completed successfully"
 
       - name: Upload PyInstaller log
         if: always()
