@@ -6,6 +6,7 @@ Build via: build.py (or: pyinstaller build_exe.spec)
 import os
 import sys
 from pathlib import Path
+from PyInstaller.utils.hooks import collect_all, collect_submodules, collect_data_files
 
 _PROJECT_DIR = Path(os.path.abspath(SPECPATH))
 
@@ -58,6 +59,51 @@ for _env in ['.env', '.env.example']:
         datas.append((_env, '.'))
         break
 
+# Collect all dependencies for key packages
+print("Collecting torch dependencies...")
+torch_d, torch_b, torch_h = collect_all('torch')
+print(f"  torch: {len(torch_d)} data, {len(torch_b)} binaries, {len(torch_h)} hiddenimports")
+
+print("Collecting whisper dependencies...")
+whisper_d, whisper_b, whisper_h = collect_all('whisper')
+print(f"  whisper: {len(whisper_d)} data, {len(whisper_b)} binaries, {len(whisper_h)} hiddenimports")
+
+# Collect langchain packages
+print("Collecting langchain dependencies...")
+lc_h = collect_submodules('langchain_core')
+lc_h += collect_submodules('langchain_openai')
+lc_h += collect_submodules('langgraph')
+
+# Extend binaries, datas, hiddenimports
+_BINARY_PATHS.extend(torch_b)
+_BINARY_PATHS.extend(whisper_b)
+datas.extend(torch_d)
+datas.extend(whisper_d)
+
+_all_hidden = [
+    # Uvicorn / Starlette
+    'uvicorn.logging', 'uvicorn.loops', 'uvicorn.loops.auto',
+    'uvicorn.protocols.http.auto', 'uvicorn.protocols.websockets.auto',
+    'uvicorn.lifespan.on',
+    'starlette.middleware.cors', 'anyio._backends._asyncio',
+    # Database
+    'sqlalchemy.ext.declarative', 'sqlalchemy.dialects.sqlite',
+    # Auth
+    'passlib.handlers.bcrypt', 'jenum', 'jose', 'cryptography',
+    # ML
+    'numpy.random', 'numpy.core.multiarray', 'tiktoken_ext.openai_public',
+    # LangChain
+    'langchain_community', 'langchain_text_splitters', 'langchain_tavily', 'tavily',
+    # Utilities
+    'pydantic.deprecated', 'multipart', 'prometheus_client',
+    'dotenv', 'PIL.Image', 'tqdm', 'regex._regex',
+    'pystray',
+    'unittest.mock', 'ctypes', 'logging.handlers',
+]
+_all_hidden.extend(torch_h)
+_all_hidden.extend(whisper_h)
+_all_hidden.extend(lc_h)
+
 # Wrap Analysis in try/except for better error reporting
 import traceback as _tb_pyi
 try:
@@ -66,25 +112,7 @@ try:
     pathex=[str(_PROJECT_DIR)],
     binaries=_BINARY_PATHS,
     datas=datas,
-    hiddenimports=[
-        'uvicorn.logging', 'uvicorn.loops', 'uvicorn.loops.auto',
-        'uvicorn.protocols.http.auto', 'uvicorn.protocols.websockets.auto',
-        'uvicorn.lifespan.on',
-        'starlette.middleware.cors', 'anyio._backends._asyncio',
-        'sqlalchemy.ext.declarative', 'sqlalchemy.dialects.sqlite',
-        'passlib.handlers.bcrypt', 'jenum', 'jose', 'cryptography',
-        'torch', 'whisper', 'tiktoken_ext.openai_public',
-        'numpy.random', 'numpy.core.multiarray',
-        'langchain_core', 'langchain_openai',
-        'langgraph.prebuilt', 'langgraph.checkpoint.memory',
-        'langgraph.store.memory',
-        'langchain_community', 'langchain_text_splitters',
-        'langchain_tavily', 'tavily',
-        'pydantic.deprecated', 'multipart', 'prometheus_client',
-        'dotenv', 'PIL.Image', 'tqdm', 'regex._regex',
-        'pystray',
-        'unittest.mock', 'ctypes', 'logging.handlers',
-    ],
+    hiddenimports=_all_hidden,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=['runtime_hook.py'],

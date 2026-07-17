@@ -91,19 +91,6 @@ jobs:
           mkdir -p VideoSubs/frontend_dist
           cp -r agentfront/dist/* VideoSubs/frontend_dist/
 
-      - name: Test PyInstaller (minimal)
-        shell: pwsh
-        run: |
-          Set-Location VideoSubs
-          pyinstaller test_spec.spec --noconfirm --log-level=WARN *>&1 | Tee-Object -FilePath test_pyinst_log.txt
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "TEST PyInstaller FAILED (exit $LASTEXITCODE). Log:"
-            Get-Content test_pyinst_log.txt -Tail 40
-            exit 1
-          }
-          Write-Host "Test PyInstaller OK. Dist contents:"
-          Get-ChildItem dist/TestExe -ErrorAction SilentlyContinue | Select-Object Name, Length
-
       - name: Build PyInstaller exe
         shell: pwsh
         run: |
