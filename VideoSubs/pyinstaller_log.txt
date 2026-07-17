@@ -1,0 +1,27 @@
+﻿python : 1260 INFO: PyInstaller: 6.21.0, contrib hooks: 2026.6
+    + CategoryInfo          : NotSpecified: (1260 INFO: PyIn...b hooks: 2026.6:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+1261 INFO: Python: 3.9.13 (conda)
+1282 INFO: Platform: Windows-10-10.0.26200-SP0
+1282 INFO: Python environment: D:\anaconda
+1283 DEBUG: Testing UPX availability ...
+1286 DEBUG: UPX is not available.
+Traceback (most recent call last):
+  File "D:\anaconda\lib\runpy.py", line 197, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "D:\anaconda\lib\runpy.py", line 87, in _run_code
+    exec(code, run_globals)
+  File "D:\anaconda\lib\site-packages\PyInstaller\__main__.py", line 321, in <module>
+    run()
+  File "D:\anaconda\lib\site-packages\PyInstaller\__main__.py", line 215, in run
+    run_build(pyi_config, spec_file, **vars(args))
+  File "D:\anaconda\lib\site-packages\PyInstaller\__main__.py", line 70, in run_build
+    PyInstaller.building.build_main.main(pyi_config, spec_file, **kwargs)
+  File "D:\anaconda\lib\site-packages\PyInstaller\building\build_main.py", line 1275, in main
+    build(specfile, distpath, workpath, clean_build)
+  File "D:\anaconda\lib\site-packages\PyInstaller\building\build_main.py", line 1213, in build
+    exec(code, spec_namespace)
+  File "build_exe.spec", line 39, in <module>
+    raise FileNotFoundError(f'Frontend dist not found at {frontend}')
+FileNotFoundError: Frontend dist not found at E:\VideoCaptionsAI\frontend_dist

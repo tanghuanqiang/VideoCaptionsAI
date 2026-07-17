@@ -1,0 +1,120 @@
+{
+  "2a08f424": {
+    "task_id": "2a08f424",
+    "task_type": "burn_task",
+    "kwargs": {
+      "media_path": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\fcd19ea1\\最怕空气突然的安静.mp4",
+      "ass_path": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\fcd19ea1\\subtitles.ass",
+      "task_dir": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\fcd19ea1"
+    },
+    "status": "completed",
+    "progress": 100,
+    "result": {
+      "output_path": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\fcd19ea1\\output.mp4"
+    },
+    "error": null,
+    "created_at": "2026-07-08T13:18:56.482138",
+    "started_at": "2026-07-08T13:18:56.484258",
+    "completed_at": "2026-07-08T13:19:06.102681",
+    "retries": 0,
+    "max_retries": 3,
+    "timeout": 3600
+  },
+  "6df0d51a": {
+    "task_id": "6df0d51a",
+    "task_type": "burn_task",
+    "kwargs": {
+      "media_path": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\78cb4a7e\\最怕空气突然的安静.mp4",
+      "ass_path": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\78cb4a7e\\subtitles.ass",
+      "task_dir": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\78cb4a7e"
+    },
+    "status": "completed",
+    "progress": 100,
+    "result": {
+      "output_path": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\78cb4a7e\\output.mp4"
+    },
+    "error": null,
+    "created_at": "2026-07-08T13:19:39.047228",
+    "started_at": "2026-07-08T13:19:39.050745",
+    "completed_at": "2026-07-08T13:19:46.513052",
+    "retries": 0,
+    "max_retries": 3,
+    "timeout": 3600
+  },
+  "41ea7735": {
+    "task_id": "41ea7735",
+    "task_type": "burn_task",
+    "kwargs": {
+      "media_path": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\d51a67a3\\最怕空气突然的安静.mp4",
+      "ass_path": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\d51a67a3\\subtitles.ass",
+      "task_dir": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\d51a67a3"
+    },
+    "status": "failed",
+    "progress": 0,
+    "result": null,
+    "error": "Command '['ffprobe', '-v', 'error', '-show_entries', 'format=duration:stream=index,codec_name,codec_type,width,height', '-of', 'json', '最怕空气突然的安静.mp4']' returned non-zero exit status 1.",
+    "created_at": "2026-07-08T17:49:01.839934",
+    "started_at": "2026-07-08T17:49:16.380233",
+    "completed_at": "2026-07-08T17:49:16.443011",
+    "retries": 3,
+    "max_retries": 3,
+    "timeout": 3600
+  },
+  "6af49bb5": {
+    "task_id": "6af49bb5",
+    "task_type": "burn_task",
+    "kwargs": {
+      "media_path": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\e34b8c18\\最怕空气突然的安静.mp4",
+      "ass_path": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\e34b8c18\\subtitles.ass",
+      "task_dir": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\e34b8c18"
+    },
+    "status": "failed",
+    "progress": 0,
+    "result": null,
+    "error": "Command '['ffprobe', '-v', 'error', '-show_entries', 'format=duration:stream=index,codec_name,codec_type,width,height', '-of', 'json', '最怕空气突然的安静.mp4']' returned non-zero exit status 1.",
+    "created_at": "2026-07-08T17:55:15.486655",
+    "started_at": "2026-07-08T17:55:30.045230",
+    "completed_at": "2026-07-08T17:55:30.106217",
+    "retries": 3,
+    "max_retries": 3,
+    "timeout": 3600
+  },
+  "bebacf8e": {
+    "task_id": "bebacf8e",
+    "task_type": "burn_task",
+    "kwargs": {
+      "media_path": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\706cfd35\\最怕空气突然的安静.mp4",
+      "ass_path": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\706cfd35\\subtitles.ass",
+      "task_dir": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\706cfd35"
+    },
+    "status": "failed",
+    "progress": 0,
+    "result": null,
+    "error": "Command '['ffprobe', '-v', 'error', '-show_entries', 'format=duration:stream=index,codec_name,codec_type,width,height', '-of', 'json', 'E:\\\\VideoCaptionsAI\\\\VideoSubs\\\\dist\\\\VideoCaptionsAI\\\\outputs\\\\706cfd35\\\\最怕空气突然的安静.mp4']' returned non-zero exit status 1.",
+    "created_at": "2026-07-08T18:00:16.572506",
+    "started_at": "2026-07-08T18:00:31.101408",
+    "completed_at": "2026-07-08T18:00:31.161318",
+    "retries": 3,
+    "max_retries": 3,
+    "timeout": 3600
+  },
+  "5d5a37cb": {
+    "task_id": "5d5a37cb",
+    "task_type": "burn_task",
+    "kwargs": {
+      "media_path": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\da95b05f\\最怕空气突然的安静.mp4",
+      "ass_path": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\da95b05f\\subtitles.ass",
+      "task_dir": "E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\da95b05f"
+    },
+    "status": "failed",
+    "progress": 0,
+    "result": null,
+    "error": "Media file not found: E:\\VideoCaptionsAI\\VideoSubs\\dist\\VideoCaptionsAI\\outputs\\da95b05f\\最怕空气突然的安静.mp4",
+    "created_at": "2026-07-08T19:51:17.078568",
+    "started_at": "2026-07-08T19:51:31.742159",
+    "completed_at": "2026-07-08T19:51:31.744304",
+    "retries": 3,
+    "max_retries": 3,
+    "timeout": 3600
+  }
+}

@@ -1,0 +1,462 @@
+﻿python : 1072 INFO: PyInstaller: 6.21.0, contrib hooks: 2026.6
+At line:2 char:105
++ ... lyContinue; python -m PyInstaller build_exe.spec --noconfirm 2>&1 | O ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (1072 INFO: PyIn...b hooks: 2026.6:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+1072 INFO: Python: 3.9.13 (conda)
+1090 INFO: Platform: Windows-10-10.0.26200-SP0
+1090 INFO: Python environment: D:\anaconda
+1096 INFO: Module search paths (PYTHONPATH):
+['E:\\VideoCaptionsAI\\VideoSubs',
+ 'D:\\anaconda\\python39.zip',
+ 'D:\\anaconda\\DLLs',
+ 'D:\\anaconda\\lib',
+ 'D:\\anaconda',
+ 'D:\\anaconda\\lib\\site-packages',
+ 'D:\\anaconda\\lib\\site-packages\\win32',
+ 'D:\\anaconda\\lib\\site-packages\\win32\\lib',
+ 'D:\\anaconda\\lib\\site-packages\\Pythonwin',
+ 'E:\\VideoCaptionsAI\\VideoSubs']
+2406 INFO: Appending 'binaries' from .spec
+2446 INFO: Appending 'datas' from .spec
+2448 INFO: checking Analysis
+2448 INFO: Building Analysis because Analysis-00.toc is non existent
+2448 INFO: Looking for Python shared library...
+2448 INFO: Using Python shared library: D:\anaconda\python39.dll
+2448 INFO: Running Analysis Analysis-00.toc
+2448 INFO: Target bytecode optimization level: 0
+2448 INFO: Initializing module dependency graph...
+2449 INFO: Initializing module graph hook caches...
+2468 INFO: Analyzing modules for base_library.zip ...
+5295 INFO: Processing standard module hook 'hook-encodings.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hoo
+ks'
+6649 INFO: Processing standard module hook 'hook-math.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hooks'
+7002 INFO: Processing standard module hook 'hook-pickle.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hooks'
+7382 INFO: Processing standard module hook 'hook-heapq.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hooks'
+7600 INFO: Caching module dependency graph...
+7642 INFO: Analyzing E:\VideoCaptionsAI\VideoSubs\main_exe.py
+7657 INFO: Processing standard module hook 'hook-_ctypes.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hooks
+'
+7667 INFO: Processing standard module hook 'hook-webbrowser.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\ho
+oks'
+7687 INFO: Processing standard module hook 'hook-uvicorn.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks
+_contrib\\stdhooks'
+9136 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'D:\\anaconda\\lib\\site-packages\\PyIns
+taller\\hooks'
+9238 INFO: Processing standard module hook 'hook-xml.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hooks'
+9869 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'D:\\anaconda\\lib\\site-packages\\P
+yInstaller\\hooks\\pre_safe_import_module'
+9871 INFO: SetuptoolsInfo: initializing cached setuptools info...
+12194 INFO: Processing standard module hook 'hook-difflib.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hook
+s'
+12213 INFO: Processing standard module hook 'hook-platform.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hoo
+ks'
+12249 INFO: Processing pre-safe-import-module hook 'hook-importlib_metadata.py' from 'D:\\anaconda\\lib\\site-packages\
+\PyInstaller\\hooks\\pre_safe_import_module'
+12258 INFO: Processing standard module hook 'hook-importlib_metadata.py' from 'D:\\anaconda\\lib\\site-packages\\PyInst
+aller\\hooks'
+12261 INFO: Processing pre-safe-import-module hook 'hook-zipp.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\
+hooks\\pre_safe_import_module'
+12461 INFO: Processing standard module hook 'hook-pkg_resources.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller
+\\hooks'
+17024 INFO: Processing standard module hook 'hook-sysconfig.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\ho
+oks'
+17118 INFO: Processing standard module hook 'hook-websockets.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_h
+ooks_contrib\\stdhooks'
+18892 INFO: Processing standard module hook 'hook-cryptography.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller
+_hooks_contrib\\stdhooks'
+21962 INFO: Processing standard module hook 'hook-bcrypt.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks
+_contrib\\stdhooks'
+22536 INFO: Processing standard module hook 'hook-anyio.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks_
+contrib\\stdhooks'
+24358 INFO: Processing standard module hook 'hook-pydantic.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hoo
+ks_contrib\\stdhooks'
+25854 INFO: Processing standard module hook 'hook-rich.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks_c
+ontrib\\stdhooks'
+27354 INFO: Processing standard module hook 'hook-pygments.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hoo
+ks'
+31359 INFO: Processing standard module hook 'hook-chardet.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hook
+s_contrib\\stdhooks'
+32110 INFO: Processing standard module hook 'hook-numpy.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hooks'
+32497 INFO: Processing standard module hook 'hook-psutil.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks
+_contrib\\stdhooks'
+33225 INFO: Processing standard module hook 'hook-zoneinfo.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hoo
+ks_contrib\\stdhooks'
+33507 INFO: Processing standard module hook 'hook-certifi.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hook
+s_contrib\\stdhooks'
+33874 INFO: Processing standard module hook 'hook-dns.rdata.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_ho
+oks_contrib\\stdhooks'
+35460 INFO: Processing standard module hook 'hook-pythoncom.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_ho
+oks_contrib\\stdhooks'
+35548 INFO: Processing standard module hook 'hook-pywintypes.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_h
+ooks_contrib\\stdhooks'
+35764 INFO: Processing pre-safe-import-module hook 'hook-distutils.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstal
+ler\\hooks\\pre_safe_import_module'
+35765 INFO: Processing pre-find-module-path hook 'hook-distutils.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstalle
+r\\hooks\\pre_find_module_path'
+37827 INFO: Processing standard module hook 'hook-distutils.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\ho
+oks'
+37844 INFO: Processing standard module hook 'hook-_osx_support.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\
+\hooks'
+37853 INFO: Processing standard module hook 'hook-distutils.util.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstalle
+r\\hooks'
+38731 INFO: Processing standard module hook 'hook-xml.etree.cElementTree.py' from 'D:\\anaconda\\lib\\site-packages\\Py
+Installer\\hooks'
+39112 INFO: Processing standard module hook 'hook-lxml.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks_c
+ontrib\\stdhooks'
+40411 INFO: Processing standard module hook 'hook-lxml.etree.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_h
+ooks_contrib\\stdhooks'
+40442 INFO: Processing standard module hook 'hook-setuptools.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\h
+ooks'
+40555 INFO: Processing pre-safe-import-module hook 'hook-packaging.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstal
+ler\\hooks\\pre_safe_import_module'
+41238 INFO: Processing standard module hook 'hook-orjson.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks
+_contrib\\stdhooks'
+41284 INFO: Processing standard module hook 'hook-torch.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks_
+contrib\\stdhooks'
+2728 WARNING: Failed to collect submodules for 'torch.utils.tensorboard' because importing 'torch.utils.tensorboard' ra
+ised: ModuleNotFoundError: No module named 'tensorboard'
+W0716 05:18:11.659782 3380 site-packages\torch\distributed\elastic\multiprocessing\redirects.py:29] NOTE: Redirects are
+ currently not supported in Windows or MacOs.
+D:\anaconda\lib\site-packages\PyInstaller\utils\hooks\__init__.py:665: DeprecationWarning: `torch.distributed._sharding
+_spec` will be deprecated, use `torch.distributed._shard.sharding_spec` instead
+  __import__(name)
+D:\anaconda\lib\site-packages\PyInstaller\utils\hooks\__init__.py:665: DeprecationWarning: `torch.distributed._sharded_
+tensor` will be deprecated, use `torch.distributed._shard.sharded_tensor` instead
+  __import__(name)
+D:\anaconda\lib\site-packages\PyInstaller\utils\hooks\__init__.py:665: DeprecationWarning: `torch.distributed._shard.ch
+eckpoint` will be deprecated, use `torch.distributed.checkpoint` instead
+  __import__(name)
+59132 INFO: hook-torch: this torch build does not depend on MKL...
+59756 INFO: Processing standard module hook 'hook-PIL.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hooks'
+59889 INFO: Processing standard module hook 'hook-PIL.Image.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\ho
+oks'
+61149 INFO: Processing standard module hook 'hook-xml.dom.domreg.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstalle
+r\\hooks'
+61265 INFO: Processing standard module hook 'hook-pycparser.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_ho
+oks_contrib\\stdhooks'
+61700 INFO: Processing standard module hook 'hook-PIL.ImageFilter.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstall
+er\\hooks'
+62097 INFO: Processing pre-safe-import-module hook 'hook-importlib_resources.py' from 'D:\\anaconda\\lib\\site-packages
+\\PyInstaller\\hooks\\pre_safe_import_module'
+62159 INFO: Processing standard module hook 'hook-imageio.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hook
+s_contrib\\stdhooks'
+63971 INFO: Processing standard module hook 'hook-imageio_ffmpeg.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstall
+er_hooks_contrib\\stdhooks'
+65447 INFO: Processing standard module hook 'hook-py.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks_con
+trib\\stdhooks'
+67744 INFO: Processing pre-safe-import-module hook 'hook-win32com.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstal
+ler_hooks_contrib\\pre_safe_import_module'
+67826 INFO: Processing standard module hook 'hook-win32com.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hoo
+ks_contrib\\stdhooks'
+68731 INFO: Processing standard module hook 'hook-urllib3.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hook
+s_contrib\\stdhooks'
+68748 INFO: Processing pre-safe-import-module hook 'hook-urllib3.packages.six.moves.py' from 'D:\\anaconda\\lib\\site-p
+ackages\\PyInstaller\\hooks\\pre_safe_import_module'
+68969 INFO: Processing standard module hook 'hook-charset_normalizer.py' from 'D:\\anaconda\\lib\\site-packages\\_pyins
+taller_hooks_contrib\\stdhooks'
+70162 INFO: Processing standard module hook 'hook-shelve.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hooks
+'
+70170 INFO: Processing standard module hook 'hook-sqlite3.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hook
+s'
+73573 INFO: Processing standard module hook 'hook-wcwidth.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hook
+s'
+73606 INFO: Processing pre-safe-import-module hook 'hook-backports.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstal
+ler\\hooks\\pre_safe_import_module'
+73612 INFO: Processing standard module hook 'hook-backports.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_ho
+oks_contrib\\stdhooks'
+74102 INFO: Processing standard module hook 'hook-fsspec.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks
+_contrib\\stdhooks'
+75587 INFO: Processing standard module hook 'hook-distributed.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_
+hooks_contrib\\stdhooks'
+78613 INFO: Processing standard module hook 'hook-dask.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks_c
+ontrib\\stdhooks'
+78815 INFO: Processing standard module hook 'hook-cloudpickle.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_
+hooks_contrib\\stdhooks'
+78924 INFO: Processing standard module hook 'hook-jinja2.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks
+_contrib\\stdhooks'
+79165 INFO: Processing standard module hook 'hook-numba.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks_
+contrib\\stdhooks'
+79181 INFO: Processing standard module hook 'hook-llvmlite.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hoo
+ks_contrib\\stdhooks'
+82989 INFO: Processing standard module hook 'hook-zmq.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks_co
+ntrib\\stdhooks'
+84898 INFO: Processing standard module hook 'hook-sqlalchemy.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\h
+ooks'
+87290 INFO: Processing standard module hook 'hook-h5py.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks_c
+ontrib\\stdhooks'
+89106 INFO: Processing standard module hook 'hook-nacl.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks_c
+ontrib\\stdhooks'
+89577 INFO: Processing standard module hook 'hook-lz4.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks_co
+ntrib\\stdhooks'
+94120 INFO: Processing pre-safe-import-module hook 'hook-tomli.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\
+\hooks\\pre_safe_import_module'
+96622 INFO: Processing standard module hook 'hook-regex.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks_
+contrib\\stdhooks'
+97017 INFO: Processing pre-safe-import-module hook 'hook-six.moves.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstal
+ler\\hooks\\pre_safe_import_module'
+97193 INFO: Processing standard module hook 'hook-passlib.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hook
+s_contrib\\stdhooks'
+98065 INFO: Processing standard module hook 'hook-langchain.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_ho
+oks_contrib\\stdhooks'
+100243 INFO: Processing standard module hook 'hook-nltk.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks_
+contrib\\stdhooks'
+102620 INFO: Processing standard module hook 'hook-sklearn.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hoo
+ks_contrib\\stdhooks'
+103535 INFO: Processing standard module hook 'hook-sklearn.utils.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstall
+er_hooks_contrib\\stdhooks'
+103824 INFO: Processing standard module hook 'hook-sklearn.cluster.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinsta
+ller_hooks_contrib\\stdhooks'
+103832 INFO: Processing standard module hook 'hook-sklearn.metrics.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinsta
+ller_hooks_contrib\\stdhooks'
+103863 INFO: Processing standard module hook 'hook-sklearn.metrics.cluster.py' from 'D:\\anaconda\\lib\\site-packages\\
+_pyinstaller_hooks_contrib\\stdhooks'
+103883 INFO: Processing standard module hook 'hook-sklearn.metrics.pairwise.py' from 'D:\\anaconda\\lib\\site-packages\
+\_pyinstaller_hooks_contrib\\stdhooks'
+103972 INFO: Processing standard module hook 'hook-sklearn.neighbors.py' from 'D:\\anaconda\\lib\\site-packages\\_pyins
+taller_hooks_contrib\\stdhooks'
+104045 INFO: Processing standard module hook 'hook-sklearn.linear_model.py' from 'D:\\anaconda\\lib\\site-packages\\_py
+installer_hooks_contrib\\stdhooks'
+104450 INFO: Processing standard module hook 'hook-sphinx.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hook
+s'
+117074 INFO: Processing standard module hook 'hook-docutils.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_ho
+oks_contrib\\stdhooks'
+123807 INFO: Processing standard module hook 'hook-babel.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hooks
+'
+124285 INFO: Processing standard module hook 'hook-pytz.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hooks'
+127035 INFO: Processing standard module hook 'hook-boto3.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks
+_contrib\\stdhooks'
+132711 INFO: Processing standard module hook 'hook-botocore.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_ho
+oks_contrib\\stdhooks'
+134583 INFO: Processing standard module hook 'hook-dateutil.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_ho
+oks_contrib\\stdhooks'
+137207 INFO: Processing standard module hook 'hook-cv2.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks_c
+ontrib\\stdhooks'
+138797 INFO: Processing standard module hook 'hook-shapely.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hoo
+ks_contrib\\stdhooks'
+138958 INFO: Processing standard module hook 'hook-pdfminer.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_ho
+oks_contrib\\stdhooks'
+139310 INFO: Processing standard module hook 'hook-pypdfium2.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_h
+ooks_contrib\\stdhooks'
+139356 INFO: Processing standard module hook 'hook-pypdfium2_raw.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstall
+er_hooks_contrib\\stdhooks'
+139964 INFO: Processing standard module hook 'hook-reportlab.lib.utils.py' from 'D:\\anaconda\\lib\\site-packages\\_pyi
+nstaller_hooks_contrib\\stdhooks'
+140235 INFO: Processing standard module hook 'hook-reportlab.pdfbase._fontdata.py' from 'D:\\anaconda\\lib\\site-packag
+es\\_pyinstaller_hooks_contrib\\stdhooks'
+142872 INFO: Processing pre-safe-import-module hook 'hook-tensorflow.py' from 'D:\\anaconda\\lib\\site-packages\\_pyins
+taller_hooks_contrib\\pre_safe_import_module'
+146510 INFO: Processing standard module hook 'hook-psycopg2.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_ho
+oks_contrib\\stdhooks'
+148163 INFO: Processing standard module hook 'hook-jsonschema.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_
+hooks_contrib\\stdhooks'
+148905 INFO: Processing standard module hook 'hook-ormsgpack.py' from 'D:\\anaconda\\lib\\site-packages\\ormsgpack\\_py
+installer'
+149213 INFO: Processing standard module hook 'hook-pystray.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hoo
+ks_contrib\\stdhooks'
+150512 INFO: Processing pre-safe-import-module hook 'hook-gi.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\h
+ooks\\pre_safe_import_module'
+150545 INFO: Analyzing hidden import 'uvicorn.loops'
+150546 INFO: Analyzing hidden import 'uvicorn.loops.auto'
+150548 INFO: Analyzing hidden import 'uvicorn.protocols.http.auto'
+150549 INFO: Analyzing hidden import 'uvicorn.protocols.websockets.auto'
+150551 INFO: Analyzing hidden import 'uvicorn.lifespan.on'
+150555 INFO: Analyzing hidden import 'anyio._backends._asyncio'
+150586 INFO: Analyzing hidden import 'sqlalchemy.dialects.sqlite'
+150625 INFO: Analyzing hidden import 'passlib.handlers.bcrypt'
+150841 INFO: Analyzing hidden import 'jenum'
+150841 ERROR: Hidden import 'jenum' not found
+150842 INFO: Analyzing hidden import 'tiktoken_ext.openai_public'
+150847 INFO: Analyzing hidden import 'langgraph.checkpoint.memory'
+150855 INFO: Analyzing hidden import 'langgraph.store.memory'
+150865 INFO: Processing module hooks (post-graph stage)...
+151460 INFO: Processing standard module hook 'hook-panel.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks
+_contrib\\stdhooks'
+1331 INFO: Note: NumExpr detected 24 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 8.
+1332 INFO: NumExpr defaulting to 8 threads.
+157486 INFO: Processing standard module hook 'hook-pyviz_comms.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller
+_hooks_contrib\\stdhooks'
+158226 INFO: Processing standard module hook 'hook-markdown.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_ho
+oks_contrib\\stdhooks'
+160105 INFO: Processing standard module hook 'hook-xarray.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hook
+s_contrib\\stdhooks'
+161397 INFO: Processing standard module hook 'hook-skimage.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hoo
+ks_contrib\\stdhooks'
+161440 INFO: Processing standard module hook 'hook-skimage.exposure.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinst
+aller_hooks_contrib\\stdhooks'
+161448 INFO: Processing standard module hook 'hook-skimage.color.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstall
+er_hooks_contrib\\stdhooks'
+161486 INFO: Processing standard module hook 'hook-skimage.filters.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinsta
+ller_hooks_contrib\\stdhooks'
+165269 INFO: Processing standard module hook 'hook-nbconvert.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_h
+ooks_contrib\\stdhooks'
+165485 INFO: Processing standard module hook 'hook-nbformat.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_ho
+oks_contrib\\stdhooks'
+165709 INFO: Processing standard module hook 'hook-mistune.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hoo
+ks_contrib\\stdhooks'
+166742 INFO: Processing standard module hook 'hook-intake.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hook
+s_contrib\\stdhooks'
+166957 INFO: Processing standard module hook 'hook-appdirs.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hoo
+ks_contrib\\stdhooks'
+168294 INFO: Processing standard module hook 'hook-astropy.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hoo
+ks_contrib\\stdhooks'
+WARNING: AstropyDeprecationWarning: The private astropy._erfa module has been made into its own package, pyerfa, which 
+is a dependency of astropy and can be imported directly using "import erfa" [astropy._erfa]
+3981 WARNING: AstropyDeprecationWarning: The private astropy._erfa module has been made into its own package, pyerfa, w
+hich is a dependency of astropy and can be imported directly using "import erfa"
+178502 INFO: Processing standard module hook 'hook-lxml.isoschematron.py' from 'D:\\anaconda\\lib\\site-packages\\_pyin
+staller_hooks_contrib\\stdhooks'
+178609 WARNING: Hidden import "mx.DateTime" not found!
+179023 INFO: Processing standard module hook 'hook-skimage.transform.py' from 'D:\\anaconda\\lib\\site-packages\\_pyins
+taller_hooks_contrib\\stdhooks'
+179030 INFO: Processing standard module hook 'hook-skimage.feature.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinsta
+ller_hooks_contrib\\stdhooks'
+179279 INFO: Processing standard module hook 'hook-skimage.draw.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstalle
+r_hooks_contrib\\stdhooks'
+179310 INFO: Processing standard module hook 'hook-skimage.measure.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinsta
+ller_hooks_contrib\\stdhooks'
+179340 INFO: Processing standard module hook 'hook-skimage.morphology.py' from 'D:\\anaconda\\lib\\site-packages\\_pyin
+staller_hooks_contrib\\stdhooks'
+179484 INFO: Processing standard module hook 'hook-skimage.restoration.py' from 'D:\\anaconda\\lib\\site-packages\\_pyi
+nstaller_hooks_contrib\\stdhooks'
+179503 INFO: Processing standard module hook 'hook-pywt.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks_
+contrib\\stdhooks'
+179586 INFO: Processing standard module hook 'hook-skimage.metrics.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinsta
+ller_hooks_contrib\\stdhooks'
+179614 INFO: Processing standard module hook 'hook-skimage.data.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstalle
+r_hooks_contrib\\stdhooks'
+179617 INFO: Processing standard module hook 'hook-skimage.io.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_
+hooks_contrib\\stdhooks'
+183853 INFO: Processing standard module hook 'hook-qtpy.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hooks'
+184144 INFO: hook-qtpy: selected 'PyQt5' as the only available Qt bindings.
+184172 INFO: Processing standard module hook 'hook-sklearn.tree.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstalle
+r_hooks_contrib\\stdhooks'
+188824 INFO: Processing standard module hook 'hook-PIL.SpiderImagePlugin.py' from 'D:\\anaconda\\lib\\site-packages\\Py
+Installer\\hooks'
+190267 INFO: Processing standard module hook 'hook-setuptools._vendor.importlib_metadata.py' from 'D:\\anaconda\\lib\\s
+ite-packages\\PyInstaller\\hooks'
+190334 INFO: Processing standard module hook 'hook-setuptools._vendor.jaraco.text.py' from 'D:\\anaconda\\lib\\site-pac
+kages\\PyInstaller\\hooks'
+192048 INFO: Processing standard module hook 'hook-lib2to3.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hoo
+ks'
+192397 INFO: Processing standard module hook 'hook-sqlalchemy.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\
+hooks'
+192810 WARNING: Hidden import "pysqlite2" not found!
+192810 WARNING: Hidden import "MySQLdb" not found!
+196949 INFO: Processing standard module hook 'hook-lxml.objectify.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstal
+ler_hooks_contrib\\stdhooks'
+196950 INFO: Processing standard module hook 'hook-tzdata.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hook
+s_contrib\\stdhooks'
+198854 INFO: Performing binary vs. data reclassification (5914 entries)
+200578 INFO: Looking for ctypes DLLs
+200614 WARNING: Ignoring /usr/lib64/libgomp.so.1 imported from D:\anaconda\lib\site-packages\torch\_inductor\codecache.
+py - only basenames are supported with ctypes imports!
+200643 WARNING: Library nvrtc64_120_0.dll required via ctypes not found
+200856 INFO: Analyzing run-time hooks ...
+200856 INFO: Including custom run-time hook 'runtime_hook.py'
+200904 INFO: Including run-time hook 'pyi_rth_pkgres.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hooks\\rt
+hooks'
+200908 INFO: Including run-time hook 'pyi_rth_multiprocessing.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\
+hooks\\rthooks'
+200909 INFO: Including run-time hook 'pyi_rth_pywintypes.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks
+_contrib\\rthooks'
+200911 INFO: Including run-time hook 'pyi_rth_pythoncom.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks_
+contrib\\rthooks'
+200912 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hooks\\r
+thooks'
+200913 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hooks\\r
+thooks'
+200915 INFO: Including run-time hook 'pyi_rth_traitlets.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks_
+contrib\\rthooks'
+200916 INFO: Including run-time hook 'pyi_rth_setuptools.py' from 'D:\\anaconda\\lib\\site-packages\\PyInstaller\\hooks
+\\rthooks'
+200918 INFO: Including run-time hook 'pyi_rth_nltk.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinstaller_hooks_contr
+ib\\rthooks'
+200919 INFO: Including run-time hook 'pyi_rth_cryptography_openssl.py' from 'D:\\anaconda\\lib\\site-packages\\_pyinsta
+ller_hooks_contrib\\rthooks'
+201149 INFO: Creating base_library.zip...
+201176 INFO: Looking for dynamic libraries
+D:\anaconda\lib\site-packages\setuptools\_distutils\_msvccompiler.py:563: UserWarning: Fallback spawn triggered. Please
+ update distutils monkeypatch.
+  warnings.warn("Fallback spawn triggered. Please update distutils monkeypatch.")
+D:\anaconda\lib\site-packages\paramiko\transport.py:219: CryptographyDeprecationWarning: Blowfish has been deprecated
+  "class": algorithms.Blowfish,
+D:\anaconda\lib\site-packages\PyInstaller\building\build_main.py:227: UserWarning: viewer requires Qt
+  __import__(package)
+WARNING: AstropyDeprecationWarning: The private astropy._erfa module has been made into its own package, pyerfa, which 
+is a dependency of astropy and can be imported directly using "import erfa" [astropy._erfa]
+D:\anaconda\lib\site-packages\PyInstaller\isolated\_child.py:100: VisibleDeprecationWarning: zmq.eventloop.minitornado 
+is deprecated in pyzmq 14.0 and will be removed.
+    Install tornado itself to use zmq with the tornado IOLoop.
+    
+  while run_next_command(read_fh, write_fh):
+W0716 05:20:57.980986 32876 site-packages\torch\distributed\elastic\multiprocessing\redirects.py:29] NOTE: Redirects ar
+e currently not supported in Windows or MacOs.
+D:\anaconda\lib\site-packages\PyInstaller\building\build_main.py:227: DeprecationWarning: `torch.distributed._sharding_
+spec` will be deprecated, use `torch.distributed._shard.sharding_spec` instead
+  __import__(package)
+D:\anaconda\lib\site-packages\PyInstaller\building\build_main.py:227: DeprecationWarning: `torch.distributed._sharded_t
+ensor` will be deprecated, use `torch.distributed._shard.sharded_tensor` instead
+  __import__(package)
+D:\anaconda\lib\site-packages\PyInstaller\building\build_main.py:227: DeprecationWarning: `torch.distributed._shard.che
+ckpoint` will be deprecated, use `torch.distributed.checkpoint` instead
+  __import__(package)
+226728 INFO: Extra DLL search directories (AddDllDirectory): ['D:\\anaconda\\lib\\site-packages\\numpy\\.libs', 'D:\\an
+aconda\\Library\\bin', 'D:\\anaconda\\Lib\\site-packages\\cv2\\../../x64/vc17/bin', 'D:\\anaconda\\lib\\site-packages\\
+torch\\lib', 'D:\\anaconda\\Library\\bin']
+226728 INFO: Extra DLL search directories (PATH): ['D:\\anaconda\\Lib\\site-packages\\cv2\\../../x64/vc17/bin', 'D:\\an
+aconda\\lib\\site-packages\\llvmlite\\binding']
+234826 WARNING: Library not found: could not resolve 'impi.dll', dependency of 'D:\\anaconda\\Library\\bin\\libicaf.dll
+'.
+234826 WARNING: Library not found: could not resolve 'impi.dll', dependency of 'D:\\anaconda\\Library\\bin\\mkl_blacs_i
+ntelmpi_ilp64.1.dll'.
+234826 WARNING: Library not found: could not resolve 'impi.dll', dependency of 'D:\\anaconda\\Library\\bin\\mkl_blacs_i
+ntelmpi_lp64.1.dll'.
+234826 WARNING: Library not found: could not resolve 'mpich2mpi.dll', dependency of 'D:\\anaconda\\Library\\bin\\mkl_bl
+acs_mpich2_ilp64.1.dll'.
+234826 WARNING: Library not found: could not resolve 'mpich2mpi.dll', dependency of 'D:\\anaconda\\Library\\bin\\mkl_bl
+acs_mpich2_lp64.1.dll'.
+234827 WARNING: Library not found: could not resolve 'msmpi.dll', dependency of 'D:\\anaconda\\Library\\bin\\mkl_blacs_
+msmpi_ilp64.1.dll'.
+234827 WARNING: Library not found: could not resolve 'msmpi.dll', dependency of 'D:\\anaconda\\Library\\bin\\mkl_blacs_
+msmpi_lp64.1.dll'.
+234827 WARNING: Library not found: could not resolve 'pgf90.dll', dependency of 'D:\\anaconda\\Library\\bin\\mkl_pgi_th
+read.1.dll'.
+234827 WARNING: Library not found: could not resolve 'pgc.dll', dependency of 'D:\\anaconda\\Library\\bin\\mkl_pgi_thre
+ad.1.dll'.
+234827 WARNING: Library not found: could not resolve 'pgmath.dll', dependency of 'D:\\anaconda\\Library\\bin\\mkl_pgi_t
+hread.1.dll'.
+234827 WARNING: Library not found: could not resolve 'ze_loader.dll', dependency of 'D:\\anaconda\\Library\\bin\\omptar
+get.rtl.level0.dll'.
+234827 WARNING: Library not found: could not resolve 'sycl.dll', dependency of 'D:\\anaconda\\Library\\bin\\onedal_dpc.
+1.dll'.
+234827 WARNING: Library not found: could not resolve 'libpq-564ca91e26b7e5908e053e043ff655fe.dll', dependency of 'D:\\a
+naconda\\lib\\site-packages\\psycopg2\\_psycopg.cp39-win_amd64.pyd'.
+235641 INFO: Warnings written to E:\VideoCaptionsAI\VideoSubs\build\build_exe\warn-build_exe.txt
+236552 INFO: Graph cross-reference written to E:\VideoCaptionsAI\VideoSubs\build\build_exe\xref-build_exe.html
+236792 INFO: checking PYZ
+236792 INFO: Building PYZ because PYZ-00.toc is non existent
+236792 INFO: Building PYZ (ZlibArchive) E:\VideoCaptionsAI\VideoSubs\build\build_exe\PYZ-00.pyz
+240646 INFO: Building PYZ (ZlibArchive) E:\VideoCaptionsAI\VideoSubs\build\build_exe\PYZ-00.pyz completed successfully.
+240768 INFO: checking PKG
+240768 INFO: Building PKG because PKG-00.toc is non existent
+240768 INFO: Building PKG (CArchive) VideoCaptionsAI.pkg
+240821 INFO: Building PKG (CArchive) VideoCaptionsAI.pkg completed successfully.
+240822 INFO: Bootloader D:\anaconda\lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\runw.exe
+240822 INFO: checking EXE
+240822 INFO: Building EXE because EXE-00.toc is non existent
+240822 INFO: Building EXE from EXE-00.toc
+240822 INFO: Copying bootloader EXE to E:\VideoCaptionsAI\VideoSubs\build\build_exe\VideoCaptionsAI.exe
+240840 INFO: Copying icon to EXE
+240845 INFO: Copying 0 resources to EXE
+240845 INFO: Embedding manifest in EXE
+240849 INFO: Appending PKG archive to EXE
+240883 INFO: Fixing EXE headers
+241060 INFO: Building EXE from EXE-00.toc completed successfully.
+241109 INFO: checking COLLECT
+241110 INFO: Building COLLECT because COLLECT-00.toc is non existent
+241110 INFO: Building COLLECT COLLECT-00.toc
+253554 INFO: Building COLLECT COLLECT-00.toc completed successfully.
+253637 INFO: Build complete! The results are available in: E:\VideoCaptionsAI\VideoSubs\dist
