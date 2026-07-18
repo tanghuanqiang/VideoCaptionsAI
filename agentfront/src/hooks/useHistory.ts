@@ -1,4 +1,6 @@
-import { useState, useCallback } from 'react';
+﻿import { useState, useCallback } from "react";
+
+const MAX_HISTORY = 50;
 
 interface HistoryState<T> {
   past: T[];
@@ -17,69 +19,42 @@ export function useHistory<T>(initialPresent: T) {
   const canRedo = state.future.length > 0;
 
   const undo = useCallback(() => {
-    setState((currentState) => {
-      const { past, present, future } = currentState;
-      if (past.length === 0) return currentState;
-
+    setState((cur) => {
+      const { past, present, future } = cur;
+      if (past.length === 0) return cur;
       const previous = past[past.length - 1];
       const newPast = past.slice(0, past.length - 1);
-
-      return {
-        past: newPast,
-        present: previous,
-        future: [present, ...future],
-      };
+      return { past: newPast, present: previous, future: [present, ...future] };
     });
   }, []);
 
   const redo = useCallback(() => {
-    setState((currentState) => {
-      const { past, present, future } = currentState;
-      if (future.length === 0) return currentState;
-
+    setState((cur) => {
+      const { past, present, future } = cur;
+      if (future.length === 0) return cur;
       const next = future[0];
       const newFuture = future.slice(1);
-
-      return {
-        past: [...past, present],
-        present: next,
-        future: newFuture,
-      };
+      return { past: [...past, present], present: next, future: newFuture };
     });
   }, []);
 
-  const set = useCallback((newPresent: T | ((curr: T) => T), options?: { transient?: boolean }) => {
-    setState((currentState) => {
-      const { past, present } = currentState;
-      
-      const resolvedPresent = newPresent instanceof Function ? newPresent(present) : newPresent;
-
-      if (resolvedPresent === present) {
-        return currentState;
-      }
-
-      if (options?.transient) {
-          return {
-              ...currentState,
-              present: resolvedPresent
-          };
-      }
-
-      return {
-        past: [...past, present],
-        present: resolvedPresent,
-        future: [],
-      };
-    });
-  }, []);
-
-  // Helper to reset history (e.g. when loading a new file)
-  const reset = useCallback((newPresent: T) => {
-      setState({
-          past: [],
-          present: newPresent,
-          future: []
+  const set = useCallback(
+    (newPresent: T | ((curr: T) => T), options?: { transient?: boolean }) => {
+      setState((cur) => {
+        const { past, present } = cur;
+        const resolved = newPresent instanceof Function ? newPresent(present) : newPresent;
+        if (resolved === present) return cur;
+        if (options?.transient) return { ...cur, present: resolved };
+        // Limit stack depth
+        const newPast = past.length >= MAX_HISTORY ? past.slice(past.length - MAX_HISTORY + 1) : past;
+        return { past: [...newPast, present], present: resolved, future: [] };
       });
+    },
+    []
+  );
+
+  const reset = useCallback((newPresent: T) => {
+    setState({ past: [], present: newPresent, future: [] });
   }, []);
 
   return { state: state.present, set, undo, redo, canUndo, canRedo, reset };

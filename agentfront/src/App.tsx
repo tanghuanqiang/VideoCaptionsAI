@@ -21,6 +21,7 @@ import type { Message } from './components/SidebarCopilot';
 import type { AssStyle, Subtitle, ASRResponse } from './types/subtitleTypes';
 
 import { calculateLayers } from './utils/subtitleUtils';
+import type { VideoContentRect } from './utils/CoordinateMapper';
 import { useHistory } from './hooks/useHistory';
 
 function MainApp() {
@@ -51,6 +52,7 @@ function MainApp() {
   // ASS字幕的PlayRes设置，从视频分辨率获取
   const [playResX, setPlayResX] = useState<number>(1920);
   const [playResY, setPlayResY] = useState<number>(1080);
+  const [contentRect, setContentRect] = useState<VideoContentRect>({ left: 0, top: 0, width: 640, height: 360 });
 
   // 主题状态管理
   const [theme, setTheme] = useState<'dark' | 'light'>(() => { const s = localStorage.getItem('theme'); return (s === 'dark' || s === 'light') ? s : 'dark'; });
@@ -244,6 +246,11 @@ function MainApp() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedSubtitleIds, setSubtitles]);
 
+  const handleSeekToTime = useCallback((time: number) => {
+    const video = videoRef.current;
+    if (video) { video.currentTime = time; }
+  }, []);
+
   const handleSubtitleUpdate = useCallback((updatedSub: Subtitle, transient: boolean = false) => {
     setSubtitles(prev => prev.map(sub => sub.id === updatedSub.id ? updatedSub : sub), { transient });
   }, [setSubtitles]);
@@ -314,7 +321,7 @@ function MainApp() {
       </header>
       {/* 预览字幕 */}
       <SubtitlePreview 
-        rect={rect} 
+        contentRect={contentRect} 
         subtitles={subtitles} 
         styles={styles}
         videoRef={videoRef} 
@@ -370,6 +377,9 @@ function MainApp() {
                 videoUrl={videoUrl}
                 updateRect={updateRect}
                 videoRef={videoRef}
+                onContentRectChange={setContentRect}
+                videoWidth={playResX}
+                videoHeight={playResY}
               />
             </div>
            
@@ -436,6 +446,7 @@ function MainApp() {
                 selectedIds={selectedSubtitleIds}
                 setSelectedIds={setSelectedSubtitleIds}
                 videoRef={videoRef}
+                onSeekToTime={handleSeekToTime}
               />
             </div>
           

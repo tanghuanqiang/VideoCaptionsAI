@@ -11,9 +11,10 @@ interface Props {
     selectedIds: string[];
     setSelectedIds: React.Dispatch<React.SetStateAction<string[]>>;
     videoRef?: React.RefObject<HTMLVideoElement | null>;
+    onSeekToTime?: (time: number) => void;
 }
 
-const SubtitleEditor: React.FC<Props> = ({ subtitles, setSubtitles, styles, selectedStyle, selectedIds, setSelectedIds, videoRef }) => {
+const SubtitleEditor: React.FC<Props> = ({ subtitles, setSubtitles, styles, selectedStyle, selectedIds, setSelectedIds, videoRef, onSeekToTime }) => {
 
     // 编辑字幕内容
     const handleEdit = (id: string | number, field: keyof Subtitle, value: string | boolean) => {
@@ -83,10 +84,9 @@ const SubtitleEditor: React.FC<Props> = ({ subtitles, setSubtitles, styles, sele
                             key={sub.id}
                             className={`subtitle-item${selectedIds.includes(sub.id) ? " selected" : ""}`}
                             onClick={() => {
-                                // Optional: Click row to select (exclusive or toggle?)
-                                // For now keep checkbox logic separate or sync?
-                                // Let's make clicking the row select it exclusively if not clicking checkbox/input
-                                // But inputs take up most space.
+                                // Seek video to subtitle start time
+                                const t = typeof sub.start === "number" ? sub.start : parseFloat(String(sub.start));
+                                if (!isNaN(t)) onSeekToTime?.(t);
                             }}
                         >
                             <input
