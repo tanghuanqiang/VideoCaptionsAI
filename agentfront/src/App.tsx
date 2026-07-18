@@ -17,6 +17,7 @@ import "react-resizable/css/styles.css";
 import SubtitleStylePanel from './components/SubtitleStylePanel';
 import SubtitlePreview from './components/SubtitlePreview';
 import SidebarCopilot from './components/SidebarCopilot';
+import KeyboardHints from './components/KeyboardHints';
 import type { Message } from './components/SidebarCopilot';
 import type { AssStyle, Subtitle, ASRResponse } from './types/subtitleTypes';
 
@@ -256,6 +257,7 @@ function MainApp() {
   }, [setSubtitles]);
 
   return (
+    <>
     <div className="app-container">
       {showOnboarding && (
         <div style={{background:"linear-gradient(135deg,#1a1a2e,#16213e)",color:"#e0e0e0",padding:"14px 24px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"2px solid #3a7bd5"}}>
@@ -500,6 +502,8 @@ function MainApp() {
         <VideoTimeline />
       </footer> */}
     </div>
+    <KeyboardHints />
+    </>
   );
 }
 
