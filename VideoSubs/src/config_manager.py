@@ -39,7 +39,7 @@ def load_config() -> dict:
     path = get_config_path()
     try:
         if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, "r", encoding="utf-8-sig") as f:
                 saved = json.load(f)
             config.update(saved)
     except Exception as e:

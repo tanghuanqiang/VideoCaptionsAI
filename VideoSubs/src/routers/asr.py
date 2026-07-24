@@ -55,15 +55,19 @@ async def api_asr(
 
     if os.path.exists(cache_file):
         print(f"ASR cache hit: {cache_key}")
-        with open(cache_file, "r", encoding="utf-8") as f:
-            result = json.load(f)
-        if width and height:
-            style = generate_recommended_style(width, height)
-            result["recommended_style"] = style.dict()
-            if "events" in result and result["events"]:
-                for event in result["events"]:
-                    event["style"] = style.Name
-        return JSONResponse(result)
+        try:
+            with open(cache_file, "r", encoding="utf-8-sig") as f:
+                result = json.load(f)
+            if width and height:
+                style = generate_recommended_style(width, height)
+                result["recommended_style"] = style.dict()
+                if "events" in result and result["events"]:
+                    for event in result["events"]:
+                        event["style"] = style.Name
+            return JSONResponse(result)
+        except (OSError, json.JSONDecodeError) as exc:
+            # A partial cache must not turn a new recognition into a 500.
+            print(f"Ignoring invalid ASR cache {cache_file}: {exc}")
 
     if quality == "auto":
         try:
@@ -86,7 +90,22 @@ async def api_asr(
 
     import asyncio
     loop = asyncio.get_running_loop()
-    result = await loop.run_in_executor(None, lambda: asr_transcribe_video.invoke({"media_path": path, "model_size": model_size}))
+    try:
+        result = await loop.run_in_executor(
+            None,
+            lambda: asr_transcribe_video.invoke({"media_path": path, "model_size": model_size}),
+        )
+    except Exception as exc:
+        import logging
+        logging.getLogger("VideoCaptionsAI").exception("ASR inference failed for %s", path)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "ASR_INFERENCE_FAILED",
+                "message": "语音识别推理失败，请检查媒体音轨、模型和后端日志。",
+                "type": type(exc).__name__,
+            },
+        ) from exc
 
     if width and height:
         style = generate_recommended_style(width, height)

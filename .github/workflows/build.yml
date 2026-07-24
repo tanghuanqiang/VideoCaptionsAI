@@ -23,15 +23,15 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Run tests
+      - name: Run unit tests
         shell: bash
         run: |
           cd VideoSubs
-          pip install pytest
+          pip install -r requirements.txt
           python -m pytest tests/unit_tests/ -v --tb=long
 
   build:
-    name: Build Installer
+    name: Build Windows EXE
     runs-on: windows-latest
     needs: test
     if: github.event_name != 'pull_request'
@@ -44,14 +44,10 @@ jobs:
         id: version
         shell: bash
         run: |
-          # Get version from git tag, or use default
-          V=$(git describe --tags --abbrev=0 || echo "v1.0.0")
-          # Remove 'v' prefix for Inno Setup
+          V=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")
           V_num=${V#v}
-          echo "VERSION=$V_num"
-          echo "V=$V"
-          echo "VERSION=$V_num" >> $GITHUB_OUTPUT
-          echo "CleanVersion=${V_num}" >> $GITHUB_ENV
+          echo "VERSION=$V_num" >> "$GITHUB_OUTPUT"
+          echo "CleanVersion=$V_num" >> "$GITHUB_ENV"
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -63,6 +59,13 @@ jobs:
         with:
           version: 10
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: agentfront/pnpm-lock.yaml
+
       - name: Setup FFmpeg
         uses: AnimMouse/setup-ffmpeg@v1
         with:
@@ -72,7 +75,7 @@ jobs:
         shell: powershell
         run: choco install innosetup -y --no-progress --limit-output
 
-      - name: Install Python deps
+      - name: Install Python dependencies
         shell: bash
         run: |
           pip install -r VideoSubs/requirements.txt
@@ -91,38 +94,38 @@ jobs:
           mkdir -p VideoSubs/frontend_dist
           cp -r agentfront/dist/* VideoSubs/frontend_dist/
 
-      - name: Build PyInstaller exe
+      - name: Build PyInstaller EXE
         shell: pwsh
         run: |
           Set-Location VideoSubs
           pyinstaller build_exe.spec --noconfirm --log-level=WARN
           if ($LASTEXITCODE -ne 0) {
-            Write-Host "PyInstaller FAILED with exit code $LASTEXITCODE"
+            Write-Host "PyInstaller failed with exit code $LASTEXITCODE"
             exit 1
           }
-          Write-Host "PyInstaller build successful!"
-          Write-Host "Dist contents:"
-          Get-ChildItem dist/VideoCaptionsAI -Recurse -File | Measure-Object -Property Length -Sum | ForEach-Object { Write-Host "Total: $([math]::Round($_.Sum/1MB, 0)) MB" }
-          Get-ChildItem dist/VideoCaptionsAI/VideoCaptionsAI.exe -ErrorAction SilentlyContinue | Write-Host
+          if (-not (Test-Path dist/VideoCaptionsAI/VideoCaptionsAI.exe)) {
+            throw "VideoCaptionsAI.exe was not created"
+          }
 
       - name: Build Inno Setup installer
         shell: bash
         run: |
           cd VideoSubs
-          # Update version in installer.iss before build
-          sed -i "s/^AppVersion=.*\\$/AppVersion=$VERSION/" installer.iss
+          sed -i "s/^AppVersion=.*$/AppVersion=$VERSION/" installer.iss
           iscc installer.iss
-          # Rename to include version
           mv VideoCaptionsAI_Setup.exe VideoCaptionsAI_$VERSION.exe
         env:
           VERSION: ${{ steps.version.outputs.VERSION }}
 
-      - name: Upload installer
+      - name: Upload Windows EXE artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: VideoCaptionsAI-Setup
-          path: VideoSubs/VideoCaptionsAI_*.exe
-          retention-days: 7
+          name: VideoCaptionsAI-Windows
+          path: |
+            VideoSubs/VideoCaptionsAI_*.exe
+            VideoSubs/dist/VideoCaptionsAI/VideoCaptionsAI.exe
+          if-no-files-found: error
+          retention-days: 14
 
   release:
     name: Create Release
@@ -132,11 +135,9 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: VideoCaptionsAI-Setup
+          name: VideoCaptionsAI-Windows
       - uses: softprops/action-gh-release@v2
         with:
           files: VideoCaptionsAI_*.exe
           draft: false
           generate_release_notes: true
-
-

@@ -1,149 +1,168 @@
-import React from "react";
+import React, { useCallback, useRef } from "react";
 import type { AssStyle, Subtitle } from "../types/subtitleTypes";
-import { findAvailableLayer, formatTime } from "../utils/subtitleUtils";
+import { findAvailableLayer, formatTime, parseTime } from "../utils/subtitleUtils";
+import { captionGroupToSubtitle, mergeCaptionGroups, splitSubtitleAtGraphemeIndex, subtitleToCaptionGroup } from "../types/captionModel";
 import "./SubtitleEditor.css";
 
 interface Props {
-    subtitles: Subtitle[];
-    setSubtitles: any; // Relaxed type to allow custom set options
-    styles: AssStyle[];
-    selectedStyle: string;
-    selectedIds: string[];
-    setSelectedIds: React.Dispatch<React.SetStateAction<string[]>>;
-    videoRef?: React.RefObject<HTMLVideoElement | null>;
-    onSeekToTime?: (time: number) => void;
+  subtitles: Subtitle[];
+  setSubtitles: React.Dispatch<React.SetStateAction<Subtitle[]>> | ((value: (current: Subtitle[]) => Subtitle[]) => void);
+  styles: AssStyle[];
+  selectedStyle: string;
+  selectedIds: string[];
+  setSelectedIds: React.Dispatch<React.SetStateAction<string[]>>;
+  selectedUnitId?: string | null;
+  setSelectedUnitId?: React.Dispatch<React.SetStateAction<string | null>>;
+  videoRef?: React.RefObject<HTMLVideoElement | null>;
+  onSeekToTime?: (time: number) => void;
 }
 
-const SubtitleEditor: React.FC<Props> = ({ subtitles, setSubtitles, styles, selectedStyle, selectedIds, setSelectedIds, videoRef, onSeekToTime }) => {
+type GraphemeSegment = { segment: string; index?: number };
 
-    // 编辑字幕内容
-    const handleEdit = (id: string | number, field: keyof Subtitle, value: string | boolean) => {
-        setSubtitles((prev: Subtitle[]) => prev.map(sub => sub.id === id ? { ...sub, [field]: value } : sub));
-    };
+const getGraphemes = (text: string): string[] => {
+  if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
+    const Segmenter = (Intl as typeof Intl & {
+      Segmenter: new (locales?: string | string[], options?: { granularity?: string }) => { segment(value: string): Iterable<GraphemeSegment> };
+    }).Segmenter;
+    return Array.from(new Segmenter("zh", { granularity: "grapheme" }).segment(text), item => item.segment);
+  }
+  return Array.from(text);
+};
 
-    // 增加字幕按钮功能
-    const handleAddSubtitle = () => {
-        const currentTime = videoRef?.current?.currentTime || 0;
-        const startSeconds = currentTime;
-        const endSeconds = currentTime + 5;
-        
-        setSubtitles((prev: Subtitle[]) => {
-            const layer = findAvailableLayer(prev, startSeconds, endSeconds);
-            const newSubtitle: Subtitle = {
-                id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
-                start: formatTime(startSeconds),
-                end: formatTime(endSeconds),
-                text: "新字幕",
-                style: selectedStyle || "Default",
-                group: "",
-                layer: layer
-            };
-            return [...prev, newSubtitle];
-        });
-    };
+const graphemeIndexAtCursor = (text: string, cursor: number): number => {
+  const safeCursor = Math.max(0, Math.min(cursor, text.length));
+  if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
+    const Segmenter = (Intl as typeof Intl & {
+      Segmenter: new (locales?: string | string[], options?: { granularity?: string }) => { segment(value: string): Iterable<GraphemeSegment> };
+    }).Segmenter;
+    let graphemeIndex = 0;
+    for (const item of new Segmenter("zh", { granularity: "grapheme" }).segment(text)) {
+      const start = item.index ?? 0;
+      if (safeCursor <= start) return graphemeIndex;
+      if (safeCursor < start + item.segment.length) return graphemeIndex;
+      graphemeIndex += 1;
+    }
+    return graphemeIndex;
+  }
+  return getGraphemes(text.slice(0, safeCursor)).length;
+};
 
-    // 删除选中字幕
-    const handleDeleteSelected = () => {
-        setSubtitles(prev => prev.filter(sub => !selectedIds.includes(sub.id)));
-        setSelectedIds([]);
-    };
+const SubtitleEditor: React.FC<Props> = ({
+  subtitles, setSubtitles, styles, selectedStyle, selectedIds, setSelectedIds,
+  setSelectedUnitId, videoRef, onSeekToTime,
+}) => {
+  const inputRefs = useRef(new Map<string, HTMLInputElement>());
+  const cursorPositions = useRef(new Map<string, number>());
 
-    // 切换全选/取消全选
-    const handleToggleSelectAll = () => {
-        if (selectedIds.length === subtitles.length && subtitles.length > 0) {
-            setSelectedIds([]); // 已全选，点击则取消全选
-        } else {
-            setSelectedIds(subtitles.map(sub => sub.id)); // 未全选，点击则全选
-        }
-    };
+  const registerInput = useCallback((id: string, input: HTMLInputElement | null) => {
+    if (input) inputRefs.current.set(id, input);
+    else inputRefs.current.delete(id);
+  }, []);
 
-    // 单个字幕选择
-    const handleSelectSubtitle = (id: string) => {
-        setSelectedIds(prev => prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]);
-    };
+  const rememberCursor = useCallback((id: string, input: HTMLInputElement) => {
+    cursorPositions.current.set(id, input.selectionStart ?? 0);
+  }, []);
 
-    return (
-        <div className="subtitle-editor-container">
-            <div className="subtitle-actions">
-                <h3>字幕编辑</h3>
-                <div style={{ flex: 1 }}></div> {/* spacer */}
-                <div className="subtitle-editor-buttons">
-                    <button onClick={handleToggleSelectAll}>
-                        {selectedIds.length === subtitles.length && subtitles.length > 0 ? "取消全选" : "全选字幕"}
-                    </button>
-                    <button onClick={handleDeleteSelected} disabled={selectedIds.length === 0}>
-                        删除选中字幕
-                    </button>
-                </div>
-            </div>
-            
-            <div className="subtitle-list">
-                {subtitles.length > 0 ? (
-                    subtitles.map(sub => (
-                        <div
-                            key={sub.id}
-                            className={`subtitle-item${selectedIds.includes(sub.id) ? " selected" : ""}`}
-                            onClick={() => {
-                                // Seek video to subtitle start time
-                                const t = typeof sub.start === "number" ? sub.start : parseFloat(String(sub.start));
-                                if (!isNaN(t)) onSeekToTime?.(t);
-                            }}
-                        >
-                            <input
-                                type="checkbox"
-                                checked={selectedIds.includes(sub.id)}
-                                onChange={() => handleSelectSubtitle(sub.id)}
-                                onClick={(e) => e.stopPropagation()}
-                            />
-                            <input
-                                value={sub.start}
-                                onChange={e => handleEdit(sub.id, "start", e.target.value)}
-                                className="subtitle-time nodrag"
-                                onClick={(e) => e.stopPropagation()}
-                                onMouseDown={(e) => e.stopPropagation()}
-                            />
-                            <span> - </span>
-                            <input
-                                value={sub.end}
-                                onChange={e => handleEdit(sub.id, "end", e.target.value)}
-                                className="subtitle-time nodrag"
-                                onClick={(e) => e.stopPropagation()}
-                                onMouseDown={(e) => e.stopPropagation()}
-                            />
-                            <input
-                                value={sub.text || ''}
-                                onChange={e => handleEdit(sub.id, "text", e.target.value)}
-                                className="subtitle-text nodrag"
-                                onClick={(e) => e.stopPropagation()}
-                                onKeyDown={(e) => e.stopPropagation()}
-                                onMouseDown={(e) => e.stopPropagation()}
-                                onPointerDown={(e) => e.stopPropagation()}
-                            />
-                            <select
-                                value={sub.style}
-                                onChange={e => handleEdit(sub.id, "style", e.target.value)}
-                                className="subtitle-style nodrag"
-                                onClick={(e) => e.stopPropagation()}
-                                onMouseDown={(e) => e.stopPropagation()}
-                            >
-                                {styles.map(s => (
-                                    <option key={s.Name} value={s.Name}>{s.Name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    ))
-                ) : (
-                    <div style={{ textAlign: 'center', color: '#888', marginTop: '20%' }}>
-                        <p>暂无字幕内容。请点击下方按钮添加。</p>
-                    </div>
-                )}
-            </div>
-            
-            <div className="subtitle-actions-bottom">
-                <button onClick={handleAddSubtitle}>增加字幕</button>
-            </div>
+  const handleSplit = useCallback((id: string) => {
+    const subtitle = subtitles.find(item => item.id === id);
+    const input = inputRefs.current.get(id);
+    if (!subtitle || !input) return;
+
+    const cursor = cursorPositions.current.get(id) ?? input.selectionStart ?? 0;
+    const splitIndex = graphemeIndexAtCursor(subtitle.text, cursor);
+    const result = splitSubtitleAtGraphemeIndex(subtitle, splitIndex, subtitle.style || selectedStyle);
+    if (!result) return;
+
+    setSubtitles(previous => {
+      const index = previous.findIndex(item => item.id === id);
+      if (index < 0) return previous;
+      const next = [...previous];
+      next.splice(index, 1, result[0], result[1]);
+      return next;
+    });
+    cursorPositions.current.delete(id);
+    setSelectedIds([result[0].id, result[1].id]);
+    setSelectedUnitId?.(null);
+  }, [selectedStyle, setSelectedIds, setSelectedUnitId, setSubtitles, subtitles]);
+
+  const setEffect = (type: "whole" | "reveal" | "highlight" | "emphasis") => {
+    if (!selectedIds.length) return;
+    setSubtitles(previous => previous.map(subtitle => selectedIds.includes(subtitle.id) ? { ...subtitle, effect: { type } } : subtitle));
+  };
+
+  const mergeSelected = () => {
+    if (selectedIds.length < 2) return;
+    setSubtitles(previous => {
+      const selected = previous.filter(item => selectedIds.includes(item.id)).map(item => subtitleToCaptionGroup(item));
+      const merged = mergeCaptionGroups(selected);
+      if (!merged) return previous;
+      const firstIndex = previous.findIndex(item => selectedIds.includes(item.id));
+      const rest = previous.filter(item => !selectedIds.includes(item.id));
+      rest.splice(Math.max(0, firstIndex), 0, captionGroupToSubtitle(merged));
+      return rest;
+    });
+    setSelectedIds([]);
+    setSelectedUnitId?.(null);
+  };
+
+  const handleEdit = (id: string, field: keyof Subtitle, value: string) => {
+    setSubtitles(previous => previous.map(item => item.id === id ? { ...item, [field]: value } : item));
+  };
+
+  const handleAddSubtitle = () => {
+    const start = videoRef?.current?.currentTime || 0;
+    const end = start + 5;
+    setSubtitles(previous => [...previous, {
+      id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      start: formatTime(start), end: formatTime(end), text: "\u65b0\u5b57\u5e55",
+      style: selectedStyle || "Default", group: "", layer: findAvailableLayer(previous, start, end),
+    }]);
+  };
+
+  const deleteSelected = () => {
+    setSubtitles(previous => previous.filter(item => !selectedIds.includes(item.id)));
+    setSelectedIds([]);
+    setSelectedUnitId?.(null);
+  };
+
+  return <div className="subtitle-editor-container">
+    <div className="subtitle-actions">
+      <h3>{"\u5b57\u5e55\u7f16\u8f91\u5668"}</h3>
+      <div className="subtitle-editor-buttons">
+        <button type="button" onClick={() => setSelectedIds(selectedIds.length === subtitles.length ? [] : subtitles.map(item => item.id))}>{"\u5168\u9009"}</button>
+        <button type="button" onClick={mergeSelected} disabled={selectedIds.length < 2}>{"\u5408\u5e76"}</button>
+        <button type="button" onClick={deleteSelected} disabled={!selectedIds.length}>{"\u5220\u9664"}</button>
+      </div>
+    </div>
+    <div className="subtitle-actions subtitle-effects-row">
+      <span className="subtitle-toolbar-label">{"\u6548\u679c"}</span>
+      {(["whole", "reveal", "highlight", "emphasis"] as const).map(effect => <button type="button" key={effect} onClick={() => setEffect(effect)} disabled={!selectedIds.length}>{effect}</button>)}
+    </div>
+    <div className="subtitle-list">
+      {subtitles.length ? subtitles.map(subtitle => <div key={subtitle.id} className={`subtitle-item${selectedIds.includes(subtitle.id) ? " selected" : ""}`} onClick={() => onSeekToTime?.(parseTime(subtitle.start))}>
+        <input type="checkbox" checked={selectedIds.includes(subtitle.id)} onChange={() => setSelectedIds(current => current.includes(subtitle.id) ? current.filter(id => id !== subtitle.id) : [...current, subtitle.id])} onClick={event => event.stopPropagation()} />
+        <input value={subtitle.start} onChange={event => handleEdit(subtitle.id, "start", event.target.value)} className="subtitle-time nodrag" onClick={event => event.stopPropagation()} />
+        <span>-</span>
+        <input value={subtitle.end} onChange={event => handleEdit(subtitle.id, "end", event.target.value)} className="subtitle-time nodrag" onClick={event => event.stopPropagation()} />
+        <div className="subtitle-text-editor">
+          <input
+            ref={input => registerInput(subtitle.id, input)}
+            value={subtitle.text}
+            onChange={event => { handleEdit(subtitle.id, "text", event.target.value); rememberCursor(subtitle.id, event.currentTarget); }}
+            onSelect={event => rememberCursor(subtitle.id, event.currentTarget)}
+            onKeyUp={event => rememberCursor(subtitle.id, event.currentTarget)}
+            className="subtitle-text nodrag"
+            onClick={event => { event.stopPropagation(); rememberCursor(subtitle.id, event.currentTarget); }}
+          />
+          <button type="button" className="subtitle-split-button" aria-label={"\u5728\u5149\u6807\u5904\u62c6\u5206\u5b57\u5e55"} title={"\u5728\u5149\u6807\u5904\u62c6\u5206\u5b57\u5e55"} onMouseDown={event => event.preventDefault()} onClick={event => { event.stopPropagation(); handleSplit(subtitle.id); }}>{"\u2702"}</button>
         </div>
-    );
+        <select value={subtitle.style} onChange={event => handleEdit(subtitle.id, "style", event.target.value)} className="subtitle-style nodrag" onClick={event => event.stopPropagation()}>
+          {styles.map(style => <option key={style.Name} value={style.Name}>{style.Name}</option>)}
+        </select>
+      </div>) : <div className="subtitle-empty">{"\u6682\u65e0\u5b57\u5e55"}</div>}
+    </div>
+    <div className="subtitle-actions-bottom"><button type="button" onClick={handleAddSubtitle}>{"\u6dfb\u52a0\u5b57\u5e55"}</button></div>
+  </div>;
 };
 
 export default SubtitleEditor;

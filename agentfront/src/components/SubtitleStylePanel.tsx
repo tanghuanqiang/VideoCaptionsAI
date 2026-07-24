@@ -1,290 +1,372 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import "./SubtitleStylePanel.css";
 import type { AssStyle } from "../types/subtitleTypes";
-import toAssColor from "../utils/toAssColor"; // 确保你的 toAssColor 工具函数存在并正确导入
+import toAssColor from "../utils/toAssColor";
 import { defaultStyle } from "../constants";
+import { type VideoContentRect } from "../utils/CoordinateMapper";
+
 interface Props {
-    styles: AssStyle[];
-    setStyles: React.Dispatch<React.SetStateAction<AssStyle[]>>;
-    selectedStyle: string;
-    setSelectedStyle: (name: string) => void;
+  styles: AssStyle[];
+  setStyles: React.Dispatch<React.SetStateAction<AssStyle[]>>;
+  selectedStyle: string;
+  setSelectedStyle: (name: string) => void;
+  contentRect?: VideoContentRect;
+  playResX?: number;
+  playResY?: number;
 }
 
+/* ── track which fields are currently focused (so they don't refresh) ── */
+function useFocusedFields() {
+  const [focused, setFocused] = useState<Set<string>>(new Set());
+  const onFocus = useCallback((name: string) => {
+    setFocused(prev => { const n = new Set(prev); n.add(name); return n; });
+  }, []);
+  const onBlur = useCallback((name: string) => {
+    setFocused(prev => { const n = new Set(prev); n.delete(name); return n; });
+  }, []);
+  return { focused, onFocus, onBlur };
+}
 
-const SubtitleStylePanel: React.FC<Props> = ({ styles, setStyles, selectedStyle, setSelectedStyle }) => {
-    const [editStyle, setEditStyle] = useState<AssStyle | null>(null);
+/* ── small helpers ── */
+const fmtNum = (v: any, fallback: number = 0) => {
+  const n = Number(v);
+  return isNaN(n) ? fallback : n;
+};
 
-    // 当 selectedStyle 变化时，更新 editStyle 为选中样式；如果未选中样式则清空编辑面板
-    React.useEffect(() => {
-        if (!selectedStyle) {
-            setEditStyle(null);
-            return;
-        }
-        const currentSelected = styles.find(s => s.Name === selectedStyle);
-        if (currentSelected) {
-            setEditStyle(currentSelected);
-        } else {
-            setEditStyle(null);
-        }
-    }, [selectedStyle, styles]);
+const SubtitleStylePanel: React.FC<Props> = ({
+  styles, setStyles, selectedStyle, setSelectedStyle,
+  contentRect, playResX = 1920, playResY = 1080,
+}) => {
+  const currentStyle = styles.find(s => s.Name === selectedStyle) ?? null;
+  const { focused, onFocus, onBlur } = useFocusedFields();
 
+  // ---- commit a change immediately ----
+  const commit = useCallback((field: keyof AssStyle, value: any) => {
+    setStyles(prev => prev.map(s => s.Name === selectedStyle ? { ...s, [field]: value } : s));
+  }, [selectedStyle, setStyles]);
 
-    const handleEdit = (field: keyof AssStyle, value: AssStyle[keyof AssStyle]) => {
-        if (!editStyle) return;
-        setEditStyle({ ...editStyle, [field]: value });
+  // ---- alignment change: reset margins to defaults for intuitive positioning ----
+  const handleAlignmentChange = useCallback((newAlign: number) => {
+    const s = currentStyle;
+    if (!s) return;
+    const oldAlign = s.Alignment ?? 2;
+    if (oldAlign === newAlign) return;
+
+    // Reset margins to defaults when changing alignment.
+    // The user expects the subtitle to jump to the new alignment position,
+    // not stay in the old position (which is what preservePosition did).
+    setStyles(prev => prev.map(st =>
+      st.Name === selectedStyle ? {
+        ...st,
+        Alignment: newAlign,
+        MarginV: 10,
+        MarginL: 10,
+        MarginR: 10,
+      } : st
+    ));
+  }, [currentStyle, selectedStyle, setStyles]);
+
+  // ---- input value: from style unless field is focused ----
+  const getVal = useCallback((field: keyof AssStyle): string | number => {
+    if (!currentStyle) return "";
+    return (currentStyle as any)[field] ?? "";
+  }, [currentStyle]);
+
+  // ---- add / delete ----
+  const handleAdd = () => {
+    const ns: AssStyle = {
+      ...defaultStyle,
+      id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      Name: `style-${styles.length + 1}`,
     };
+    setStyles([...styles, ns]);
+    setSelectedStyle(ns.Name);
+  };
 
-    const handleSave = () => {
-        if (!editStyle) return;
-        setStyles(styles.map(s => s.id === editStyle.id ? editStyle : s));
-        // setEditStyle(null); // 保存后不清空编辑状态，方便继续调整
-        setSelectedStyle(editStyle.Name);
-    };
+  const handleDelete = (id: string) => {
+    const rest = styles.filter(s => s.id !== id);
+    setStyles(rest);
+    if (rest.length === 0) { setSelectedStyle(""); return; }
+    if (selectedStyle === styles.find(s => s.id === id)?.Name) {
+      setSelectedStyle(rest[0].Name);
+    }
+  };
 
-    const handleAdd = () => {
-        const newStyle: AssStyle = { ...defaultStyle, id: `${Date.now()}_${Math.random().toString(16).slice(2)}`, Name: `样式${styles.length + 1}` };
-        setStyles([...styles, newStyle]);
-        setEditStyle(newStyle);
-        setSelectedStyle(newStyle.Name);
-    };
+  // ---- alignment buttons ----
+  const alignGrid = [
+    [7, 8, 9],
+    [4, 5, 6],
+    [1, 2, 3],
+  ];
+  const alignLabels: Record<number, string> = {
+    7: "↖", 8: "↑", 9: "↗",
+    4: "←", 5: "◎", 6: "→",
+    1: "↙", 2: "↓", 3: "↘",
+  };
 
-    const handleDelete = (id: string) => {
-        const newStyles = styles.filter(s => s.id !== id);
-        setStyles(newStyles);
-        if (newStyles.length === 0) {
-            setSelectedStyle("");
-            setEditStyle(null);
-            return;
-        }
-        if (editStyle && editStyle.id === id) { // 如果删除的是当前正在编辑的样式
-            setEditStyle(newStyles[0]); // 自动切换到第一个样式进行编辑
-            setSelectedStyle(newStyles[0].Name);
-        } else if (selectedStyle === styles.find(s => s.id === id)?.Name) {
-            setSelectedStyle(newStyles[0].Name);
-        }
-    };
-
+  // ---- render ----
+  if (styles.length === 0) {
     return (
-        <div className="subtitle-style-panel">
-            <h3>字幕样式设置</h3>
-            {styles.length === 0 ? (
-                <div className="empty-style-list">
-                    <p>暂无样式，请点击下方按钮新增样式。</p>
-                    <button onClick={handleAdd}>新增样式</button>
-                </div>
-            ) : (
-                <>
-                    <div className="style-list">
-                        {styles.map(s => (
-                            <div
-                                key={s.id}
-                                className={`style-item${selectedStyle === s.Name ? " selected" : ""}`}
-                                onClick={() => {
-                                    // 点击已选中的样式则取消选择，隐藏编辑面板；否则选中并进入编辑
-                                    if (selectedStyle === s.Name) {
-                                        setSelectedStyle("");
-                                        setEditStyle(null);
-                                    } else {
-                                        setSelectedStyle(s.Name);
-                                        setEditStyle(s); // 点击样式列表项时，也开始编辑该样式
-                                    }
-                                }}
-                            >
-                                <span>{s.Name}</span>
-                                <div className="button-group">
-                                    <button onClick={e => { e.stopPropagation(); setSelectedStyle(s.Name); setEditStyle(s); }}>编辑</button>
-                                    {styles.length > 1 && (
-                                        <button onClick={e => { e.stopPropagation(); handleDelete(s.id); }} className="cancel">删除</button>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                        <button onClick={handleAdd}>新增样式</button>
-                    </div>
-                    
-                    {selectedStyle && editStyle && (
-                        
-                        <div className="edit-panel">
-                            <div className="edit-panel-header">
-                                <h3>编辑样式: {editStyle.Name}</h3>
-                            </div>
-                            
-                            <div className="style-form">
-                                {/* 基础设置 */}
-                                <div className="form-section">
-                                    <div className="form-row">
-                                        <div className="form-control">
-                                            <label>样式名</label>
-                                            <input type="text" value={editStyle.Name} onChange={e => handleEdit("Name", e.target.value)} />
-                                        </div>
-                                        <div className="form-control">
-                                            <label>字体</label>
-                                            <input type="text" value={editStyle.FontName} onChange={e => handleEdit("FontName", e.target.value)} />
-                                        </div>
-                                    </div>
-                                    <div className="form-row">
-                                        <div className="form-control">
-                                            <label>字号</label>
-                                            <input type="number" value={editStyle.FontSize} onChange={e => handleEdit("FontSize", Number(e.target.value))} />
-                                        </div>
-                                        <div className="form-control">
-                                            <label>对齐</label>
-                                            <select value={editStyle.Alignment ?? 2} onChange={e => handleEdit("Alignment", Number(e.target.value))}>
-                                                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(v => <option key={v} value={v}>{v}</option>)}
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 颜色设置 */}
-                                <div className="form-section colors-section">
-                                    <div className="color-row">
-                                        <label>主色</label>
-                                        <div className="color-picker-wrapper">
-                                            <input type="color" value={editStyle.PrimaryColour} onChange={e => handleEdit("PrimaryColour", e.target.value)} />
-                                        </div>
-                                        <div className="alpha-slider">
-                                            <input 
-                                                type="range" 
-                                                min={0} 
-                                                max={255} 
-                                                value={editStyle.PrimaryAlpha ?? 255} 
-                                                onChange={e => handleEdit("PrimaryAlpha", Number(e.target.value))} 
-                                            />
-                                            <span className="alpha-text">{Math.round(((editStyle.PrimaryAlpha ?? 255) / 255) * 100)}%</span>
-                                        </div>
-                                        <span className="color-code">{toAssColor(editStyle.PrimaryColour, editStyle.PrimaryAlpha)}</span>
-                                    </div>
-
-                                    <div className="color-row">
-                                        <label>副色</label>
-                                        <div className="color-picker-wrapper">
-                                            <input type="color" value={editStyle.SecondaryColour || "#000000"} onChange={e => handleEdit("SecondaryColour", e.target.value)} />
-                                        </div>
-                                        <div className="alpha-slider">
-                                            <input 
-                                                type="range" 
-                                                min={0} 
-                                                max={255} 
-                                                value={editStyle.SecondaryAlpha ?? 255} 
-                                                onChange={e => handleEdit("SecondaryAlpha", Number(e.target.value))} 
-                                            />
-                                            <span className="alpha-text">{Math.round(((editStyle.SecondaryAlpha ?? 255) / 255) * 100)}%</span>
-                                        </div>
-                                        <span className="color-code">{toAssColor(editStyle.SecondaryColour || "#000000", editStyle.SecondaryAlpha)}</span>
-                                    </div>
-
-                                    <div className="color-row">
-                                        <label>描边色</label>
-                                        <div className="color-picker-wrapper">
-                                            <input type="color" value={editStyle.OutlineColour || "#000000"} onChange={e => handleEdit("OutlineColour", e.target.value)} />
-                                        </div>
-                                        <div className="alpha-slider">
-                                            <input 
-                                                type="range" 
-                                                min={0} 
-                                                max={255} 
-                                                value={editStyle.OutlineAlpha ?? 255} 
-                                                onChange={e => handleEdit("OutlineAlpha", Number(e.target.value))} 
-                                            />
-                                            <span className="alpha-text">{Math.round(((editStyle.OutlineAlpha ?? 255) / 255) * 100)}%</span>
-                                        </div>
-                                        <span className="color-code">{toAssColor(editStyle.OutlineColour || "#000000", editStyle.OutlineAlpha)}</span>
-                                    </div>
-
-                                    <div className="color-row">
-                                        <label>背景色</label>
-                                        <div className="color-picker-wrapper">
-                                            <input type="color" value={editStyle.BackColour || "#000000"} onChange={e => handleEdit("BackColour", e.target.value)} />
-                                        </div>
-                                        <div className="alpha-slider">
-                                            <input 
-                                                type="range" 
-                                                min={0} 
-                                                max={255} 
-                                                value={editStyle.BackAlpha ?? 255} 
-                                                onChange={e => handleEdit("BackAlpha", Number(e.target.value))} 
-                                            />
-                                            <span className="alpha-text">{Math.round(((editStyle.BackAlpha ?? 255) / 255) * 100)}%</span>
-                                        </div>
-                                        <span className="color-code">{toAssColor(editStyle.BackColour || "#000000", editStyle.BackAlpha)}</span>
-                                    </div>
-                                </div>
-
-                                {/* 样式选项 */}
-                                <div className="form-section checkboxes-section">
-                                    <label className="checkbox-control">
-                                        <input type="checkbox" checked={!!editStyle.Bold} onChange={e => handleEdit("Bold", e.target.checked)} />
-                                        <span>加粗</span>
-                                    </label>
-                                    <label className="checkbox-control">
-                                        <input type="checkbox" checked={!!editStyle.Italic} onChange={e => handleEdit("Italic", e.target.checked)} />
-                                        <span>斜体</span>
-                                    </label>
-                                    <label className="checkbox-control">
-                                        <input type="checkbox" checked={!!editStyle.Underline} onChange={e => handleEdit("Underline", e.target.checked)} />
-                                        <span>下划线</span>
-                                    </label>
-                                    <label className="checkbox-control">
-                                        <input type="checkbox" checked={!!editStyle.StrikeOut} onChange={e => handleEdit("StrikeOut", e.target.checked)} />
-                                        <span>删除线</span>
-                                    </label>
-                                </div>
-
-                                {/* 几何变换 */}
-                                <div className="form-section geometry-section">
-                                    <div className="form-row">
-                                        <div className="form-control">
-                                            <label>横向缩放 (%)</label>
-                                            <input type="number" value={editStyle.ScaleX || 100} onChange={e => handleEdit("ScaleX", Number(e.target.value))} />
-                                        </div>
-                                        <div className="form-control">
-                                            <label>纵向缩放 (%)</label>
-                                            <input type="number" value={editStyle.ScaleY || 100} onChange={e => handleEdit("ScaleY", Number(e.target.value))} />
-                                        </div>
-                                    </div>
-                                    <div className="form-row">
-                                        <div className="form-control">
-                                            <label>字间距</label>
-                                            <input type="number" value={editStyle.Spacing || 0} onChange={e => handleEdit("Spacing", Number(e.target.value))} />
-                                        </div>
-                                        <div className="form-control">
-                                            <label>旋转角度</label>
-                                            <input type="number" value={editStyle.Angle || 0} onChange={e => handleEdit("Angle", Number(e.target.value))} />
-                                        </div>
-                                    </div>
-                                    <div className="form-row">
-                                        <div className="form-control">
-                                            <label>描边宽度</label>
-                                            <input type="number" value={editStyle.Outline || 0} onChange={e => handleEdit("Outline", Number(e.target.value))} />
-                                        </div>
-                                        <div className="form-control">
-                                            <label>阴影深度</label>
-                                            <input type="number" value={editStyle.Shadow || 0} onChange={e => handleEdit("Shadow", Number(e.target.value))} />
-                                        </div>
-                                    </div>
-                                    <div className="form-row">
-                                        <div className="form-control">
-                                            <label>边框样式</label>
-                                            <select value={editStyle.BorderStyle ?? 1} onChange={e => handleEdit("BorderStyle", Number(e.target.value))}>
-                                                <option value={1}>外描边 + 阴影</option>
-                                                <option value={3}>不透明背景盒</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="edit-panel-actions" style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                                    <button className="cancel" onClick={() => setEditStyle(null)}>取消</button>
-                                    <button onClick={handleSave}>保存</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </>
-            )}
-          
+      <div className="subtitle-style-panel">
+        <h3>字幕样式设置</h3>
+        <div className="empty-style-list">
+          <p>暂无样式，点击下方按钮新增样式。</p>
+          <button onClick={handleAdd}>新增样式</button>
         </div>
+      </div>
     );
+  }
+
+  const s = currentStyle;
+  if (!s) {
+    return (
+      <div className="subtitle-style-panel">
+        <h3>字幕样式设置</h3>
+        <div className="style-list">
+          {styles.map(st => (
+            <div key={st.id}
+              className={`style-item${selectedStyle === st.Name ? " selected" : ""}`}
+              onClick={() => setSelectedStyle(st.Name)}
+            >
+              <span>{st.Name}</span>
+              <div className="button-group">
+                {styles.length > 1 && (
+                  <button className="cancel" onClick={e => { e.stopPropagation(); handleDelete(st.id); }}>删除</button>
+                )}
+              </div>
+            </div>
+          ))}
+          <button onClick={handleAdd}>新增样式</button>
+        </div>
+        <p style={{ padding: 16, color: "var(--ant-color-text-secondary)" }}>选择一个样式进行编辑</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="subtitle-style-panel">
+      <h3>字幕样式设置</h3>
+
+      <div className="style-list">
+        {styles.map(st => (
+          <div key={st.id}
+            className={`style-item${selectedStyle === st.Name ? " selected" : ""}`}
+            onClick={() => setSelectedStyle(st.Name)}
+          >
+            <span>{st.Name}</span>
+            <div className="button-group">
+              {styles.length > 1 && (
+                <button className="cancel" onClick={e => { e.stopPropagation(); handleDelete(st.id); }}>删除</button>
+              )}
+            </div>
+          </div>
+        ))}
+        <button onClick={handleAdd}>新增样式</button>
+      </div>
+
+      {/* ── Edit form ── */}
+      <div className="edit-panel">
+        <div className="edit-panel-content">
+          {/* 基础文字 */}
+          <div className="form-section">
+            <h4>基础文字</h4>
+            <div className="form-row">
+              <div className="form-control">
+                <label>字体</label>
+                <select
+                  value={String(getVal("FontName") || "Arial")}
+                  onChange={e => commit("FontName", e.target.value)}
+                >
+                  <option value="Arial">Arial</option>
+                  <option value="Microsoft YaHei">微软雅黑</option>
+                  <option value="SimHei">黑体</option>
+                  <option value="SimSun">宋体</option>
+                  <option value="KaiTi">楷体</option>
+                </select>
+              </div>
+              <div className="form-control">
+                <label>字号</label>
+                <input type="number"
+                  value={getVal("FontSize")}
+                  onFocus={() => onFocus("FontSize")}
+                  onBlur={() => onBlur("FontSize")}
+                  onChange={e => commit("FontSize", fmtNum(e.target.value, 48))}
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-control">
+                <label>主颜色</label>
+                <input type="color"
+                  value={(() => {
+                    const c = (s.PrimaryColour || "#FFFFFF");
+                    if (c.startsWith("&H")) {
+                      const hex = c.slice(2);
+                      return "#" + hex.slice(4,6) + hex.slice(2,4) + hex.slice(0,2);
+                    }
+                    return c;
+                  })()}
+                  onChange={e => {
+                    const h = e.target.value.replace("#", "");
+                    commit("PrimaryColour", `&H00${h.slice(4,6)}${h.slice(2,4)}${h.slice(0,2)}`);
+                  }}
+                />
+              </div>
+              <div className="form-control">
+                <label>透明度</label>
+                <input type="range" min="0" max="255"
+                  value={s.PrimaryAlpha != null ? (255 - (s.PrimaryAlpha ?? 0)) : 255}
+                  onChange={e => commit("PrimaryAlpha", 255 - Number(e.target.value))}
+                />
+              </div>
+            </div>
+            <div className="checkboxes">
+              <label className="checkbox-control">
+                <input type="checkbox" checked={!!s.Bold} onChange={e => commit("Bold", e.target.checked)} />
+                <span>粗体</span>
+              </label>
+              <label className="checkbox-control">
+                <input type="checkbox" checked={!!s.Italic} onChange={e => commit("Italic", e.target.checked)} />
+                <span>斜体</span>
+              </label>
+              <label className="checkbox-control">
+                <input type="checkbox" checked={!!s.Underline} onChange={e => commit("Underline", e.target.checked)} />
+                <span>下划线</span>
+              </label>
+              <label className="checkbox-control">
+                <input type="checkbox" checked={!!s.StrikeOut} onChange={e => commit("StrikeOut", e.target.checked)} />
+                <span>删除线</span>
+              </label>
+            </div>
+          </div>
+
+          {/* 位置与对齐 */}
+          <div className="form-section">
+            <h4>位置与对齐</h4>
+            <div className="alignment-grid">
+              {alignGrid.map((row, ri) => (
+                <div key={ri} className="alignment-row">
+                  {row.map(a => (
+                    <button key={a}
+                      className={`align-btn${(s.Alignment ?? 2) === a ? " active" : ""}`}
+                      onClick={() => handleAlignmentChange(a)}
+                      title={`位置 ${a}`}
+                    >{alignLabels[a]}</button>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div className="form-row">
+              <div className="form-control">
+                <label>左边距</label>
+                <input type="number"
+                  value={getVal("MarginL")}
+                  onFocus={() => onFocus("MarginL")}
+                  onBlur={() => onBlur("MarginL")}
+                  onChange={e => commit("MarginL", fmtNum(e.target.value, 10))}
+                />
+              </div>
+              <div className="form-control">
+                <label>右边距</label>
+                <input type="number"
+                  value={getVal("MarginR")}
+                  onFocus={() => onFocus("MarginR")}
+                  onBlur={() => onBlur("MarginR")}
+                  onChange={e => commit("MarginR", fmtNum(e.target.value, 10))}
+                />
+              </div>
+              <div className="form-control">
+                <label>垂直边距</label>
+                <input type="number"
+                  value={getVal("MarginV")}
+                  onFocus={() => onFocus("MarginV")}
+                  onBlur={() => onBlur("MarginV")}
+                  onChange={e => commit("MarginV", fmtNum(e.target.value, 10))}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 几何变换 */}
+          <div className="form-section geometry-section">
+            <h4>几何变换</h4>
+            <div className="form-row">
+              <div className="form-control">
+                <label>横向缩放 (%)</label>
+                <input type="number"
+                  value={getVal("ScaleX")}
+                  onFocus={() => onFocus("ScaleX")}
+                  onBlur={() => onBlur("ScaleX")}
+                  onChange={e => commit("ScaleX", fmtNum(e.target.value, 100))}
+                />
+              </div>
+              <div className="form-control">
+                <label>纵向缩放 (%)</label>
+                <input type="number"
+                  value={getVal("ScaleY")}
+                  onFocus={() => onFocus("ScaleY")}
+                  onBlur={() => onBlur("ScaleY")}
+                  onChange={e => commit("ScaleY", fmtNum(e.target.value, 100))}
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-control">
+                <label>字间距</label>
+                <input type="number"
+                  value={getVal("Spacing")}
+                  onFocus={() => onFocus("Spacing")}
+                  onBlur={() => onBlur("Spacing")}
+                  onChange={e => commit("Spacing", fmtNum(e.target.value, 0))}
+                />
+              </div>
+              <div className="form-control">
+                <label>旋转角度</label>
+                <input type="number"
+                  value={getVal("Angle")}
+                  onFocus={() => onFocus("Angle")}
+                  onBlur={() => onBlur("Angle")}
+                  onChange={e => commit("Angle", fmtNum(e.target.value, 0))}
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-control">
+                <label>描边宽度</label>
+                <input type="number"
+                  value={getVal("Outline")}
+                  onFocus={() => onFocus("Outline")}
+                  onBlur={() => onBlur("Outline")}
+                  onChange={e => commit("Outline", fmtNum(e.target.value, 0))}
+                />
+              </div>
+              <div className="form-control">
+                <label>阴影深度</label>
+                <input type="number"
+                  value={getVal("Shadow")}
+                  onFocus={() => onFocus("Shadow")}
+                  onBlur={() => onBlur("Shadow")}
+                  onChange={e => commit("Shadow", fmtNum(e.target.value, 0))}
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-control">
+                <label>边框样式</label>
+                <select
+                  value={s.BorderStyle ?? 1}
+                  onChange={e => commit("BorderStyle", Number(e.target.value))}
+                >
+                  <option value={1}>外描边 + 阴影</option>
+                  <option value={3}>不透明背景</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default SubtitleStylePanel;

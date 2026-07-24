@@ -21,7 +21,7 @@ export const defaultStyle: AssStyle = {
   Angle: 0,
   BorderStyle: 1,
   Outline: 2,
-  Shadow: 0,
+  Shadow: 2,
   Alignment: 2,
   MarginL: 10,
   MarginR: 10,
@@ -29,6 +29,6 @@ export const defaultStyle: AssStyle = {
   Encoding: 1,
   PrimaryAlpha: 255,
   SecondaryAlpha: 0,
-  OutlineAlpha: 0,
-  BackAlpha: 0
+  OutlineAlpha: 255,
+  BackAlpha: 255
 }

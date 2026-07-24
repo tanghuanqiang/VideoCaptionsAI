@@ -1,4 +1,4 @@
-﻿"""
+"""
 Video resolution-aware subtitle style recommender.
 Generates optimal ASS style parameters based on video dimensions and aspect ratio.
 """
@@ -69,6 +69,6 @@ def generate_recommended_style(width: int, height: int) -> AssStyle:
         Encoding=1,
         PrimaryAlpha=255,
         SecondaryAlpha=0,
-        OutlineAlpha=0,
-        BackAlpha=0,
+        OutlineAlpha=255,
+        BackAlpha=255,
     )

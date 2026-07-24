@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import os
 import sys
 import warnings
@@ -216,7 +216,7 @@ if frontend_path.exists() and frontend_path.is_dir():
     async def vite_svg():
         svg_path = frontend_path / "vite.svg"
         if svg_path.exists():
-            return FileResponse(str(svg_path))
+            return FileResponse(str(svg_path), headers={"Cache-Control": "no-cache"})
         return JSONResponse({"detail": "Not Found"}, status_code=404)
 
     for subdir in ["ffmpeg-core", "fonts"]:
@@ -230,7 +230,7 @@ if frontend_path.exists() and frontend_path.is_dir():
     async def spa_fallback(full_path: str):
         ip = frontend_path / "index.html"
         if ip.exists():
-            return FileResponse(str(ip), media_type="text/html")
+            return FileResponse(str(ip), media_type="text/html", headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"})
         return JSONResponse({"detail": "Frontend not found"}, status_code=404)
 
     logger.info("Frontend served from: %s", FRONTEND_DIR)

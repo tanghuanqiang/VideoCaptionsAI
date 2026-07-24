@@ -1,5 +1,4 @@
-/* SubtitleEditor.css */
-
+/* Subtitle editor layout */
 .subtitle-editor-container {
   display: flex;
   flex-direction: column;
@@ -11,117 +10,58 @@
   border-right: 1px solid var(--ant-color-border-secondary);
 }
 
-/* Scrollbar styling for Webkit browsers */
-.subtitle-editor-container::-webkit-scrollbar {
-  width: 6px;
-}
-
-.subtitle-editor-container::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.subtitle-editor-container::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
-}
+.subtitle-editor-container::-webkit-scrollbar,
+.subtitle-list::-webkit-scrollbar { width: 6px; }
+.subtitle-editor-container::-webkit-scrollbar-track,
+.subtitle-list::-webkit-scrollbar-track { background: transparent; }
+.subtitle-editor-container::-webkit-scrollbar-thumb,
+.subtitle-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 3px; }
 
 .subtitle-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 0 0 16px 0;
-  margin-bottom: 0;
+  padding: 0 0 12px;
+  margin-bottom: 12px;
   border-bottom: 1px solid var(--ant-color-border-secondary);
 }
 
-.subtitle-actions h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--ant-color-text);
-  margin: 0;
-  padding: 0;
-}
+.subtitle-actions h3 { font-size: 16px; font-weight: 600; color: var(--ant-color-text); margin: 0; }
+.subtitle-editor-buttons { display: flex; gap: 8px; }
+.subtitle-effects-row { justify-content: flex-start; flex-wrap: wrap; }
+.subtitle-toolbar-label { color: var(--ant-color-text-secondary); font-size: 12px; }
 
-.subtitle-editor-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-/* 添加 flex: 1 和 overflow-y: auto; 让列表独立滚动 */
 .subtitle-list {
   flex: 1;
   min-height: 0;
-  /* 滚动现在由外层 .subtitle-editor-scroll 控制，这里保持自适应高度 */
-}
-
-/* 可选：如果你有一个缩放/拖拽提示元素 class 名，比如 .resize-hint-subtitle，可放置在右下角 */
-.resize-hint-subtitle {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  pointer-events: none;
-  opacity: 0.6;
-  z-index: 10;
-}
-
-/* 为 subtitle-list 添加滚动条样式 */
-.subtitle-list::-webkit-scrollbar {
-  width: 6px;
-}
-.subtitle-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-.subtitle-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
-}
-.subtitle-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-/* Firefox 滚动条 */
-.subtitle-list {
+  overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  scrollbar-color: rgba(255,255,255,.2) transparent;
 }
-
 
 .subtitle-item {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: nowrap;
   padding: 8px;
   background: var(--ant-color-bg-elevated);
   border: 1px solid transparent;
   border-radius: var(--ant-border-radius);
   margin-bottom: 8px;
-  transition: all 0.2s;
+  transition: background .2s, border-color .2s;
   position: relative;
 }
 
-.subtitle-item.selected {
-  background: rgba(22, 119, 255, 0.15);
-  border-color: var(--ant-color-primary);
-}
+.subtitle-item.selected { background: rgba(22,119,255,.15); border-color: var(--ant-color-primary); }
+.subtitle-item:hover { background: var(--ant-color-bg-elevated); border-color: var(--ant-color-primary-hover); }
 
-.subtitle-item:hover {
-  background: var(--ant-color-bg-elevated);
-  border-color: var(--ant-color-primary-hover);
-}
+input[type="checkbox"] { accent-color: var(--ant-color-primary); position: relative; z-index: 1; pointer-events: auto; }
 
-input[type="checkbox"] {
-  accent-color: var(--ant-color-primary);
-  position: relative;
-  z-index: 1;
-  pointer-events: auto;
-}
-
-/* Common input and select styling */
 .subtitle-time,
 .subtitle-text,
-.subtitle-style,
-.subtitle-group {
+.subtitle-style {
   background: var(--ant-color-bg-container);
   border: 1px solid var(--ant-color-border);
   color: var(--ant-color-text);
@@ -129,69 +69,48 @@ input[type="checkbox"] {
   border-radius: var(--ant-border-radius);
   font-size: 12px;
   outline: none;
-  transition: all 0.2s;
+  transition: border-color .2s, box-shadow .2s;
   position: relative;
   z-index: 1;
   pointer-events: auto;
 }
 
-.subtitle-time:focus,
-.subtitle-text:focus,
-.subtitle-style:focus,
-.subtitle-group:focus {
-  border-color: var(--ant-color-primary);
-  box-shadow: 0 0 0 2px rgba(5, 145, 255, 0.1);
-}
+.subtitle-time:focus, .subtitle-text:focus, .subtitle-style:focus { border-color: var(--ant-color-primary); box-shadow: 0 0 0 2px rgba(5,145,255,.1); }
+.subtitle-time { width: 80px; flex: 0 0 80px; font-family: "Courier New", Courier, monospace; }
+.subtitle-style { width: 80px; flex: 0 0 80px; }
+.subtitle-text-editor { display: flex; align-items: center; flex: 1 1 180px; min-width: 120px; gap: 4px; }
+.subtitle-text { flex: 1; width: 100%; min-width: 0; user-select: text !important; -webkit-user-select: text !important; cursor: text; }
 
-.subtitle-time {
-  width: 80px;
-  font-family: 'Courier New', Courier, monospace;
-}
-
-.subtitle-text {
-  flex: 1;
-  width: auto;
-  user-select: text !important;
-  -webkit-user-select: text !important;
-  cursor: text;
-}
-
-.subtitle-style {
-  width: 80px;
-  flex-shrink: 0;
-}
-
-/* Button styling */
-button {
-  background: var(--ant-color-primary);
-  color: #fff;
-  border: none;
-  border-radius: var(--ant-border-radius);
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 400;
-  cursor: pointer;
-  transition: all 0.2s;
-  min-width: 80px;
-}
-
-button:hover {
-  background: var(--ant-color-primary-hover);
-}
-
-button:disabled {
-  background: var(--ant-color-bg-container);
-  color: var(--ant-color-text-tertiary);
+.subtitle-split-button {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--ant-color-text-secondary);
   border: 1px solid var(--ant-color-border);
-  cursor: not-allowed;
+  border-radius: var(--ant-border-radius);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
 }
 
-.subtitle-actions-bottom {
-  margin-top: 16px;
-  padding-top: 12px;
-  padding-bottom: 32px;
-  /* padding-right: 16px; */
-  border-top: 1px solid var(--ant-color-border-secondary);
-  display: flex;
-  justify-content: flex-end;
+.subtitle-split-button:hover { color: var(--ant-color-primary); border-color: var(--ant-color-primary); background: rgba(22,119,255,.12); }
+
+button { background: var(--ant-color-primary); color: #fff; border: none; border-radius: var(--ant-border-radius); padding: 4px 12px; font-size: 12px; font-weight: 400; cursor: pointer; transition: background .2s; min-width: 80px; }
+button:hover { background: var(--ant-color-primary-hover); }
+button:disabled { background: var(--ant-color-bg-container); color: var(--ant-color-text-tertiary); border: 1px solid var(--ant-color-border); cursor: not-allowed; }
+.subtitle-split-button:disabled { background: transparent; }
+
+.subtitle-empty { padding: 32px 0; text-align: center; color: var(--ant-color-text-secondary); }
+.subtitle-actions-bottom { margin-top: 16px; padding: 12px 0 32px; border-top: 1px solid var(--ant-color-border-secondary); display: flex; justify-content: flex-end; }
+
+@media (max-width: 720px) {
+  .subtitle-item { flex-wrap: wrap; }
+  .subtitle-text-editor { order: 5; flex-basis: 100%; }
+  .subtitle-style { margin-left: auto; }
 }

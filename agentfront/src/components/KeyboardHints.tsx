@@ -1,13 +1,13 @@
 ﻿import { useEffect, useState } from "react";
 
 const SHORTCUTS = [
-  { keys: "Ctrl+Z", desc: "Undo" },
-  { keys: "Ctrl+Y", desc: "Redo" },
-  { keys: "Space", desc: "Play / Pause" },
-  { keys: "\u2190 \u2192", desc: "Seek backward / forward 5s" },
-  { keys: "Delete", desc: "Delete selected subtitles" },
-  { keys: "Ctrl+A", desc: "Select all subtitles" },
-  { keys: "?", desc: "Show / hide shortcuts" },
+  { keys: "Ctrl+Z", desc: "撤销" },
+  { keys: "Ctrl+Y", desc: "重做" },
+  { keys: "Space", desc: "播放 / 暂停" },
+  { keys: "\u2190 \u2192", desc: "倒退 / 前进 5 秒" },
+  { keys: "Delete", desc: "删除所选字幕" },
+  { keys: "Ctrl+A", desc: "全选字幕" },
+  { keys: "?", desc: "显示 / 隐藏快捷键" },
 ];
 
 export default function KeyboardHints() {
@@ -45,7 +45,7 @@ export default function KeyboardHints() {
         onClick={(e) => e.stopPropagation()}
       >
         <h3 style={{ margin: "0 0 16px", color: "#3a7bd5", fontSize: 16 }}>
-          Keyboard Shortcuts
+          快捷键
         </h3>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {SHORTCUTS.map((s) => (
@@ -67,7 +67,7 @@ export default function KeyboardHints() {
           ))}
         </div>
         <p style={{ margin: "16px 0 0", fontSize: 11, color: "#666" }}>
-          Press <kbd style={{ background: "rgba(255,255,255,0.1)", padding: "0 4px", borderRadius: 2 }}>?</kbd> to toggle
+          按 <kbd style={{ background: "rgba(255,255,255,0.1)", padding: "0 4px", borderRadius: 2 }}>?</kbd> 切换显示
         </p>
       </div>
     </div>

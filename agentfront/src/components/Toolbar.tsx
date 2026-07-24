@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./Toolbar.css";
 import type { ASRResponse, Subtitle, AssStyle, SubtitleEvent } from "../types/subtitleTypes";
-import toAssColor from "../utils/toAssColor";
 import DownloadProgress from "./DownloadProgress";
 import { toSRT, toASS, downloadFile } from "../utils/subtitleUtils";
 import { ffmpegService } from "../utils/ffmpegService";
@@ -25,20 +24,20 @@ interface ToolbarProps {
   playResY?: number;
   copilotOpen: boolean;
   toggleCopilot: () => void;
-  currentPage: "editor" | "history";
-  setCurrentPage: (page: "editor" | "history") => void;
+  onImportProject: (file: File) => void | Promise<void>;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSubtitlesUpdate, styles, subtitles, theme, toggleTheme, playResX = 1920, playResY = 1080, copilotOpen, toggleCopilot, currentPage, setCurrentPage }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSubtitlesUpdate, styles, subtitles, theme, toggleTheme, playResX = 1920, playResY = 1080, copilotOpen, toggleCopilot, onImportProject }) => {
   // Auth removed - no login required
   const [recognizing, setRecognizing] = useState(false);
+  const [asrError, setAsrError] = useState<string | null>(null);
   const [videoHeight, setVideoHeight] = useState<number | null>(null);
   const [videoWidth, setVideoWidth] = useState<number | null>(null);
   const [videoDuration, setVideoDuration] = useState<number | null>(null); // 视频时长（秒）
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [asrQuality, setAsrQuality] = useState<'standard' | 'high' | 'professional'>('standard');
   const exportMenuRef = useRef<HTMLDivElement>(null);
-  
+
   const [showTutorialMenu, setShowTutorialMenu] = useState(false);
   const tutorialMenuRef = useRef<HTMLDivElement>(null);
 
@@ -161,11 +160,6 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
     }
   };
 
-  // 前端烧录逻辑 (已弃用)
-  const handleFrontendBurn = async (fileName: string) => {
-    alert("前端渲染功能暂时不可用，请使用后端渲染。");
-    return;
-  };
 
   // 后端烧录逻辑
   const handleBackendBurn = async (fileName: string) => {
@@ -173,8 +167,8 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
     let estimatedProcessingTime = 60; // 默认值
     if (videoDuration) {
         // 基础处理系数 (服务器通常比实时快)
-        const baseFactor = 0.5; 
-        
+        const baseFactor = 0.5;
+
         // 分辨率系数
         let resolutionFactor = 1.0;
         if (videoWidth && videoHeight) {
@@ -182,12 +176,12 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
             const basePixels = 1920 * 1080; // 1080p基准
             resolutionFactor = Math.sqrt(pixelCount / basePixels); // 使用平方根平滑增长
         }
-        
+
         estimatedProcessingTime = videoDuration * baseFactor * resolutionFactor;
-        
+
         // 加上固定的开销时间 (上传处理、启动ffmpeg等)
         estimatedProcessingTime += 5;
-        
+
         // 限制最小和最大预估时间
         estimatedProcessingTime = Math.max(10, Math.min(600, estimatedProcessingTime));
     }
@@ -203,10 +197,8 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
     });
 
     try {
-      const toAssTime = (t: string | number) => { let s: number; if (typeof t === "number") { s = t; } else { const parts = String(t).split(':'); if (parts.length === 3) { const hh = parseInt(parts[0]) || 0; const mm = parseInt(parts[1]) || 0; const ss = parseFloat((parts[2] || '0').replace(',', '.')) || 0; s = hh * 3600 + mm * 60 + ss; } else { s = parseFloat(String(t)) || 0; } } const h = Math.floor(s/3600); const m = Math.floor((s%3600)/60); const sec = Math.floor(s%60); const cs = Math.round((s-Math.floor(s))*100); return h+":"+String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0")+"."+String(cs).padStart(2,"0"); };
-
-      // 生成ASS文件内容
-      const assFileContent = `[Script Info]\nScriptType: v4.00+\nPlayResX:${videoWidth || 1920}\nPlayResY:${videoHeight || 1080}\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n${styles.map(style => `Style: ${style.Name},${style.FontName},${style.FontSize},${toAssColor(style.PrimaryColour || "#000000", style.PrimaryAlpha)},${toAssColor(style.SecondaryColour || "#000000", style.SecondaryAlpha)},${toAssColor(style.OutlineColour || "#000000",style.OutlineAlpha)},${toAssColor(style.BackColour || "#000000",style.BackAlpha)},${style.Bold ? -1 : 0},${style.Italic ? -1 : 0},${style.Underline ? -1 : 0},${style.StrikeOut ? -1 : 0},${style.ScaleX},${style.ScaleY},${style.Spacing},${style.Angle},${style.BorderStyle},${style.Outline},${style.Shadow},${style.Alignment},${style.MarginL},${style.MarginR},${style.MarginV},${style.Encoding}`).join('\n')}\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${subtitles.map(sub => `Dialogue: 0,${toAssTime(sub.start)},${toAssTime(sub.end)},${sub.style||"Default"},,0,0,0,,${sub.text}`).join('\n')}`;
+      // Use shared toASS function (single source of truth, avoids duplicates)
+      const assFileContent = toASS(subtitles, styles, videoWidth || 1920, videoHeight || 1080);
 
       // 上传文件到后端
       const formData = new FormData();
@@ -216,7 +208,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
       console.log("📤 开始上传文件到服务器...");
 
       // 使用 XMLHttpRequest 以获取上传进度
-      const result = await new Promise<any>((resolve, reject) => {
+      const result = await new Promise<{ task_id: string }>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/api/burn/');
 
@@ -238,12 +230,12 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
             reject(new Error('文件过大，超过服务器限制'));
             return;
           }
-          
+
           if (xhr.status >= 200 && xhr.status < 300) {
             try {
               const response = JSON.parse(xhr.responseText);
               resolve(response);
-            } catch (e) {
+            } catch {
               reject(new Error('Invalid JSON response'));
             }
           } else {
@@ -259,7 +251,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
 
       console.log(`✅ 任务已提交，任务ID: ${taskId}`);
       console.log(`🎥 视频时长: ${videoDuration ? videoDuration.toFixed(1) : '未知'}秒`);
-      
+
       // 上传完成，设置为30%并开始处理
       setDownloadProgress(prev => ({ ...prev, progress: 30, status: 'processing' }));
       console.log("🔄 开始基于时长的进度预测...");
@@ -280,7 +272,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
   // 轮询后端任务状态（基于视频时长的倍计时进度）
   const pollTaskStatus = async (taskId: string, fileName: string, videoDurationSeconds: number, estimatedProcessingTime: number) => {
     console.log(`🔍 pollTaskStatus 启动 - taskId: ${taskId}, 视频时长: ${videoDurationSeconds}s`);
-    
+
     const maxAttempts = 300;
     let attempts = 0;
     let progressInterval: number | null = null;
@@ -289,7 +281,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
     // 从30%到99%需要增长69%
     const totalProgressSteps = 69;
     const progressIntervalMs = (estimatedProcessingTime * 1000) / totalProgressSteps;
-    
+
     console.log(`🎥 视频: ${videoDurationSeconds.toFixed(1)}s | 预估: ${estimatedProcessingTime.toFixed(1)}s | 间隔: ${progressIntervalMs.toFixed(0)}ms`);
 
     // 启动倍计时进度：从30%平滑增长到99%
@@ -333,11 +325,11 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
         if (taskInfo.status === 'completed') {
           // 任务完成
           isCompleted = true;
-          
+
           console.log("✅ 任务完成，准备下载...");
-          
+
           setDownloadProgress(prev => ({ ...prev, status: 'downloading' }));
-          
+
           // 下载文件
           await downloadFromBackend(taskId, fileName);
           return;
@@ -378,7 +370,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
       // 使用带 Token 的 URL 直接触发浏览器下载，避免 fetch/blob 的 CORS 和内存问题
       const encodedFileName = encodeURIComponent(fileName);
       const downloadUrl = `/api/burn/download/${taskId}?filename=${encodedFileName}`;
-      
+
       const downloadLink = document.createElement('a');
       downloadLink.href = downloadUrl;
       downloadLink.download = fileName; // 浏览器可能会优先使用 Content-Disposition
@@ -400,11 +392,12 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
 
   const doASR = async (file: File) => {
     setRecognizing(true);
+    setAsrError(null);
     try {
       // 1. 尝试在前端提取音频（根据质量模式选择参数）
       let fileToUpload: File | Blob = file;
       let audioOptions;
-      
+
       // 根据质量模式配置音频压缩参数
       switch (asrQuality) {
         case 'professional':
@@ -416,7 +409,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
         default: // 'standard'
           audioOptions = { sampleRate: 16000, bitrate: '64k', channels: 1 };
       }
-      
+
       try {
         console.log("开始前端音频提取...", audioOptions);
         const audioBlob = await ffmpegService.extractAudio(file, audioOptions);
@@ -433,21 +426,23 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
       formData.append("quality", asrQuality);
       if (videoWidth) formData.append("width", videoWidth.toString());
       if (videoHeight) formData.append("height", videoHeight.toString());
-      
-      const resp = await fetch("/api/asr/", { 
-        method: "POST", 
+
+      const resp = await fetch("/api/asr/", {
+        method: "POST",
         body: formData,
       });
-      
+
       if (resp.status === 413) {
         throw new Error("文件过大，超过服务器限制");
       }
-      
+
       if (!resp.ok) {
-        const errText = await resp.text();
-        throw new Error(`识别失败: ${resp.status} ${errText}`);
+        const payload = await resp.json().catch(() => null);
+        const detail = payload?.detail;
+        const message = typeof detail === "string" ? detail : detail?.message;
+        throw new Error(message || `识别失败（HTTP ${resp.status}）`);
       }
-      
+
       const data = await resp.json();
       const secondsToTimeStr = (seconds: number) => {
         if (typeof seconds !== "number" || isNaN(seconds)) return "00:00:00.00";
@@ -457,7 +452,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
         const ms = Math.round((seconds - Math.floor(seconds)) * 100);
         return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}.${ms.toString().padStart(2, "0")}`;
       };
-      
+
       const formatted = (data.events || []).map((item: SubtitleEvent) => ({
         id: item.id,
         start: secondsToTimeStr(Number(item.start)),
@@ -465,6 +460,10 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
         text: item.text,
         style: item.style || "Default",
         group: item.speaker || "",
+        words: item.words,
+        units: item.units,
+        overrides: item.overrides,
+        effect: item.effect,
       }));
       const asrResponse: ASRResponse = {
         language: data.language || "",
@@ -474,8 +473,14 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
         recommended_style: data.recommended_style,
       };
       onSubtitlesUpdate(asrResponse);
+      if (formatted.length === 0) {
+        setAsrError("未识别到可用语音，请检查视频是否包含清晰的人声音轨。");
+      }
     } catch (e) {
-      alert("字幕识别失败：" + e);
+      const rawMessage = e instanceof Error ? e.message : "识别失败，请稍后重试。";
+      const message = e instanceof TypeError ? "无法连接语音识别服务，请确认后端已启动（127.0.0.1:8000）。" : rawMessage;
+      setAsrError(message);
+      console.error("ASR request failed", e);
     } finally {
       setRecognizing(false);
     }
@@ -487,11 +492,11 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
     <>
       <div className="toolbar">
         <span className="toolbar-title">{title}</span>
-        <div className="toolbar-actions toolbar-actions-left">
+        <div className="toolbar-actions toolbar-actions-left toolbar-main-group">
           {/* Tutorial Button */}
           <div style={{ position: 'relative' }} ref={tutorialMenuRef}>
             <button
-              className="toolbar-btn"
+              className="toolbar-btn toolbar-btn-compact toolbar-tutorial"
               style={{ minWidth: 'auto', padding: '0 12px', gap: '6px', whiteSpace: 'nowrap' }}
               onClick={() => setShowTutorialMenu(!showTutorialMenu)}
               title="使用教程"
@@ -513,20 +518,31 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
               </div>
             )}
           </div>
-          <button
-            className="toolbar-btn"
-            style={{ minWidth: "130px", padding: "0 14px", gap: "6px", whiteSpace: "nowrap", flexShrink: 0 }}
-            onClick={() => setCurrentPage(currentPage === "editor" ? "history" : "editor")}
-            title={currentPage === "editor" ? "查看历史记录" : "返回编辑器"}
+          <label
+            htmlFor="project-upload"
+            className="toolbar-btn toolbar-btn-compact toolbar-project-import"
+            style={{ minWidth: "118px", padding: "0 14px", gap: "6px", whiteSpace: "nowrap", flexShrink: 0 }}
+            title={"\u5bfc\u5165\u9879\u76ee"}
           >
-            {currentPage === "editor" ? (
-              <><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>历史记录</span></>
-            ) : (
-              <><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg><span>返回编辑器</span></>
-            )}
-          </button>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 7h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+              <path d="M12 12v6m-3-3 3 3 3-3" />
+            </svg>
+            <span>{"\u5bfc\u5165\u9879\u76ee"}</span>
+            <input
+              id="project-upload"
+              type="file"
+              accept=".json,application/json"
+              style={{ display: "none" }}
+              onChange={event => {
+                const file = event.target.files?.[0];
+                if (file) void onImportProject(file);
+                event.currentTarget.value = "";
+              }}
+            />
+          </label>
 
-          <label htmlFor="video-upload" className="toolbar-btn">
+          <label htmlFor="video-upload" className="toolbar-btn toolbar-btn-primary toolbar-import">
             <span>导入视频</span>
             <input
               id="video-upload"
@@ -540,11 +556,11 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
                   const url = URL.createObjectURL(file);
                   const video = document.createElement("video");
                   video.preload = "metadata"; video.src = url;
-                  video.onloadedmetadata = () => { 
-                    setVideoWidth(video.videoWidth); 
-                    setVideoHeight(video.videoHeight); 
+                  video.onloadedmetadata = () => {
+                    setVideoWidth(video.videoWidth);
+                    setVideoHeight(video.videoHeight);
                     setVideoDuration(video.duration); // 获取视频时长
-                    URL.revokeObjectURL(url); 
+                    URL.revokeObjectURL(url);
                   };
                 }
               }}
@@ -553,7 +569,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
           {/* ASR Button 恢复语音识别按钮 */}
           <button
             type="button"
-            className="toolbar-btn"
+            className="toolbar-btn toolbar-btn-primary toolbar-asr"
             style={{ margin: '0 8px' }}
             disabled={!videoFile || recognizing}
             onClick={() => videoFile && !recognizing && doASR(videoFile)}
@@ -562,10 +578,10 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
             {recognizing ? "识别中..." : "语音识别"}
           </button>
           {/* ASR质量模式选择 */}
-          <select 
-            value={asrQuality} 
+          <select
+            value={asrQuality}
             onChange={(e) => setAsrQuality(e.target.value as 'standard' | 'high' | 'professional')}
-            className="toolbar-btn"
+            className="toolbar-select"
             style={{ margin: '0 8px', cursor: 'pointer' }}
             title="识别质量模式"
           >
@@ -573,7 +589,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
             <option value="high">高质量(medium)</option>
             <option value="professional">专业(large-v3)</option>
           </select>
-          <button type="button" className="toolbar-btn" onClick={toggleTheme} title={theme === 'dark' ? "切换到亮色模式" : "切换到暗色模式"}>
+          <button type="button" className="toolbar-icon-btn" onClick={toggleTheme} title={theme === 'dark' ? "切换到亮色模式" : "切换到暗色模式"}>
             {theme === 'dark' ? (
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="5"></circle>
@@ -593,12 +609,12 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
             )}
           </button>
         </div>
-        <div className="toolbar-actions toolbar-actions-right">
+        <div className="toolbar-actions toolbar-actions-right toolbar-output-group">
           <div className="export-dropdown-container" ref={exportMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
-            <button 
-                type="button" 
+            <button
+                type="button"
                 onClick={() => setShowExportMenu(!showExportMenu)}
-                className="toolbar-btn export-btn"
+                className="toolbar-btn toolbar-btn-compact export-btn"
             >
                 导出字幕 ▼
             </button>
@@ -628,7 +644,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
             style={{
               position: 'static',
               margin: '0 12px',
-              width: '36px', 
+              width: '36px',
               height: '36px',
               borderRadius: '8px',
               padding: 0,
@@ -645,14 +661,19 @@ const Toolbar: React.FC<ToolbarProps> = ({ title, setVideoFile, videoFile, onSub
 
           <button
             type="button"
-            className="toolbar-btn"
+            className="toolbar-btn toolbar-btn-primary toolbar-btn-compact toolbar-video-export"
             disabled={downloadProgress.isVisible}
             style={{ opacity: downloadProgress.isVisible ? 0.6 : 1, cursor: downloadProgress.isVisible ? "not-allowed" : "pointer" }}
             onClick={handleExportVideo}
           >导出视频</button>
         </div>
       </div>
-      
+      {asrError && (
+        <div className="toolbar-notice" role="alert">
+          <span>{asrError}</span>
+          <button type="button" className="toolbar-notice-close" onClick={() => setAsrError(null)} aria-label="关闭提示">×</button>
+        </div>
+      )}
       {downloadProgress.isVisible && (
         <DownloadProgress
           isVisible={downloadProgress.isVisible}

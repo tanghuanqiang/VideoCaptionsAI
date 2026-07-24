@@ -222,7 +222,7 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
     if (settingsLoaded && !apiKey && messages.length === 0) {
       setMessages([{
         id: 'welcome',
-        text: 'Welcome! I can help with: speech-to-text, subtitle editing, style adjustment, video burning.\n\nClick the gear icon (top-right) to configure your OpenAI-compatible API.',
+        text: '欢迎！我可以协助：语音识别、字幕编辑、样式调整、视频烧录。\n\n点击右上角齿轮图标配置 OpenAI 兼容 API。',
         role: 'assistant'
       }]);
     }
@@ -314,7 +314,7 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
   return (
     <div className="sidebar-copilot">
       <div className="sidebar-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <span>Copilot</span>
+        <span>AI 助手</span>
         <div style={{display:'flex',gap:6,alignItems:'center'}}>
           <button
             className={!apiKey && settingsLoaded ? "gear-pulse" : ""}
@@ -331,31 +331,31 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
               <rect x="8" y="3" width="2" height="12" rx="1" fill="#b3e5fc"/>
               <rect x="3" y="8" width="12" height="2" rx="1" fill="#b3e5fc"/>
             </svg>
-            New Chat
+            新建对话
           </button>
         </div>
       </div>
       {showSettings && (
         <div style={{padding:'12px',borderBottom:'1px solid #333',background:'#1a1d24'}}>
-          <div style={{fontWeight:600,marginBottom:10,fontSize:13,color:'#ccc'}}>Copilot API Settings</div>
+          <div style={{fontWeight:600,marginBottom:10,fontSize:13,color:'#ccc'}}>AI 助手 API 设置</div>
           <div style={{marginBottom:8}}>
-            <label style={{fontSize:11,color:'#888',display:'block',marginBottom:2}}>API Base URL</label>
+            <label style={{fontSize:11,color:'#888',display:'block',marginBottom:2}}>API 基础地址</label>
             <input value={apiBase} onChange={e=>setApiBase(e.target.value)} placeholder="https://api.openai.com/v1" style={{width:'100%',padding:'6px 8px',background:'#0d1117',border:'1px solid #333',borderRadius:4,color:'#e0e0e0',fontSize:12}} />
           </div>
           <div style={{marginBottom:8}}>
-            <label style={{fontSize:11,color:'#888',display:'block',marginBottom:2}}>API Key</label>
+            <label style={{fontSize:11,color:'#888',display:'block',marginBottom:2}}>API 密钥</label>
             <input type="password" value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="sk-..." style={{width:'100%',padding:'6px 8px',background:'#0d1117',border:'1px solid #333',borderRadius:4,color:'#e0e0e0',fontSize:12}} />
           </div>
           <div style={{marginBottom:8}}>
-            <label style={{fontSize:11,color:'#888',display:'block',marginBottom:2}}>Model Name</label>
+            <label style={{fontSize:11,color:'#888',display:'block',marginBottom:2}}>模型名称</label>
             <input value={modelName} onChange={e=>setModelName(e.target.value)} placeholder="gpt-4o" style={{width:'100%',padding:'6px 8px',background:'#0d1117',border:'1px solid #333',borderRadius:4,color:'#e0e0e0',fontSize:12}} />
           </div>
           <div style={{marginBottom:10}}>
-            <label style={{fontSize:11,color:'#888',display:'block',marginBottom:2}}>Tavily API Key (optional)</label>
+            <label style={{fontSize:11,color:'#888',display:'block',marginBottom:2}}>Tavily API 密钥（可选）</label>
             <input type="password" value={tavilyKey} onChange={e=>setTavilyKey(e.target.value)} placeholder="tvly-..." style={{width:'100%',padding:'6px 8px',background:'#0d1117',border:'1px solid #333',borderRadius:4,color:'#e0e0e0',fontSize:12}} />
           </div>
           <button onClick={saveSettings} disabled={savingSettings} style={{width:'100%',padding:'8px',background:'#3a7bd5',color:'#fff',border:'none',borderRadius:4,cursor:'pointer',fontSize:13,fontWeight:600}}>
-            {savingSettings ? 'Saving...' : 'Save & Reload'}
+            {savingSettings ? '保存中...' : '保存并重载'}
           </button>
         </div>
       )}
@@ -415,7 +415,7 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
                           }
                         }}>确认(Keep)</button>
                       <button style={{background:'#f5f5f5',color:'#333',border:'none',borderRadius:4,padding:'4px 16px',cursor:'pointer'} }
-                        onClick={() => { setHiddenSubtitleSigs(prev => prev.includes(sig) ? prev : [...prev, sig]); }}>取消(Cancel)</button>
+                        onClick={() => { setHiddenSubtitleSigs(prev => prev.includes(sig) ? prev : [...prev, sig]); }}>取消</button>
                     </div>
                   </div>
                 );
@@ -448,7 +448,7 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
                           }
                         }}>确认(Keep)</button>
                       <button style={{background:'#f5f5f5',color:'#333',border:'none',borderRadius:4,padding:'4px 16px',cursor:'pointer'} }
-                        onClick={() => { setHiddenStyleSigs(prev => prev.includes(sig) ? prev : [...prev, sig]); }}>取消(Cancel)</button>
+                        onClick={() => { setHiddenStyleSigs(prev => prev.includes(sig) ? prev : [...prev, sig]); }}>取消</button>
                     </div>
                   </div>
                 );

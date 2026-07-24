@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState, useCallback } from 'react'; // Added useCallback
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'; // Added useCallback
 // import reactLogo from './assets/react.svg'
 // import viteLogo from '/vite.svg'
 import './App.css'
@@ -24,6 +24,9 @@ import type { AssStyle, Subtitle, ASRResponse } from './types/subtitleTypes';
 import { calculateLayers } from './utils/subtitleUtils';
 import type { VideoContentRect } from './utils/CoordinateMapper';
 import { useHistory } from './hooks/useHistory';
+import { splitGroupByCharacters, subtitleToCaptionGroup, captionGroupToSubtitle } from './types/captionModel';
+import CaptionPropertiesPanel from './components/CaptionPropertiesPanel';
+import AssPreviewCanvas from './components/AssPreviewCanvas';
 
 function MainApp() {
   // Copilot 侧边栏开关
@@ -40,24 +43,23 @@ function MainApp() {
     set: setSubtitles, 
     undo, 
     redo, 
-    canUndo, 
-    canRedo,
-    reset: resetSubtitles
   } = useHistory<Subtitle[]>([]);
 
   const [selectedSubtitleIds, setSelectedSubtitleIds] = useState<string[]>([]);
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [layoutWidth, setLayoutWidth] = useState(window.innerWidth);
-  const [rect, setRect] = useState({ w: 0, h: 0, left: 0, top: 0 });
+  const [, setRect] = useState({ w: 0, h: 0, left: 0, top: 0 });
   const [layoutHeight, setLayoutHeight] = useState(window.innerHeight - 56); // header 高度 56px
   const videoRef = useRef<HTMLVideoElement>(null); // Explicitly define videoRef type
   // ASS字幕的PlayRes设置，从视频分辨率获取
   const [playResX, setPlayResX] = useState<number>(1920);
   const [playResY, setPlayResY] = useState<number>(1080);
   const [contentRect, setContentRect] = useState<VideoContentRect>({ left: 0, top: 0, width: 640, height: 360 });
+  const [assPreviewEnabled, setAssPreviewEnabled] = useState(false);
+  const [assRendererReady, setAssRendererReady] = useState(false);
 
   // 主题状态管理
   const [theme, setTheme] = useState<'dark' | 'light'>(() => { const s = localStorage.getItem('theme'); return (s === 'dark' || s === 'light') ? s : 'dark'; });
-  const [currentPage, setCurrentPage] = useState<'editor' | 'history'>('editor');
 
   // Keyboard shortcuts for Undo/Redo
   useEffect(() => {
@@ -179,6 +181,77 @@ function MainApp() {
   const handleStyleUpdate = useCallback((styleName: string, updates: Partial<AssStyle>) => {
     setStyles(prev => prev.map(s => s.Name === styleName ? { ...s, ...updates } : s));
   }, []);
+  const handleAssRendererState = useCallback((ready: boolean) => setAssRendererReady(ready), []);
+  const handleImportProject = useCallback(async (file: File) => {
+    try {
+      const parsed: unknown = JSON.parse(await file.text());
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("\u9879\u76ee\u6587\u4ef6\u5fc5\u987b\u662f JSON \u5bf9\u8c61\u3002");
+      }
+
+      const project = parsed as Record<string, unknown>;
+      const source = Array.isArray(project.subtitles) ? project.subtitles : project.events;
+      if (!Array.isArray(source)) {
+        throw new Error("\u9879\u76ee\u4e2d\u7f3a\u5c11 subtitles \u6216 events \u6570\u7ec4\u3002");
+      }
+
+      const importedSubtitles: Subtitle[] = source.map((entry, index) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+          throw new Error(`\u7b2c ${index + 1} \u6761\u5b57\u5e55\u683c\u5f0f\u65e0\u6548\u3002`);
+        }
+        const item = entry as Record<string, unknown>;
+        const start = item.start;
+        const end = item.end;
+        if ((typeof start !== "string" && typeof start !== "number") || (typeof end !== "string" && typeof end !== "number") || typeof item.text !== "string") {
+          throw new Error(`\u7b2c ${index + 1} \u6761\u5b57\u5e55\u7f3a\u5c11\u6709\u6548\u7684 start\u3001end \u6216 text\u3002`);
+        }
+        return {
+          id: typeof item.id === "string" ? item.id : `project-${index + 1}-${Date.now()}`,
+          start,
+          end,
+          text: item.text,
+          style: typeof item.style === "string" ? item.style : "Default",
+          group: typeof item.group === "string" ? item.group : typeof item.speaker === "string" ? item.speaker : "",
+          layer: typeof item.layer === "number" ? item.layer : undefined,
+          overrides: item.overrides && typeof item.overrides === "object" ? item.overrides as Subtitle["overrides"] : undefined,
+          units: Array.isArray(item.units) ? item.units as Subtitle["units"] : undefined,
+          words: Array.isArray(item.words) ? item.words as Subtitle["words"] : undefined,
+          effect: item.effect && typeof item.effect === "object" ? item.effect as Subtitle["effect"] : undefined,
+        };
+      });
+
+      const importedStyles = Array.isArray(project.styles)
+        ? project.styles.flatMap((entry, index) => {
+            if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+            const style = entry as Partial<AssStyle>;
+            if (typeof style.Name !== "string" || !style.Name.trim()) return [];
+            return [{ ...defaultStyle, ...style, id: typeof style.id === "string" ? style.id : `project-style-${index + 1}` } as AssStyle];
+          })
+        : [];
+      const nextStyles = importedStyles.length ? importedStyles : styles;
+      const requestedStyle = typeof project.selectedStyle === "string" ? project.selectedStyle : null;
+      const nextSelectedStyle = requestedStyle && nextStyles.some(style => style.Name === requestedStyle)
+        ? requestedStyle
+        : nextStyles[0]?.Name || "Default";
+
+      setSubtitles(calculateLayers(importedSubtitles));
+      setStyles(nextStyles);
+      setSelectedStyle(nextSelectedStyle);
+      setSelectedSubtitleIds([]);
+      setSelectedUnitId(null);
+
+      const resolution = project.resolution && typeof project.resolution === "object" && !Array.isArray(project.resolution)
+        ? project.resolution as Record<string, unknown>
+        : null;
+      const importedWidth = typeof project.playResX === "number" ? project.playResX : resolution?.width;
+      const importedHeight = typeof project.playResY === "number" ? project.playResY : resolution?.height;
+      if (typeof importedWidth === "number" && importedWidth > 0) setPlayResX(importedWidth);
+      if (typeof importedHeight === "number" && importedHeight > 0) setPlayResY(importedHeight);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "\u672a\u77e5\u9519\u8bef";
+      window.alert(`\u5bfc\u5165\u9879\u76ee\u5931\u8d25\uff1a${message}`);
+    }
+  }, [setSubtitles, styles]);
 
   const alpha = 5;
   const layout = [
@@ -199,10 +272,12 @@ function MainApp() {
                   return [...prev, subtitle.id];
               }
           });
+          setSelectedUnitId(null);
           return; // Don't seek when multi-selecting
       }
 
       setSelectedSubtitleIds([subtitle.id]);
+      setSelectedUnitId(null);
       if (videoRef.current) {
           let time = 0;
           if (typeof subtitle.start === 'number') {
@@ -264,11 +339,11 @@ function MainApp() {
           <div style={{display:"flex",alignItems:"center",gap:16}}>
             <span style={{fontSize:24}}>??</span>
             <div>
-              <div style={{fontWeight:"bold",fontSize:16,marginBottom:4}}>Welcome to VideoCaptionsAI!</div>
-              <div style={{fontSize:13,color:"#999",lineHeight:1.6}}>3 steps: Upload video ? Speech-to-text ? Edit &amp; export. Copilot in sidebar for AI help.</div>
+              <div style={{fontWeight:"bold",fontSize:16,marginBottom:4}}>欢迎使用 AI 字幕识别生成器</div>
+              <div style={{fontSize:13,color:"#999",lineHeight:1.6}}>三步上手：导入视频 → 语音识别 → 编辑并导出。右侧 Copilot 提供 AI 辅助。</div>
             </div>
           </div>
-          <button onClick={dismissOnboarding} style={{background:"transparent",border:"1px solid #555",color:"#999",borderRadius:4,padding:"6px 16px",cursor:"pointer",fontSize:13}}>Got it</button>
+          <button onClick={dismissOnboarding} style={{background:"transparent",border:"1px solid #555",color:"#999",borderRadius:4,padding:"6px 16px",cursor:"pointer",fontSize:13}}>我知道了</button>
         </div>
       )}
       <header>
@@ -280,14 +355,26 @@ function MainApp() {
             const subsArr = resp.events || [];
             console.log("ASR返回的字幕数据：", resp);
             
-            const formatted: Subtitle[] = subsArr.map((item) => ({
-              id: item.id,
-              start: item.start,
-              end: item.end,
-              text: item.text,
-              style: item.style || "Default",
-              group: item.speaker || "",
-            }));
+            const formatted: Subtitle[] = subsArr.map((item) => {
+              const group = splitGroupByCharacters({
+                ...subtitleToCaptionGroup({
+                  id: item.id,
+                  start: item.start,
+                  end: item.end,
+                  text: item.text,
+                  style: item.style || "Default",
+                  group: item.speaker || "",
+                }),
+                effect: { type: "whole" },
+              }, item.words);
+              return {
+                ...captionGroupToSubtitle(group),
+                start: item.start,
+                end: item.end,
+                group: item.speaker || "",
+                words: item.words,
+              };
+            });
             
             const layered = calculateLayers(formatted);
             setSubtitles(layered);
@@ -317,8 +404,7 @@ function MainApp() {
           playResY={playResY}
           copilotOpen={copilotOpen}
           toggleCopilot={() => setCopilotOpen(v => !v)}
-          currentPage={currentPage}
-          setCurrentPage={setCurrentPage}
+          onImportProject={handleImportProject}
         />
       </header>
       {/* 预览字幕 */}
@@ -330,6 +416,7 @@ function MainApp() {
         playResX={playResX}  
         playResY={playResY}  
         onStyleUpdate={handleStyleUpdate}
+        enabled={!assPreviewEnabled || !assRendererReady}
       />
       <main className="main-content">
         {/* Copilot 侧边栏开关按钮已移动到 Toolbar */}
@@ -367,7 +454,10 @@ function MainApp() {
               borderTopRightRadius: 16,
               flexShrink: 0  // 防止 header 被压缩
             }}>
-              视频面板
+              <span>视频预览</span>
+              <button type="button" onMouseDown={event => event.stopPropagation()} onClick={() => setAssPreviewEnabled(value => !value)} style={{ marginLeft: "auto", minWidth: 0, padding: "3px 8px", background: assPreviewEnabled ? "#1677ff" : "rgba(255,255,255,.16)" }}>
+                {assPreviewEnabled ? "ASS 渲染" : "CSS 预览"}
+              </button>
             </div>
             {/* 关键：这个容器负责为视频提供正确的空间 */}
             <div style={{ 
@@ -382,7 +472,18 @@ function MainApp() {
                 onContentRectChange={setContentRect}
                 videoWidth={playResX}
                 videoHeight={playResY}
-              />
+              >
+                <AssPreviewCanvas
+                  subtitles={subtitles}
+                  styles={styles}
+                  videoRef={videoRef}
+                  playResX={playResX}
+                  playResY={playResY}
+                  contentRect={contentRect}
+                  enabled={assPreviewEnabled}
+                  onRendererState={handleAssRendererState}
+                />
+              </VideoPanel>
             </div>
            
           </div>
@@ -445,8 +546,10 @@ function MainApp() {
                 setSubtitles={setSubtitles}
                 styles={styles}
                 selectedStyle={selectedStyle}
-                selectedIds={selectedSubtitleIds}
-                setSelectedIds={setSelectedSubtitleIds}
+                  selectedIds={selectedSubtitleIds}
+                  setSelectedIds={setSelectedSubtitleIds}
+                  selectedUnitId={selectedUnitId}
+                  setSelectedUnitId={setSelectedUnitId}
                 videoRef={videoRef}
                 onSeekToTime={handleSeekToTime}
               />
@@ -470,17 +573,27 @@ function MainApp() {
                   borderTopLeftRadius: 16,
                   borderTopRightRadius: 16,
                   flex: "0 0 auto"
-              }}>
-                  字幕样式
-              </div>
+              }}>{selectedSubtitleIds.length ? "\u5b57\u5e55\u5c40\u90e8\u5c5e\u6027" : "\u5b57\u5e55\u6837\u5f0f"}</div>
               {/* 这个新添加的 div 才是真正的可滚动区域 */}
               <div style={{ flex: "1 1 0", overflowY: "auto" }}>
-                  <SubtitleStylePanel
+                  {selectedSubtitleIds.length ? (
+                    <CaptionPropertiesPanel
+                      subtitles={subtitles}
+                      selectedIds={selectedSubtitleIds}
+                      selectedUnitId={selectedUnitId}
+                      setSubtitles={setSubtitles}
+                    />
+                  ) : (
+                    <SubtitleStylePanel
                       styles={styles}
                       setStyles={setStyles}
                       selectedStyle={selectedStyle}
                       setSelectedStyle={setSelectedStyle}
-                  />
+                      contentRect={contentRect}
+                      playResX={playResX}
+                      playResY={playResY}
+                    />
+                  )}
               </div>
              
           </div>

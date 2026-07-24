@@ -59,13 +59,13 @@ export const VideoHistory: React.FC<VideoHistoryProps> = ({ onLoadVideo }) => {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to delete history');
+        throw new Error('删除历史失败');
       }
       
       // 刷新列表
       fetchHistory();
     } catch (err) {
-      alert('删除失败: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      alert('删除失败: ' + (err instanceof Error ? err.message : '未知错误'));
     }
   };
 

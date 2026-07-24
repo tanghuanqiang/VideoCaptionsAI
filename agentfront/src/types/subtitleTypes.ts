@@ -1,11 +1,55 @@
+export interface WordTimestamp {
+    word: string;
+    start: number;
+    end: number;
+    timingSource?: "asr-word" | "estimated";
+}
+
+export interface CaptionOverrides {
+  fontFamily?: string;
+  fontSize?: number;
+  primaryColor?: string;
+  opacity?: number;
+  outlineColor?: string;
+  outlineWidth?: number;
+  shadowColor?: string;
+  shadowWidth?: number;
+  x?: number;
+  y?: number;
+  scaleX?: number;
+  scaleY?: number;
+  rotation?: number;
+  letterSpacing?: number;
+}
+
+export type CaptionEffectType = "whole" | "reveal" | "highlight" | "emphasis";
+
+export interface CaptionEffect {
+  type: CaptionEffectType;
+  params?: Record<string, number | string>;
+}
+
+export interface CaptionUnit {
+  id: string;
+  text: string;
+  startMs: number;
+  endMs: number;
+  overrides: CaptionOverrides;
+  timingSource: "asr-word" | "estimated";
+  order: number;
+}
+
 export interface SubtitleEvent {
     id: string;
     start: number;
     end: number;
     text: string;
     speaker?: string;
-    words?: Array<Record<string, any>>;
+    words?: WordTimestamp[];
     style?: string;
+    overrides?: CaptionOverrides;
+    units?: CaptionUnit[];
+    effect?: CaptionEffect;
 }
 
 export interface AssStyle {
@@ -58,6 +102,10 @@ export interface Subtitle {
   group: string;
   selected?: boolean;
   layer?: number;
+  overrides?: CaptionOverrides;
+  units?: CaptionUnit[];
+  effect?: CaptionEffect;
+  words?: WordTimestamp[];
 }
 
 export type ASRResponse = {
@@ -71,6 +119,10 @@ export type ASRResponse = {
     text: string;
     style?: string;
     speaker?: string;
+    words?: WordTimestamp[];
+    overrides?: CaptionOverrides;
+    units?: CaptionUnit[];
+    effect?: CaptionEffect;
   }>;
   recommended_style?: AssStyle;
 };

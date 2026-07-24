@@ -21,6 +21,31 @@ out_dir = "outputs"
 # ----------------
 # 核心工具函数
 # ----------------
+
+def normalize_word_timestamps(raw_words: Optional[List[Dict[str, object]]]) -> Optional[List[Dict[str, object]]]:
+    """Normalize Whisper word entries for the frontend timeline contract."""
+    normalized: List[Dict[str, object]] = []
+    for word in raw_words or []:
+        token = str(word.get("word", ""))
+        start = word.get("start")
+        end = word.get("end")
+        if not token or start is None or end is None:
+            continue
+        try:
+            start_value = float(start)
+            end_value = float(end)
+        except (TypeError, ValueError):
+            continue
+        if end_value < start_value:
+            start_value, end_value = end_value, start_value
+        normalized.append({
+            "word": token,
+            "start": start_value,
+            "end": end_value,
+            "timingSource": "asr-word",
+        })
+    return normalized or None
+
 @tool
 def probe_media(media_path: str) -> Dict[str, Any]:
     """
@@ -81,17 +106,23 @@ def asr_transcribe_video(media_path: str, lang: str = None, model_size: str = No
     """
     model = get_whisper_model(model_size)
     print(f"Starting transcription for {media_path} with model {model_size or 'default'}...")
-    result = model.transcribe(media_path, language=lang)
+    # Word timestamps are the source for the editor's word/character timeline.
+    # Keep a fallback for compatible Whisper wrappers that do not expose the option.
+    try:
+        result = model.transcribe(media_path, language=lang, word_timestamps=True)
+    except TypeError:
+        result = model.transcribe(media_path, language=lang)
     detected_lang = result.get('language', 'unknown')
     print(f"Transcription finished. Detected language: {detected_lang}")
     
     events = []
-    for i, seg in enumerate(result['segments']):
+    for i, seg in enumerate(result.get('segments', [])):
         events.append(SubtitleEvent(
             id=str(i+1),
             start=seg['start'],
             end=seg['end'],
             text=seg['text'],
+            words=normalize_word_timestamps(seg.get("words")),
             style="Default"
         ))
     

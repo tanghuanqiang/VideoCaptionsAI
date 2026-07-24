@@ -1,15 +1,16 @@
-﻿import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { toCssRgba, parseAssColor } from "../utils/toAssColor";
 import type { AssStyle, Subtitle } from "../types/subtitleTypes";
 import {
   assToCSS,
   cssDragToASS,
   cssResizeToASS,
-  getVideoContentRect,
   type VideoContentRect,
 } from "../utils/CoordinateMapper";
 
-interface SubtitlePreviewProps {
+/* types */
+interface Props {
   subtitles: Subtitle[];
   styles: AssStyle[];
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -17,339 +18,344 @@ interface SubtitlePreviewProps {
   playResY?: number;
   onStyleUpdate?: (styleName: string, updates: Partial<AssStyle>) => void;
   contentRect?: VideoContentRect;
+  enabled?: boolean;
 }
 
-interface DragInfo {
+interface DragState {
   subId: string;
   styleName: string;
   mode: "move" | "resize";
   startMouseX: number;
   startMouseY: number;
   startFontSize: number;
+  startAlignment: number;
   startMarginV: number;
   startMarginL: number;
   startMarginR: number;
-  startAlignment: number;
-  ghostLeft: number;
-  ghostTop: number;
-  ghostWidth: number;
-  ghostHeight: number;
 }
 
-const SubtitlePreview: React.FC<SubtitlePreviewProps> = ({
+const SubtitlePreview: React.FC<Props> = ({
   subtitles, styles, videoRef,
   playResX = 1920, playResY = 1080,
-  onStyleUpdate, contentRect,
+  onStyleUpdate, contentRect, enabled = true,
 }) => {
   const [activeSubs, setActiveSubs] = useState<Subtitle[]>([]);
+  const [currentTime, setCurrentTime] = useState(0);
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
-  const dragRef = useRef<DragInfo | null>(null);
-  const overlayRef = useRef<HTMLDivElement | null>(null);
-  const rafRef = useRef<number>(0);
-  const [dragGhost, setDragGhost] = useState<{
-    left: number; top: number; width: number; height: number; mode: "move" | "resize";
-  } | null>(null);
+  const [dragOffset, setDragOffset] = useState<{ dx: number; dy: number; scale: number }>({ dx: 0, dy: 0, scale: 1 });
+
+  const dragRef = useRef<DragState | null>(null);
+  const offsetRef = useRef<{ dx: number; dy: number; scale: number }>({ dx: 0, dy: 0, scale: 1 });
+  const endDragFn = useRef<(() => void) | null>(null);
   const [portalReady, setPortalReady] = useState(false);
 
-  // Default content rect if none provided
-  const cr = contentRect || { left: 0, top: 0, width: 640, height: 360 };
+  const cr = useMemo(() => contentRect || { left: 0, top: 0, width: 640, height: 360 }, [contentRect]);
 
+  /* portal */
   useEffect(() => {
+    let id: ReturnType<typeof setTimeout>;
     const check = () => {
-      if (document.getElementById("subtitle-overlay-container")) {
-        setPortalReady(true);
-      } else { setTimeout(check, 50); }
+      if (document.getElementById("subtitle-overlay-container")) setPortalReady(true);
+      else id = setTimeout(check, 50);
     };
     check();
+    return () => clearTimeout(id);
   }, []);
 
-  const timeToSeconds = useCallback((time: string | number): number => {
-    if (typeof time === "number") return time;
-    if (/^\d+(?:\.\d+)?$/.test(time)) return parseFloat(time);
-    const c = time.replace(",", ".");
-    const p = c.split(":");
-    if (p.length === 3) return parseInt(p[0]||"0")*3600 + parseInt(p[1]||"0")*60 + parseFloat(p[2]||"0");
-    return parseFloat(c) || 0;
+  useEffect(() => () => { endDragFn.current?.(); }, []);
+
+  /* time parsing */
+  const t2s = useCallback((t: string | number): number => {
+    if (typeof t === "number") return t;
+    if (/^\d+(?:\.\d+)?$/.test(t)) return parseFloat(t);
+    const parts = t.replace(",", ".").split(":");
+    if (parts.length === 3) return +parts[0]*3600 + +parts[1]*60 + parseFloat(parts[2]);
+    return parseFloat(parts[0]) || 0;
   }, []);
 
-  // Throttled timeupdate using requestAnimationFrame
+  /* timeupdate */
   useEffect(() => {
-    if (!videoRef?.current) return;
-    const ve = videoRef.current;
-
+    const ve = videoRef?.current;
+    if (!ve) return;
     let ticking = false;
+    let raf = 0;
     const onTime = () => {
       if (ticking) return;
       ticking = true;
-      rafRef.current = requestAnimationFrame(() => {
+      raf = requestAnimationFrame(() => {
         const t = ve.currentTime || 0;
-        setActiveSubs(subtitles.filter(sub => {
-          const s = timeToSeconds(sub.start);
-          const e = timeToSeconds(sub.end);
-          return t >= s && t <= e;
-        }));
+        setCurrentTime(t);
+        setActiveSubs(subtitles.filter(s => t >= t2s(s.start) && t <= t2s(s.end)));
         ticking = false;
       });
     };
-
     ve.addEventListener("timeupdate", onTime);
-    return () => {
-      ve.removeEventListener("timeupdate", onTime);
-      cancelAnimationFrame(rafRef.current);
-    };
-  }, [videoRef, subtitles, timeToSeconds]);
+    return () => { ve.removeEventListener("timeupdate", onTime); cancelAnimationFrame(raf); };
+  }, [videoRef, subtitles, t2s]);
 
-  // ---- Build CSS position from ASS style using CoordinateMapper ----
-  const computePos = useCallback((st: AssStyle): React.CSSProperties => {
+  /* build CSS from ASS */
+  const buildStyle = useCallback((st: AssStyle, overrides: Subtitle["overrides"] = {}): React.CSSProperties => {
+    const effective = {
+      ...st,
+      FontName: overrides?.fontFamily ?? st.FontName,
+      FontSize: overrides?.fontSize ?? st.FontSize,
+      PrimaryColour: overrides?.primaryColor ?? st.PrimaryColour,
+      OutlineColour: overrides?.outlineColor ?? st.OutlineColour,
+      Outline: overrides?.outlineWidth ?? st.Outline,
+      Shadow: overrides?.shadowWidth ?? st.Shadow,
+      ScaleX: overrides?.scaleX ?? st.ScaleX,
+      ScaleY: overrides?.scaleY ?? st.ScaleY,
+      Angle: overrides?.rotation ?? st.Angle,
+      Spacing: overrides?.letterSpacing ?? st.Spacing,
+    };
+    const alignment = effective.Alignment ?? 2;
     const pos = assToCSS(
-      {
-        alignment: st.Alignment ?? 2,
-        marginL: st.MarginL ?? 10,
-        marginR: st.MarginR ?? 10,
-        marginV: st.MarginV ?? 10,
-        fontSize: st.FontSize ?? 48,
-      },
+      alignment,
+      effective.MarginL ?? 10,
+      effective.MarginR ?? 10,
+      effective.MarginV ?? 10,
+      effective.FontSize ?? 48,
       cr, playResX, playResY
     );
 
-    const rgb = st.PrimaryColour?.startsWith("#") && st.PrimaryColour.length === 7
-      ? "#" + st.PrimaryColour.slice(5,7) + st.PrimaryColour.slice(3,5) + st.PrimaryColour.slice(1,3)
-      : (st.PrimaryColour || "#FFFFFF");
+    // Fix #1: Alpha/transparency from PrimaryAlpha
+    const primaryAlpha = overrides?.opacity ?? (effective.PrimaryAlpha ?? 255) / 255;
+    const rgbaColor = toCssRgba(effective.PrimaryColour || "#FFFFFF", primaryAlpha < 1 ? primaryAlpha : 0.999);
 
-    const alpha = st.PrimaryAlpha != null ? (st.PrimaryAlpha ?? 255) / 255 : 1;
+    // text alignment within element
+    const haMod = alignment % 3;
+    const textAlign = haMod === 0 ? "right" : haMod === 2 ? "center" : "left";
 
-    const alignMap: Record<number, string> = {
-      1: "flex-end", 2: "flex-end", 3: "flex-end",
-      4: "center", 5: "center", 6: "center",
-      7: "flex-start", 8: "flex-start", 9: "flex-start",
-    };
+    // Position transform from CoordinateMapper
+    const translateXform = pos.translateX ? `translate(${pos.translateX})` : "";
 
-    const justifyMap: Record<number, string> = {
-      1: "flex-start", 2: "center", 3: "flex-end",
-      4: "flex-start", 5: "center", 6: "flex-end",
-      7: "flex-start", 8: "center", 9: "flex-end",
-    };
+    // Geometry transforms
+    const scaleXform = (effective.ScaleX !== undefined && effective.ScaleX !== 100) || (effective.ScaleY !== undefined && effective.ScaleY !== 100)
+      ? `scale(${(effective.ScaleX??100)/100}, ${(effective.ScaleY??100)/100})` : "";
+    const angleXform = effective.Angle ? `rotate(${effective.Angle}deg)` : "";
 
-    const al = st.Alignment ?? 2;
-    const translateX = al === 2 || al === 5 || al === 8 ? "-50%" : "0";
-    const translateY = al === 4 || al === 5 || al === 6 ? "-50%" : "0";
+    // Fix #2: Synthetic italic for CJK fonts
+    const combinedXform = [translateXform, scaleXform, angleXform, effective.Italic ? "skewX(-12deg)" : ""].filter(Boolean).join(" ");
+
+    // Outline colour with alpha from OutlineAlpha (0 = fully opaque in ASS convention)
+    const outlineColour = (() => {
+      const c = parseAssColor(effective.OutlineColour || "#000000");
+      if (!c) return "rgba(0,0,0,1)";
+      const rawAlpha = effective.OutlineAlpha ?? 255;
+      // OutlineAlpha=0 means fully opaque in ASS (same as 255), so default 0 to 255
+      const outlineAlpha = (rawAlpha === 0 ? 255 : rawAlpha) / 255;
+      return `rgba(${c.r},${c.g},${c.b},${outlineAlpha})`;
+    })();
+
+    // Shadow colour from BackColour with BackAlpha
+    const backColour = (() => {
+      const c = parseAssColor(effective.BackColour || "#000000");
+      if (!c) return "rgba(0,0,0,1)";
+      const rawAlpha = effective.BackAlpha ?? 255;
+      // BackAlpha=0 means fully opaque in ASS (same as 255)
+      const backAlpha = (rawAlpha === 0 ? 255 : rawAlpha) / 255;
+      return `rgba(${c.r},${c.g},${c.b},${backAlpha})`;
+    })();
+
+    const us = cr.height / playResY;
 
     return {
       position: "absolute" as const,
-      left: pos.left,
-      top: pos.top,
-      color: `rgba(${parseInt(rgb.slice(1,3),16)},${parseInt(rgb.slice(3,5),16)},${parseInt(rgb.slice(5,7),16)},${alpha})`,
-      fontSize: pos.fontSizePx,
-      fontFamily: st.FontName || "Arial",
-      fontWeight: st.Bold ? "bold" : "normal",
-      fontStyle: st.Italic ? "italic" : "normal",
-      textDecoration: [
-        st.Underline ? "underline" : "",
-        st.StrikeOut ? "line-through" : "",
-      ].filter(Boolean).join(" ") || "none",
-      letterSpacing: st.Spacing ? st.Spacing * (cr.width / playResX) + "px" : undefined,
-      transform: translateX || translateY ? `translate(${translateX},${translateY})` : undefined,
-      display: "inline-block",
-      whiteSpace: "pre-wrap",
-      userSelect: "none" as const,
+      left: overrides?.x !== undefined ? `${(overrides.x / playResX) * 100}%` : pos.left,
+      top: overrides?.y !== undefined ? `${(overrides.y / playResY) * 100}%` : pos.top,
+      transform: combinedXform || undefined,
+      transformOrigin: "center center",
+      color: rgbaColor,
+      fontSize: pos.fontSize,
+      fontFamily: effective.FontName || "Arial",
+      fontWeight: effective.Bold ? "bold" : "normal",
+      fontStyle: effective.Italic ? "italic" : "normal",
+      // Fix #4: Letter spacing from ASS Spacing
+      letterSpacing: `${((effective.Spacing || 0) * us).toFixed(1)}px`,
+      textDecoration: [effective.Underline?"underline":"",effective.StrikeOut?"line-through":""].filter(Boolean).join(" ") || undefined,
+      textAlign: textAlign as React.CSSProperties["textAlign"],
+      whiteSpace: "pre-wrap" as const,
       pointerEvents: "auto" as const,
-      textShadow: st.Shadow && st.Shadow > 0
-        ? `0 ${st.Shadow * (cr.height / playResY)}px ${st.Shadow * (cr.height / playResY)}px rgba(0,0,0,0.7)`
-        : undefined,
-      WebkitTextStroke: st.Outline && st.Outline > 0
-        ? `${st.Outline * (cr.width / playResX)}px ${st.OutlineColour || "#000000"}`
-        : undefined,
+      // Fix #3: Clean outline with -webkit-text-stroke, no ghosting
+      WebkitTextStroke: (() => {
+        const o = effective.Outline ?? 2; if (o <= 0) return undefined;
+        return `${(o * us).toFixed(1)}px ${outlineColour}`;
+      })(),
+      paintOrder: (effective.Outline ?? 2) > 0 ? "stroke fill" : undefined,
+      // Shadow: drop-shadow filter using BackColour (ASS shadow colour)
+      filter: (() => {
+        const s = effective.Shadow ?? 0; if (s <= 0) return undefined;
+        const t = Math.max(2, s * us);
+        return `drop-shadow(${t.toFixed(1)}px ${t.toFixed(1)}px 1px ${backColour})`;
+      })(),
+      lineHeight: "1.2",
     };
   }, [cr, playResX, playResY]);
 
-  // ---- startDrag using CoordinateMapper ----
-  const startDrag = useCallback((e: React.MouseEvent, subId: string, styleName: string, mode: "move"|"resize") => {
-    e.stopPropagation(); e.preventDefault();
-    setSelectedSubId(subId);
+  /* drag start */
+  const startDrag = useCallback((e: React.MouseEvent, subId: string, styleName: string, mode: "move" | "resize") => {
+    e.preventDefault();
+    e.stopPropagation();
 
     const styleObj = styles.find(s => s.Name === styleName);
     if (!styleObj) return;
 
-    const pos = assToCSS(
-      {
-        alignment: styleObj.Alignment ?? 2,
-        marginL: styleObj.MarginL ?? 10,
-        marginR: styleObj.MarginR ?? 10,
-        marginV: styleObj.MarginV ?? 10,
-        fontSize: styleObj.FontSize ?? 48,
-      },
-      cr, playResX, playResY
-    );
-
-    const sub = subtitles.find(s => s.id === subId);
-    // Estimate text width from font size and text length
-    const estWidth = (sub?.text?.length || 1) * pos.fontSizePx * 0.6;
-
-    dragRef.current = {
+    const ds: DragState = {
       subId, styleName, mode,
       startMouseX: e.clientX, startMouseY: e.clientY,
       startFontSize: styleObj.FontSize || 48,
-      startMarginV: styleObj.MarginV || 10,
-      startMarginL: styleObj.MarginL || 10,
-      startMarginR: styleObj.MarginR || 10,
       startAlignment: styleObj.Alignment ?? 2,
-      ghostLeft: pos.left,
-      ghostTop: pos.top,
-      ghostWidth: estWidth,
-      ghostHeight: pos.fontSizePx * 1.2,
+      startMarginV: styleObj.MarginV ?? 10,
+      startMarginL: styleObj.MarginL ?? 10,
+      startMarginR: styleObj.MarginR ?? 10,
     };
 
-    setDragGhost({
-      left: pos.left, top: pos.top,
-      width: estWidth, height: pos.fontSizePx * 1.2,
-      mode,
-    });
-  }, [styles, subtitles, cr, playResX, playResY]);
+    dragRef.current = ds;
+    offsetRef.current = { dx: 0, dy: 0, scale: 1 };
+    setSelectedSubId(subId);
+    setDragOffset({ dx: 0, dy: 0, scale: 1 });
 
-  // ---- global mouse handlers ----
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      const d = dragRef.current; if (!d) return;
-      const dx = e.clientX - d.startMouseX, dy = e.clientY - d.startMouseY;
-
-      if (d.mode === "move") {
-        d.ghostLeft += dx;
-        d.ghostTop += dy;
-        d.startMouseX = e.clientX;
-        d.startMouseY = e.clientY;
-        setDragGhost({
-          left: d.ghostLeft, top: d.ghostTop,
-          width: d.ghostWidth, height: d.ghostHeight,
-          mode: "move",
-        });
+    const onMove = (ev: MouseEvent) => {
+      const d = dragRef.current;
+      if (!d || d.subId !== subId) return;
+      const mx = ev.clientX, my = ev.clientY;
+      if (d.mode === "resize") {
+        const basePx = d.startFontSize * (cr.height / playResY);
+        const s = Math.max(12, basePx + (my - d.startMouseY)) / basePx;
+        offsetRef.current = { dx: 0, dy: 0, scale: s };
+        setDragOffset({ dx: 0, dy: 0, scale: s });
       } else {
-        const nh = Math.max(12, d.ghostHeight + dy);
-        d.ghostHeight = nh;
-        d.startMouseY = e.clientY;
-        setDragGhost({
-          left: d.ghostLeft, top: d.ghostTop,
-          width: d.ghostWidth, height: nh, mode: "resize",
-        });
+        offsetRef.current = { dx: mx - d.startMouseX, dy: my - d.startMouseY, scale: 1 };
+        setDragOffset({ dx: mx - d.startMouseX, dy: my - d.startMouseY, scale: 1 });
       }
     };
 
     const onUp = () => {
-      const d = dragRef.current; if (!d || !onStyleUpdate) return;
-      const styleObj = styles.find(s => s.Name === d.styleName);
-      if (!styleObj) { dragRef.current = null; setDragGhost(null); return; }
+      const d = dragRef.current;
+      if (!d || d.subId !== subId) { end(); return; }
+      if (!onStyleUpdate) { end(); return; }
+      if (!styles.some(s => s.Name === d.styleName)) { end(); return; }
+
+      const off = offsetRef.current;
 
       if (d.mode === "move") {
-        const totalDx = d.ghostLeft - (dragRef.current ? 0 : 0);
-        const pos = assToCSS(
-          { alignment: d.startAlignment, marginL: d.startMarginL, marginR: d.startMarginR, marginV: d.startMarginV, fontSize: d.startFontSize },
-          cr, playResX, playResY
-        );
-        const totalDy = d.ghostTop - pos.top;
-        const totalXDx = d.ghostLeft - pos.left;
-
-        const updates = cssDragToASS(
-          totalXDx, totalDy,
-          { alignment: d.startAlignment, marginL: d.startMarginL, marginR: d.startMarginR, marginV: d.startMarginV, fontSize: d.startFontSize },
-          cr, playResX, playResY
+        const up = cssDragToASS(
+          off.dx, off.dy,
+          d.startAlignment, d.startMarginL, d.startMarginR,
+          d.startMarginV, d.startFontSize,
+          cr, playResY
         );
         onStyleUpdate(d.styleName, {
-          Alignment: updates.alignment,
-          MarginV: updates.marginV,
-          MarginL: updates.marginL,
-          MarginR: updates.marginR,
+          MarginV: up.marginV,
+          MarginL: up.marginL,
+          MarginR: up.marginR,
         });
       } else {
-        const heightRatio = d.ghostHeight / (d.startFontSize * (cr.height / playResY));
-        const newFs = cssResizeToASS(
-          d.ghostHeight - d.startFontSize * (cr.height / playResY),
-          d.startFontSize, cr, playResY
-        );
-        onStyleUpdate(d.styleName, { FontSize: Math.round(newFs) });
+        const nf = cssResizeToASS(off.scale, d.startFontSize, cr, playResY);
+        onStyleUpdate(d.styleName, { FontSize: Math.round(nf) });
       }
 
+      end();
+    };
+
+    const end = () => {
       dragRef.current = null;
-      setDragGhost(null);
+      offsetRef.current = { dx: 0, dy: 0, scale: 1 };
+      setDragOffset({ dx: 0, dy: 0, scale: 1 });
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      endDragFn.current = null;
     };
 
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-  }, [styles, cr, playResX, playResY, onStyleUpdate]);
+    endDragFn.current = end;
+  }, [styles, cr, playResY, onStyleUpdate]);
 
-  // ---- Ghost style ----
-  const ghostSub = dragRef.current ? subtitles.find(s => s.id === dragRef.current!.subId) : null;
-  const ghostStyle = (): React.CSSProperties | null => {
-    if (!dragGhost || !ghostSub) return null;
-    const st = styles.find(s => s.Name === dragRef.current?.styleName);
-    if (!st) return null;
-    const rgb = st.PrimaryColour?.startsWith("#") && st.PrimaryColour.length === 7
-      ? "#" + st.PrimaryColour.slice(5,7) + st.PrimaryColour.slice(3,5) + st.PrimaryColour.slice(1,3)
-      : (st.PrimaryColour || "#FFF");
-    const fs = dragGhost.mode === "resize"
-      ? Math.max(12, (st.FontSize || 48) * (cr.height / playResY) * dragGhost.height / 40)
-      : (st.FontSize || 48) * (cr.height / playResY);
-    return {
-      position: "absolute", left: dragGhost.left, top: dragGhost.top,
-      color: rgb, fontSize: fs,
-      fontFamily: st.FontName, fontWeight: st.Bold ? "bold" : "normal",
-      fontStyle: st.Italic ? "italic" : "normal",
-      whiteSpace: "pre-wrap",
-      outline: "2px dashed rgba(64,150,255,0.7)", outlineOffset: "2px",
-      cursor: dragGhost.mode === "move" ? "grabbing" : "nwse-resize",
-      userSelect: "none", zIndex: 100, opacity: 0.85, pointerEvents: "none",
-    };
-  };
+  /* render */
+  const dragId = dragRef.current?.subId || null;
 
   const overlay = (
-    <div ref={overlayRef} style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 10, overflow: "hidden" }}>
+    <div style={{ position:"absolute", inset:0, pointerEvents:"none", zIndex:10, overflow:"hidden" }}>
       {activeSubs.map(sub => {
         const st = styles.find(s => s.Name === sub.style);
         if (!st) return null;
-        const isDragging = dragRef.current?.subId === sub.id && dragGhost !== null;
-        if (isDragging) return null;
 
-        const baseStyle = computePos(st);
-        const isSelected = selectedSubId === sub.id;
+        const base = buildStyle(st, sub.overrides);
+        const isSel = selectedSubId === sub.id;
+        const isDrg = dragId === sub.id;
+        const unitStyle = (unit: NonNullable<Subtitle["units"]>[number]): React.CSSProperties => {
+          const rendered = buildStyle(st, { ...(sub.overrides || {}), ...(unit.overrides || {}) });
+          return {
+            color: rendered.color,
+            fontSize: rendered.fontSize,
+            fontFamily: rendered.fontFamily,
+            fontWeight: rendered.fontWeight,
+            fontStyle: rendered.fontStyle,
+            letterSpacing: rendered.letterSpacing,
+            WebkitTextStroke: rendered.WebkitTextStroke,
+            paintOrder: rendered.paintOrder,
+            display: "inline-block",
+          };
+        };
+
+        let extraTf = "";
+        if (isDrg) {
+          extraTf = dragRef.current?.mode === "resize"
+            ? `scale(${dragOffset.scale})`
+            : `translate(${dragOffset.dx}px,${dragOffset.dy}px)`;
+        }
+
+        const baseTf = base.transform || "";
+        const tf = [extraTf, baseTf].filter(Boolean).join(" ");
+
+        const effect = sub.effect?.type || "whole";
+        const visibleUnits = (sub.units || []).filter(unit => effect !== "reveal" || currentTime >= unit.startMs / 1000);
+        const renderedUnits = visibleUnits.map(unit => <span key={unit.id} style={{
+          ...unitStyle(unit),
+          ...(effect === "highlight" && currentTime >= unit.startMs / 1000 && currentTime <= unit.endMs / 1000
+            ? { color: unit.overrides.primaryColor ? toCssRgba(unit.overrides.primaryColor, unit.overrides.opacity ?? 1) : "#4DD8FF" }
+            : {}),
+          ...(effect === "emphasis" && currentTime >= unit.startMs / 1000 && currentTime <= unit.endMs / 1000
+            ? { transform: "scale(1.1)" }
+            : {}),
+        }}>{unit.text}</span>);
 
         return (
           <div key={sub.id} data-sub-id={sub.id}
             style={{
-              ...baseStyle,
-              zIndex: isSelected ? 11 : 10,
-              cursor: "grab",
-              outline: isSelected ? "2px dashed rgba(64,150,255,0.7)" : "none",
+              ...base, transform: tf || undefined, transformOrigin: "center center",
+              zIndex: isDrg ? 100 : isSel ? 11 : 10,
+              cursor: isDrg ? "grabbing" : "grab",
+              outline: isSel ? "2px dashed rgba(64,150,255,0.7)" : "none",
               outlineOffset: "2px",
+              opacity: isDrg ? 0.85 : 1,
             }}
             onMouseDown={e => startDrag(e, sub.id, sub.style || "Default", "move")}
           >
-            {sub.text}
-            {isSelected && (
-              <span style={{
-                position: "absolute", right: -5, bottom: -5, width: 14, height: 14,
-                background: "rgba(64,150,255,0.9)", border: "2px solid #fff",
-                borderRadius: 3, cursor: "nwse-resize", zIndex: 12,
-              }}
-                onMouseDown={e => startDrag(e, sub.id, sub.style || "Default", "resize")}
+            {sub.units?.length ? renderedUnits : sub.text}
+            {isSel && (
+              <span
+                style={{
+                  position:"absolute", right:-5, bottom:-5, width:14, height:14,
+                  background:"rgba(64,150,255,0.9)", border:"2px solid #fff",
+                  borderRadius:3, cursor:"nwse-resize", zIndex:12,
+                }}
+                onMouseDown={e => { e.stopPropagation(); startDrag(e, sub.id, sub.style || "Default", "resize"); }}
               />
             )}
           </div>
         );
       })}
-      {dragGhost && ghostSub && (
-        <div style={ghostStyle()!}>{ghostSub.text}</div>
-      )}
-      {selectedSubId && !dragGhost && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "auto" }}
+      {selectedSubId && !dragId && (
+        <div style={{ position:"absolute", inset:0, zIndex:5, pointerEvents:"auto" }}
           onClick={() => setSelectedSubId(null)} />
       )}
     </div>
   );
 
   const target = document.getElementById("subtitle-overlay-container");
-  return portalReady && target ? createPortal(overlay, target) : null;
+  return enabled && portalReady && target ? createPortal(overlay, target) : null;
 };
 
 export default SubtitlePreview;
