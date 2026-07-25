@@ -44,7 +44,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          V=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")
+          V=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.1.0")
           V_num=${V#v}
           echo "VERSION=$V_num" >> "$GITHUB_OUTPUT"
           echo "CleanVersion=$V_num" >> "$GITHUB_ENV"

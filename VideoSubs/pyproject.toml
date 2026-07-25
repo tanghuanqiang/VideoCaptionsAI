@@ -1,6 +1,6 @@
 [project]
 name = "videocaptionsai"
-version = "1.0.0"
+version = "1.1.0"
 description = "AI-powered video subtitle recognition, style editing, and hard-burning tool"
 authors = [
     { name = "VideoCaptionsAI" },

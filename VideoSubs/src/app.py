@@ -122,7 +122,7 @@ async def lifespan(app: FastAPI):
     await burn_queue.stop()
 
 
-app = FastAPI(title="VideoCaptionsAI", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="VideoCaptionsAI", version="1.1.0", lifespan=lifespan)
 
 init_db()
 
@@ -162,7 +162,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 async def health_check():
     return JSONResponse({
         "status": "ok",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "whisper_loaded": bool(getattr(get_whisper_model, "_current_model", None) or True),
     })
 

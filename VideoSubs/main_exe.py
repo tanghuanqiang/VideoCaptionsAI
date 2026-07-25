@@ -182,7 +182,7 @@ def create_tray_icon():
 def main():
     _setup_logging()
     log.info("=" * 50)
-    log.info("  VideoCaptionsAI v1.0.0 - Port %d", PORT)
+    log.info("  VideoCaptionsAI v1.1.0 - Port %d", PORT)
     log.info("=" * 50)
     print(f"VideoCaptionsAI started on port {PORT}", flush=True)
 

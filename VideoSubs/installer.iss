@@ -3,7 +3,7 @@
 
 [Setup]
 AppName=VideoCaptionsAI
-AppVersion=1.0.0
+AppVersion=1.1.0
 AppPublisher=VideoCaptionsAI
 DefaultDirName={autopf}\VideoCaptionsAI
 DefaultGroupName=VideoCaptionsAI
