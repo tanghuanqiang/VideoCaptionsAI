@@ -153,9 +153,12 @@ function buildDialogueText(
   resY: number,
 ): string {
   const prefix = groupOverrideTags(group.overrides, resX, resY);
+  const secondary = group.secondaryText?.trim()
+    ? `\\N{\\r\\fs${Math.max(12, Math.round((group.overrides.fontSize ?? baseStyle.FontSize ?? 48) * 0.68))}\\1a&H18&}${escapeText(group.secondaryText.trim())}`
+    : "";
 
   if (group.units.length === 0) {
-    return prefix + escapeText(group.text);
+    return prefix + escapeText(group.text) + secondary;
   }
 
   const baseFont = group.overrides.fontSize ?? baseStyle.FontSize ?? 48;
@@ -174,7 +177,7 @@ function buildDialogueText(
     })
     .join("");
 
-  return prefix + body;
+  return prefix + body + secondary;
 }
 
 export interface BuildAssOptions {

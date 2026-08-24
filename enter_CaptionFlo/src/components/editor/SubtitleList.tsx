@@ -128,6 +128,11 @@ export function SubtitleList() {
                     <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-foreground/90">
                       {g.text || "（空字幕）"}
                     </p>
+                    {g.secondaryText && (
+                      <p className="mt-1 line-clamp-1 text-[11px] leading-4 text-foreground/50">
+                        {g.secondaryText}
+                      </p>
+                    )}
                   </button>
                 </li>
               );

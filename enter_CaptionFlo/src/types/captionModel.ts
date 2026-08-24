@@ -19,6 +19,7 @@ export type TimingSource = "asr-word" | "estimated";
 export interface CaptionGroup {
   id: string;
   text: string;
+  secondaryText?: string;
   startMs: number;
   endMs: number;
   baseStyleId: string;
@@ -58,6 +59,7 @@ export const captionGroupToSubtitle = (group: CaptionGroup): Subtitle => ({
   start: group.startMs / 1000,
   end: group.endMs / 1000,
   text: group.text,
+  secondaryText: group.secondaryText,
   style: group.baseStyleId,
   group: "",
   overrides: group.overrides,
@@ -80,6 +82,7 @@ export const subtitleToCaptionGroup = (
 ): CaptionGroup => ({
   id: subtitle.id,
   text: subtitle.text,
+  secondaryText: subtitle.secondaryText,
   startMs: Math.round(toSeconds(subtitle.start) * 1000),
   endMs: Math.round(toSeconds(subtitle.end) * 1000),
   baseStyleId: styleId,
@@ -212,12 +215,23 @@ export const mergeCaptionGroups = (
   return {
     ...first,
     text: ordered.map((group) => group.text).join(""),
+    secondaryText: mergeSecondaryText(ordered.map((group) => group.secondaryText)),
     startMs: Math.min(...ordered.map((group) => group.startMs)),
     endMs: Math.max(...ordered.map((group) => group.endMs)),
     units: mergedUnits,
     words: ordered.flatMap((group) => group.words || []),
   };
 };
+
+function mergeSecondaryText(parts: Array<string | undefined>): string | undefined {
+  const text = parts.filter((part): part is string => !!part?.trim());
+  if (text.length === 0) return undefined;
+  return text.reduce((merged, part) => {
+    if (!merged) return part;
+    const needsSpace = /[A-Za-z0-9]$/u.test(merged) && /^[A-Za-z0-9]/u.test(part);
+    return `${merged}${needsSpace ? " " : ""}${part}`;
+  }, "");
+}
 
 export const mergeOverrides = (
   style: AssStyle | undefined,
@@ -252,10 +266,12 @@ export const splitSubtitleAtGraphemeIndex = (
   const midSec = startSec + (duration * splitIndex) / graphemes.length;
   const leftText = graphemes.slice(0, splitIndex).join("");
   const rightText = graphemes.slice(splitIndex).join("");
+  const secondary = splitSecondaryText(subtitle.secondaryText, splitIndex / graphemes.length);
   const left: Subtitle = {
     ...subtitle,
     id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
     text: leftText,
+    secondaryText: secondary.left,
     end: midSec,
     style: styleId,
     overrides: { ...(subtitle.overrides || {}) },
@@ -266,6 +282,7 @@ export const splitSubtitleAtGraphemeIndex = (
     ...subtitle,
     id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
     text: rightText,
+    secondaryText: secondary.right,
     start: midSec,
     style: styleId,
     overrides: { ...(subtitle.overrides || {}) },
@@ -285,11 +302,13 @@ export const splitCaptionGroupAtGrapheme = (
     return null;
   const duration = group.endMs - group.startMs;
   const midMs = Math.round(group.startMs + (duration * splitIndex) / graphemes.length);
+  const secondary = splitSecondaryText(group.secondaryText, splitIndex / graphemes.length);
   const makeId = () => `${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const left: CaptionGroup = {
     ...group,
     id: makeId(),
     text: graphemes.slice(0, splitIndex).join(""),
+    secondaryText: secondary.left,
     startMs: group.startMs,
     endMs: midMs,
     overrides: { ...group.overrides },
@@ -300,6 +319,7 @@ export const splitCaptionGroupAtGrapheme = (
     ...group,
     id: makeId(),
     text: graphemes.slice(splitIndex).join(""),
+    secondaryText: secondary.right,
     startMs: midMs,
     endMs: group.endMs,
     overrides: { ...group.overrides },
@@ -311,3 +331,18 @@ export const splitCaptionGroupAtGrapheme = (
 
 export const graphemesOf = (text: string): string[] =>
   splitGraphemes(text).filter(Boolean);
+
+export function splitSecondaryText(
+  text: string | undefined,
+  ratio: number,
+): { left?: string; right?: string } {
+  if (!text?.trim()) return {};
+  const graphemes = splitGraphemes(text).filter(Boolean);
+  const splitIndex = Math.min(
+    graphemes.length - 1,
+    Math.max(1, Math.round(graphemes.length * ratio)),
+  );
+  const left = graphemes.slice(0, splitIndex).join("");
+  const right = graphemes.slice(splitIndex).join("");
+  return { left: left || undefined, right: right || undefined };
+}

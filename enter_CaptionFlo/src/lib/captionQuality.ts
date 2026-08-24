@@ -1,4 +1,4 @@
-import type { CaptionGroup } from "@/types/captionModel";
+import { splitSecondaryText, type CaptionGroup } from "@/types/captionModel";
 
 export type CaptionQualityIssueKind =
   | "invalid-duration"
@@ -341,6 +341,7 @@ export function repairCaptionSegmentation(
     }
 
     const splitRatio = splitIndex / graphemes.length;
+    const secondary = splitSecondaryText(group.secondaryText, splitRatio);
     const splitMs = Math.round(group.startMs + durationMs * splitRatio);
     if (splitMs - group.startMs < rules.minDisplayMs || group.endMs - splitMs < rules.minDisplayMs) {
       result.push(group);
@@ -356,6 +357,7 @@ export function repairCaptionSegmentation(
         ...group,
         id: leftId,
         text: leftText,
+        secondaryText: secondary.left,
         endMs: splitMs,
         units: units.left,
         words: words.left.length ? words.left : undefined,
@@ -365,6 +367,7 @@ export function repairCaptionSegmentation(
         ...group,
         id: rightId,
         text: rightText,
+        secondaryText: secondary.right,
         startMs: splitMs,
         units: units.right,
         words: words.right.length ? words.right : undefined,

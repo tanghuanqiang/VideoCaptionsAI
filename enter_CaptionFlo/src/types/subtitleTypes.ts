@@ -44,6 +44,7 @@ export interface SubtitleEvent {
   start: number;
   end: number;
   text: string;
+  secondaryText?: string;
   speaker?: string;
   words?: WordTimestamp[];
   style?: string;
@@ -98,6 +99,7 @@ export interface Subtitle {
   start: string | number;
   end: string | number;
   text: string;
+  secondaryText?: string;
   style: string;
   group: string;
   selected?: boolean;

@@ -24,6 +24,14 @@ export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
   const setText = (text: string) =>
     dispatch({ type: "UPDATE_GROUP", id: group.id, patch: { text }, commit: true });
 
+  const setSecondaryText = (secondaryText: string) =>
+    dispatch({
+      type: "UPDATE_GROUP",
+      id: group.id,
+      patch: { secondaryText: secondaryText.trim() || undefined },
+      commit: true,
+    });
+
   const setTime = (patch: { startMs?: number; endMs?: number }) =>
     dispatch({ type: "UPDATE_GROUP", id: group.id, patch, commit: true });
 
@@ -53,6 +61,13 @@ export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
           onChange={(e) => setText(e.target.value)}
           className="min-h-16 resize-none bg-card text-sm"
           placeholder="输入字幕文本"
+        />
+        <SectionTitle>副字幕</SectionTitle>
+        <Textarea
+          value={group.secondaryText ?? ""}
+          onChange={(e) => setSecondaryText(e.target.value)}
+          className="min-h-14 resize-none bg-card text-sm"
+          placeholder="可选：输入第二语言或辅助说明"
         />
 
         <SectionTitle>基础样式</SectionTitle>
