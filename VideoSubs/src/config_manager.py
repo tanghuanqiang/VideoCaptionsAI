@@ -50,12 +50,25 @@ def load_config() -> dict:
 def save_config(config: dict) -> bool:
     """Save config to file."""
     path = get_config_path()
+    temporary_path = f"{path}.tmp"
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
+        with open(temporary_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
+        os.replace(temporary_path, path)
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            # Windows ACLs may reject POSIX permission bits; the atomic write
+            # still prevents a partially-written key file.
+            pass
         return True
     except Exception as e:
+        try:
+            if os.path.exists(temporary_path):
+                os.remove(temporary_path)
+        except OSError:
+            pass
         print(f"Error saving config to {path}: {e}")
         return False
 

@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 
-from src.services.storage import get_file_path, save_upload
+from src.services.storage import UploadTooLargeError, get_file_path, save_upload
 from src.config import MAX_UPLOAD_SIZE, OUTPUTS_DIR
 from src.services.style_recommender import generate_recommended_style
 from src.utils.task_queue import burn_queue
@@ -61,7 +61,10 @@ async def api_asr(
             _validate_file_ext(file.filename)
         if file.size and file.size > MAX_UPLOAD_SIZE:
             raise HTTPException(status_code=413, detail=f"File too large. Max size is {MAX_UPLOAD_SIZE/1024/1024}MB")
-        path = save_upload(file)
+        try:
+            path = save_upload(file)
+        except UploadTooLargeError as exc:
+            raise HTTPException(status_code=413, detail=str(exc)) from exc
     elif file_path:
         path = _resolve_saved_path(file_path)
         if not path:
@@ -129,7 +132,6 @@ async def api_asr(
             detail={
                 "code": "ASR_INFERENCE_FAILED",
                 "message": "语音识别推理失败，请检查媒体音轨、模型和后端日志。",
-                "type": type(exc).__name__,
             },
         ) from exc
 

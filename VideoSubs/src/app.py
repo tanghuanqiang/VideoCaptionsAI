@@ -76,6 +76,8 @@ from src.db import init_db
 from src.utils.model_loader import get_whisper_model
 from src.utils.task_queue import burn_queue
 from src.services.cleanup import cleanup_old_files, periodic_cleanup
+from src.config import MAX_REQUEST_SIZE
+from src.security import LOCAL_ORIGIN_REGEX, is_loopback_host, redact_config_for_client
 
 # Fix task queue persistence path
 burn_queue.persistence_file = os.path.join(OUTPUTS_DIR, "queue_state.json")
@@ -133,12 +135,29 @@ init_db()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origin_regex=LOCAL_ORIGIN_REGEX,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["Content-Disposition", "Content-Length"],
 )
+
+
+@app.middleware("http")
+async def local_only_requests(request: Request, call_next):
+    client = request.client
+    if client is not None and not is_loopback_host(client.host):
+        logger.warning("Rejected non-local request for %s", request.url.path)
+        return JSONResponse(status_code=403, content={"detail": "This local service only accepts loopback requests"})
+
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > MAX_REQUEST_SIZE:
+                return JSONResponse(status_code=413, content={"detail": "Request body is too large"})
+        except ValueError:
+            return JSONResponse(status_code=400, content={"detail": "Invalid Content-Length header"})
+    return await call_next(request)
 
 # Mount outputs
 app.mount("/outputs", StaticFiles(directory=OUTPUTS_DIR), name="outputs")
@@ -168,7 +187,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error", "type": type(exc).__name__},
+        content={"detail": "Internal server error"},
     )
 
 
@@ -206,7 +225,7 @@ class ConfigUpdate(BaseModel):
 
 @app.get("/api/config")
 async def api_get_config():
-    return JSONResponse(get_config())
+    return JSONResponse(redact_config_for_client(get_config()))
 
 
 @app.post("/api/config")
@@ -218,8 +237,8 @@ async def api_update_config(body: ConfigUpdate):
             reload_agent()
         except Exception as e:
             logger.warning("Failed to reload agent: %s", e)
-        return JSONResponse(config)
-    return JSONResponse(get_config())
+        return JSONResponse(redact_config_for_client(config))
+    return JSONResponse(redact_config_for_client(get_config()))
 
 
 # ---- Frontend SPA ----

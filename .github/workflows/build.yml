@@ -28,7 +28,34 @@ jobs:
         run: |
           cd VideoSubs
           pip install -r requirements.txt
-          python -m pytest tests/unit_tests/ -v --tb=long
+          python -m pytest tests/unit_tests/ tests/test_security_hardening.py -v --tb=long
+
+  captionflo-security:
+    name: CaptionFlo Security
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: enter_CaptionFlo/pnpm-lock.yaml
+
+      - name: Verify CaptionFlo
+        shell: bash
+        run: |
+          cd enter_CaptionFlo
+          pnpm install --frozen-lockfile
+          pnpm check
+          pnpm build
+          pnpm audit --prod --audit-level=low
 
   build:
     name: Build Windows EXE

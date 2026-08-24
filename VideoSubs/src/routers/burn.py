@@ -1,16 +1,19 @@
 import os
 import uuid
+import logging
+from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 import src.config as _config
-from src.services.caption_payload import require_ass_text, unwrap_export_payload
-from src.services.storage import get_file_path
+from src.services.caption_payload import MAX_ASS_PAYLOAD_BYTES, require_ass_text, unwrap_export_payload
+from src.services.storage import UploadTooLargeError, get_file_path, save_upload_to_path
 from src.utils.task_queue import burn_queue
 
 router = APIRouter()
+logger = logging.getLogger("VideoCaptionsAI")
 
 ALLOWED_VIDEO = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".flv", ".wmv"}
 ALLOWED_SUBTITLE = {".ass", ".srt", ".vtt", ".ssa"}
@@ -41,11 +44,12 @@ def _find_video_by_name(video_name: Optional[str]) -> Optional[str]:
 def _resolve_video_path(value: Any) -> Optional[str]:
     if not isinstance(value, str) or not value or value.startswith("blob:"):
         return None
-    if value.startswith("/outputs/"):
-        value = os.path.join(_config.OUTPUTS_DIR, value[len("/outputs/"):].replace("/", os.sep))
-    if os.path.isfile(value):
-        return os.path.abspath(value)
-    return None
+    relative = value[len("/outputs/"):] if value.startswith("/outputs/") else value
+    root = Path(_config.OUTPUTS_DIR).resolve()
+    candidate = (root / relative).resolve()
+    if candidate == root or root not in candidate.parents:
+        return None
+    return str(candidate) if candidate.is_file() else None
 
 
 async def _parse_burn_request(request: Request) -> tuple[Any, str, Optional[str]]:
@@ -88,7 +92,10 @@ async def _parse_burn_request(request: Request) -> tuple[Any, str, Optional[str]
     _validate(file.filename or "", ALLOWED_VIDEO)
     _validate(ass_file.filename or "", ALLOWED_SUBTITLE)
     try:
-        ass_text = (await ass_file.read()).decode("utf-8")
+        ass_bytes = await ass_file.read(MAX_ASS_PAYLOAD_BYTES + 1)
+        if len(ass_bytes) > MAX_ASS_PAYLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="ASS file exceeds the maximum allowed size")
+        ass_text = ass_bytes.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise HTTPException(status_code=400, detail="ASS file must be UTF-8") from exc
     return file, ass_text, file.filename
@@ -107,8 +114,10 @@ async def api_burn(request: Request):
                 task_dir,
                 _safe_filename(parsed_video.filename or video_name or "video.mp4", "video.mp4"),
             )
-            with open(media_path, "wb") as f:
-                f.write(await parsed_video.read())
+            try:
+                save_upload_to_path(parsed_video, media_path)
+            except UploadTooLargeError as exc:
+                raise HTTPException(status_code=413, detail=str(exc)) from exc
         else:
             media_path = os.path.abspath(parsed_video)
 
@@ -131,8 +140,6 @@ async def api_burn(request: Request):
         })
     except HTTPException:
         raise
-    except Exception as e:
-        print(f"Error in /burn/: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Hard-burn request failed")
+        raise HTTPException(status_code=500, detail="Failed to queue hard-burn task")

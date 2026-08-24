@@ -1,7 +1,7 @@
 import os
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
-from src.services.storage import save_upload_with_uuid
+from src.services.storage import UploadTooLargeError, save_upload_with_uuid
 from src.config import MAX_UPLOAD_SIZE, OUTPUTS_DIR
 
 router = APIRouter()
@@ -18,7 +18,10 @@ async def upload_file_endpoint(file: UploadFile = File(...)):
     if file.size and file.size > MAX_UPLOAD_SIZE:
         raise HTTPException(status_code=413, detail=f"File too large. Max size is {MAX_UPLOAD_SIZE/1024/1024}MB")
 
-    file_uuid, file_path = save_upload_with_uuid(file, "default")
+    try:
+        file_uuid, file_path = save_upload_with_uuid(file, "default")
+    except UploadTooLargeError as exc:
+        raise HTTPException(status_code=413, detail=str(exc)) from exc
     relative_path = os.path.relpath(file_path, OUTPUTS_DIR).replace(os.sep, "/")
     return JSONResponse({
         "uuid": file_uuid,

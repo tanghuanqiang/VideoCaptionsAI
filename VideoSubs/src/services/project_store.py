@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 from src.config import OUTPUTS_DIR
 
 PROJECT_FILENAME = "captionflo-project.json"
+MAX_PROJECT_DOCUMENT_BYTES = int(os.environ.get("MAX_PROJECT_DOCUMENT_BYTES", 25 * 1024 * 1024))
 
 
 def project_path() -> Path:
@@ -52,8 +53,11 @@ def save_document(document: Dict[str, Any]) -> Dict[str, Any]:
     path = project_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     saved = sanitize_document(document)
+    serialized = json.dumps(saved, ensure_ascii=False, indent=2)
+    if len(serialized.encode("utf-8")) > MAX_PROJECT_DOCUMENT_BYTES:
+        raise ValueError("Project document exceeds the maximum allowed size")
     temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(saved, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.write_text(serialized, encoding="utf-8")
     temporary.replace(path)
     return saved
 
