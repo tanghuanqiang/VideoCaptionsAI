@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Highlighter, MessageSquareText, Sparkles } from "lucide-react";
+import { FileOutput, Highlighter, MessageSquareText, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import {
   applyKeywordHighlights,
@@ -7,6 +7,12 @@ import {
   findKeywordHighlightIssues,
   repairFillerWords,
 } from "@/lib/captionTextTools";
+import {
+  buildContentPackageMarkdown,
+  contentPackageFilename,
+  deriveContentChapters,
+  deriveContentHighlights,
+} from "@/lib/contentPackage";
 import { useEditor } from "@/state/EditorContext";
 
 export function ContentOptimizationPanel() {
@@ -21,6 +27,8 @@ export function ContentOptimizationPanel() {
     [state.doc.groups],
   );
   const keywordCount = keywordIssues.reduce((total, issue) => total + issue.terms.length, 0);
+  const chapters = useMemo(() => deriveContentChapters(state.doc.groups), [state.doc.groups]);
+  const highlights = useMemo(() => deriveContentHighlights(state.doc.groups), [state.doc.groups]);
 
   const focusIssue = (groupId: string) => {
     const group = state.doc.groups.find((item) => item.id === groupId);
@@ -53,6 +61,17 @@ export function ContentOptimizationPanel() {
     }
     dispatch({ type: "SET_GROUPS", groups: next, commit: true });
     toast.success(`已强调 ${keywordCount} 个数字或术语`);
+  };
+
+  const exportContentPackage = () => {
+    const markdown = buildContentPackageMarkdown(state.doc.projectName, state.doc.groups);
+    const url = URL.createObjectURL(new Blob([markdown], { type: "text/markdown;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = contentPackageFilename(state.doc.projectName);
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    toast.success("内容清单已导出");
   };
 
   if (state.doc.groups.length === 0) {
@@ -144,6 +163,25 @@ export function ContentOptimizationPanel() {
           ) : (
             <p className="mt-2 text-[11px] text-foreground/50">没有可安全自动强调的内容。</p>
           )}
+        </div>
+
+        <div className="mt-3 border-t border-border/60 px-2 pt-3">
+          <div className="flex items-center gap-2">
+            <FileOutput className="h-4 w-4 text-primary" />
+            <div>
+              <p className="text-xs font-medium">章节与高光清单</p>
+              <p className="mt-0.5 text-[11px] text-foreground/50">
+                {chapters.length} 个章节候选，{highlights.length} 个高光候选
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={exportContentPackage}
+            className="mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-primary/25 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+          >
+            <FileOutput className="h-3.5 w-3.5" />
+            导出内容清单
+          </button>
         </div>
       </div>
     </div>
