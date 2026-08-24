@@ -59,6 +59,11 @@ set_config_path(str(_EXE_DIR / "config.json"))
 
 import src.config as config
 config.OUTPUTS_DIR = OUTPUTS_DIR
+_default_fonts_dir = _BUNDLE_DIR / "frontend_dist" / "fonts"
+config.FONTS_DIR = os.environ.get(
+    "FONTS_DIR",
+    str(_default_fonts_dir if _default_fonts_dir.is_dir() else _EXE_DIR / "fonts"),
+)
 
 import src.db as db_module
 db_module.SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
@@ -76,7 +81,7 @@ from src.services.cleanup import cleanup_old_files, periodic_cleanup
 burn_queue.persistence_file = os.path.join(OUTPUTS_DIR, "queue_state.json")
 
 # Routers
-from src.routers import upload, asr, burn, copilot, tasks, history
+from src.routers import upload, asr, burn, copilot, tasks, history, export, project
 
 # Prometheus
 try:
@@ -145,6 +150,16 @@ app.include_router(burn.router, prefix="/api")
 app.include_router(copilot.router, prefix="/api")
 app.include_router(tasks.router, prefix="/api")
 app.include_router(history.router, prefix="/api")
+app.include_router(export.router, prefix="/api")
+app.include_router(project.router, prefix="/api")
+
+# CaptionFlo currently uses root-relative API paths; keep /api aliases too.
+app.include_router(upload.router)
+app.include_router(asr.router)
+app.include_router(burn.router)
+app.include_router(tasks.router)
+app.include_router(export.router)
+app.include_router(project.router)
 
 
 # ---- Global exception handler ----

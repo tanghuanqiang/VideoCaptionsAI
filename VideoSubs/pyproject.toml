@@ -15,6 +15,7 @@ dependencies = [
     "python-jose[cryptography]>=3.3",
     "passlib[bcrypt]>=1.7",
     "python-multipart>=0.0.6",
+    "pysubs2>=1.7.2",
     "aiofiles>=23.0",
     "whisper>=1.1",
     "torch>=2.0",

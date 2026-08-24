@@ -16,7 +16,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent  # VideoCaptionsAI/
 BACKEND_DIR = Path(__file__).resolve().parent           # VideoSubs/
-FRONTEND_DIR = PROJECT_ROOT / "agentfront"
+FRONTEND_DIR = PROJECT_ROOT / "enter_CaptionFlo"
 FRONTEND_DIST = FRONTEND_DIR / "dist"
 FRONTEND_OUT = BACKEND_DIR / "frontend_dist"
 DIST_OUT = BACKEND_DIR / "dist"
@@ -78,7 +78,7 @@ def build_frontend():
     env = os.environ.copy()
     env["CI"] = "true"
     
-    run("pnpm build", cwd=str(FRONTEND_DIR))
+    run("pnpm run build:prod", cwd=str(FRONTEND_DIR))
 
 
 def copy_frontend():

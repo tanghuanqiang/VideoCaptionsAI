@@ -1,0 +1,521 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useReducer,
+  type ReactNode,
+} from "react";
+import type { AssStyle } from "@/types/subtitleTypes";
+import type {
+  CaptionEffect,
+  CaptionGroup,
+  CaptionOverrides,
+  CaptionSelection,
+} from "@/types/captionModel";
+import {
+  mergeCaptionGroups,
+  splitCaptionGroupAtGrapheme,
+} from "@/types/captionModel";
+import { defaultStyle, stylePresets } from "@/constants";
+
+export type VideoStatus = "empty" | "loaded";
+export type AsrStatus = "idle" | "running" | "success" | "error";
+export type ExportStatus = "idle" | "running" | "success" | "error";
+export type EditorMode = "edit" | "cut";
+export type ExportKind = "subtitle" | "video" | null;
+
+export interface EditorDoc {
+  projectName: string;
+  videoUrl: string | null;
+  videoName: string | null;
+  videoFileId: string | null;
+  videoPath: string | null;
+  durationMs: number;
+  /** Real intrinsic video resolution; ASS PlayRes is aligned to this. */
+  resolution: { width: number; height: number };
+  groups: CaptionGroup[];
+  styles: AssStyle[];
+  selection: CaptionSelection;
+}
+
+export interface EditorState {
+  doc: EditorDoc;
+  past: EditorDoc[];
+  future: EditorDoc[];
+  currentMs: number;
+  isPlaying: boolean;
+  mode: EditorMode;
+  video: VideoStatus;
+  asr: { status: AsrStatus; progress: number; label: string; error: string | null };
+  exportState: {
+    status: ExportStatus;
+    kind: ExportKind;
+    progress: number;
+    label: string;
+    error: string | null;
+    resultName: string | null;
+  };
+}
+
+const initialDoc: EditorDoc = {
+  projectName: "未命名项目",
+  videoUrl: null,
+  videoName: null,
+  videoFileId: null,
+  videoPath: null,
+  durationMs: 0,
+  resolution: { width: 1280, height: 720 },
+  groups: [],
+  styles: [defaultStyle, ...stylePresets.map((p) => p.style)],
+  selection: { groupIds: [], unitIds: [] },
+};
+
+const initialState: EditorState = {
+  doc: initialDoc,
+  past: [],
+  future: [],
+  currentMs: 0,
+  isPlaying: false,
+  mode: "edit",
+  video: "empty",
+  asr: { status: "idle", progress: 0, label: "", error: null },
+  exportState: {
+    status: "idle",
+    kind: null,
+    progress: 0,
+    label: "",
+    error: null,
+    resultName: null,
+  },
+};
+
+type Action =
+  | { type: "SET_PROJECT_NAME"; name: string }
+  | { type: "LOAD_VIDEO"; url: string; name: string; durationMs?: number; fileId?: string | null; filePath?: string | null }
+  | { type: "SET_VIDEO_SOURCE"; videoUrl?: string | null; videoFileId?: string | null; videoPath?: string | null }
+  | { type: "LOAD_PROJECT"; doc: EditorDoc }
+  | { type: "SET_DURATION"; durationMs: number }
+  | { type: "SET_RESOLUTION"; width: number; height: number }
+  | { type: "SET_CURRENT_MS"; ms: number }
+  | { type: "SET_PLAYING"; playing: boolean }
+  | { type: "SET_MODE"; mode: EditorMode }
+  | { type: "SET_GROUPS"; groups: CaptionGroup[]; commit?: boolean }
+  | { type: "SET_STYLES"; styles: AssStyle[]; commit?: boolean }
+  | { type: "ADD_STYLE"; style: AssStyle }
+  | { type: "SELECT"; selection: CaptionSelection }
+  | { type: "UPDATE_GROUP"; id: string; patch: Partial<CaptionGroup>; commit?: boolean }
+  | { type: "UPDATE_GROUP_OVERRIDES"; ids: string[]; patch: CaptionOverrides }
+  | { type: "RESET_GROUP_OVERRIDES"; ids: string[] }
+  | { type: "APPLY_STYLE"; ids: string[]; styleId: string }
+  | { type: "UPDATE_UNIT"; groupId: string; unitId: string; patch: Partial<CaptionOverrides> }
+  | { type: "SET_UNIT_EFFECT"; groupId: string; unitId: string; effect?: CaptionEffect }
+  | { type: "SPLIT_GROUP"; groupId: string; graphemeIndex: number }
+  | { type: "MERGE_SELECTED" }
+  | { type: "DELETE_SELECTED" }
+  | { type: "ASR_START" }
+  | { type: "ASR_PROGRESS"; progress: number; label: string }
+  | { type: "ASR_SUCCESS"; groups: CaptionGroup[]; styles?: AssStyle[] }
+  | { type: "ASR_ERROR"; error: string }
+  | { type: "ASR_RESET" }
+  | { type: "EXPORT_START"; kind: Exclude<ExportKind, null> }
+  | { type: "EXPORT_PROGRESS"; progress: number; label: string }
+  | { type: "EXPORT_SUCCESS"; resultName: string }
+  | { type: "EXPORT_ERROR"; error: string }
+  | { type: "EXPORT_RESET" }
+  | { type: "UNDO" }
+  | { type: "REDO" };
+
+const HISTORY_LIMIT = 50;
+
+/** Wrap a doc mutation with history push. */
+function commitDoc(state: EditorState, next: EditorDoc): EditorState {
+  return {
+    ...state,
+    doc: next,
+    past: [...state.past, state.doc].slice(-HISTORY_LIMIT),
+    future: [],
+  };
+}
+
+function sortGroups(groups: CaptionGroup[]): CaptionGroup[] {
+  return [...groups].sort((a, b) => a.startMs - b.startMs);
+}
+
+function reducer(state: EditorState, action: Action): EditorState {
+  const { doc } = state;
+  switch (action.type) {
+    case "SET_PROJECT_NAME":
+      return { ...state, doc: { ...doc, projectName: action.name } };
+
+    case "LOAD_VIDEO":
+      return {
+        ...state,
+        video: "loaded",
+        doc: {
+          ...doc,
+          videoUrl: action.url,
+          videoName: action.name,
+          videoFileId: action.fileId ?? doc.videoFileId,
+          videoPath: action.filePath ?? doc.videoPath,
+          durationMs: action.durationMs ?? doc.durationMs,
+        },
+      };
+
+    case "SET_VIDEO_SOURCE":
+      return {
+        ...state,
+        doc: {
+          ...doc,
+          videoUrl: action.videoUrl ?? doc.videoUrl,
+          videoFileId: action.videoFileId ?? doc.videoFileId,
+          videoPath: action.videoPath ?? doc.videoPath,
+        },
+      };
+
+    case "LOAD_PROJECT":
+      return {
+        ...state,
+        video: action.doc.videoUrl || action.doc.videoFileId || action.doc.videoPath ? "loaded" : "empty",
+        doc: {
+          ...action.doc,
+          selection: action.doc.selection ?? { groupIds: [], unitIds: [] },
+          styles: action.doc.styles?.length ? action.doc.styles : doc.styles,
+          videoFileId: action.doc.videoFileId ?? null,
+          videoPath: action.doc.videoPath ?? null,
+          videoUrl: action.doc.videoUrl ?? null,
+          groups: Array.isArray(action.doc.groups) ? action.doc.groups : [],
+        },
+        past: [],
+        future: [],
+        currentMs: 0,
+        isPlaying: false,
+        mode: "edit",
+        asr: { status: "idle", progress: 0, label: "", error: null },
+        exportState: {
+          status: "idle",
+          kind: null,
+          progress: 0,
+          label: "",
+          error: null,
+          resultName: null,
+        },
+      };
+
+    case "SET_DURATION":
+      return { ...state, doc: { ...doc, durationMs: action.durationMs } };
+
+    case "SET_RESOLUTION":
+      return {
+        ...state,
+        doc: {
+          ...doc,
+          resolution: { width: action.width, height: action.height },
+        },
+      };
+
+    case "SET_CURRENT_MS":
+      return { ...state, currentMs: action.ms };
+
+    case "SET_PLAYING":
+      return { ...state, isPlaying: action.playing };
+
+    case "SET_MODE":
+      return { ...state, mode: action.mode };
+
+    case "SET_GROUPS": {
+      const next = { ...doc, groups: sortGroups(action.groups) };
+      return action.commit ? commitDoc(state, next) : { ...state, doc: next };
+    }
+
+    case "SET_STYLES": {
+      const next = { ...doc, styles: action.styles };
+      return action.commit ? commitDoc(state, next) : { ...state, doc: next };
+    }
+
+    case "ADD_STYLE":
+      return commitDoc(state, { ...doc, styles: [...doc.styles, action.style] });
+
+    case "SELECT":
+      return { ...state, doc: { ...doc, selection: action.selection } };
+
+    case "UPDATE_GROUP": {
+      const groups = doc.groups.map((g) =>
+        g.id === action.id ? { ...g, ...action.patch } : g,
+      );
+      const next = { ...doc, groups: sortGroups(groups) };
+      return action.commit ? commitDoc(state, next) : { ...state, doc: next };
+    }
+
+    case "UPDATE_GROUP_OVERRIDES": {
+      const groups = doc.groups.map((g) =>
+        action.ids.includes(g.id)
+          ? { ...g, overrides: { ...g.overrides, ...action.patch } }
+          : g,
+      );
+      return commitDoc(state, { ...doc, groups });
+    }
+
+    case "RESET_GROUP_OVERRIDES": {
+      const groups = doc.groups.map((g) =>
+        action.ids.includes(g.id) ? { ...g, overrides: {} } : g,
+      );
+      return commitDoc(state, { ...doc, groups });
+    }
+
+    case "APPLY_STYLE": {
+      const groups = doc.groups.map((g) =>
+        action.ids.includes(g.id) ? { ...g, baseStyleId: action.styleId } : g,
+      );
+      return commitDoc(state, { ...doc, groups });
+    }
+
+    case "UPDATE_UNIT": {
+      const groups = doc.groups.map((g) => {
+        if (g.id !== action.groupId) return g;
+        return {
+          ...g,
+          units: g.units.map((u) =>
+            u.id === action.unitId
+              ? { ...u, overrides: { ...u.overrides, ...action.patch } }
+              : u,
+          ),
+        };
+      });
+      return commitDoc(state, { ...doc, groups });
+    }
+
+    case "SET_UNIT_EFFECT": {
+      const groups = doc.groups.map((g) => {
+        if (g.id !== action.groupId) return g;
+        return {
+          ...g,
+          units: g.units.map((u) =>
+            u.id === action.unitId ? { ...u, effect: action.effect } : u,
+          ),
+        } as CaptionGroup;
+      });
+      return commitDoc(state, { ...doc, groups });
+    }
+
+    case "SPLIT_GROUP": {
+      const target = doc.groups.find((g) => g.id === action.groupId);
+      if (!target) return state;
+      const result = splitCaptionGroupAtGrapheme(target, action.graphemeIndex);
+      if (!result) return state;
+      const groups = sortGroups([
+        ...doc.groups.filter((g) => g.id !== action.groupId),
+        ...result,
+      ]);
+      return commitDoc(state, {
+        ...doc,
+        groups,
+        selection: { groupIds: [result[0].id], unitIds: [] },
+      });
+    }
+
+    case "MERGE_SELECTED": {
+      const ids = doc.selection.groupIds;
+      if (ids.length < 2) return state;
+      const selected = doc.groups.filter((g) => ids.includes(g.id));
+      const merged = mergeCaptionGroups(selected);
+      if (!merged) return state;
+      const groups = sortGroups([
+        ...doc.groups.filter((g) => !ids.includes(g.id)),
+        merged,
+      ]);
+      return commitDoc(state, {
+        ...doc,
+        groups,
+        selection: { groupIds: [merged.id], unitIds: [] },
+      });
+    }
+
+    case "DELETE_SELECTED": {
+      const ids = doc.selection.groupIds;
+      if (ids.length === 0) return state;
+      const groups = doc.groups.filter((g) => !ids.includes(g.id));
+      return commitDoc(state, {
+        ...doc,
+        groups,
+        selection: { groupIds: [], unitIds: [] },
+      });
+    }
+
+    case "ASR_START":
+      return {
+        ...state,
+        asr: { status: "running", progress: 0, label: "准备中", error: null },
+      };
+    case "ASR_PROGRESS":
+      return {
+        ...state,
+        asr: { ...state.asr, progress: action.progress, label: action.label },
+      };
+    case "ASR_SUCCESS": {
+      const next: EditorDoc = {
+        ...doc,
+        groups: sortGroups(action.groups),
+        styles: action.styles ?? doc.styles,
+        selection: { groupIds: [], unitIds: [] },
+      };
+      return {
+        ...commitDoc(state, next),
+        asr: { status: "success", progress: 100, label: "识别完成", error: null },
+      };
+    }
+    case "ASR_ERROR":
+      return {
+        ...state,
+        asr: { status: "error", progress: 0, label: "", error: action.error },
+      };
+    case "ASR_RESET":
+      return {
+        ...state,
+        asr: { status: "idle", progress: 0, label: "", error: null },
+      };
+
+    case "EXPORT_START":
+      return {
+        ...state,
+        exportState: {
+          status: "running",
+          kind: action.kind,
+          progress: 0,
+          label: "开始",
+          error: null,
+          resultName: null,
+        },
+      };
+    case "EXPORT_PROGRESS":
+      return {
+        ...state,
+        exportState: {
+          ...state.exportState,
+          progress: action.progress,
+          label: action.label,
+        },
+      };
+    case "EXPORT_SUCCESS":
+      return {
+        ...state,
+        exportState: {
+          ...state.exportState,
+          status: "success",
+          progress: 100,
+          resultName: action.resultName,
+        },
+      };
+    case "EXPORT_ERROR":
+      return {
+        ...state,
+        exportState: { ...state.exportState, status: "error", error: action.error },
+      };
+    case "EXPORT_RESET":
+      return {
+        ...state,
+        exportState: {
+          status: "idle",
+          kind: null,
+          progress: 0,
+          label: "",
+          error: null,
+          resultName: null,
+        },
+      };
+
+    case "UNDO": {
+      if (state.past.length === 0) return state;
+      const previous = state.past[state.past.length - 1];
+      return {
+        ...state,
+        doc: previous,
+        past: state.past.slice(0, -1),
+        future: [state.doc, ...state.future].slice(0, HISTORY_LIMIT),
+      };
+    }
+    case "REDO": {
+      if (state.future.length === 0) return state;
+      const nextDoc = state.future[0];
+      return {
+        ...state,
+        doc: nextDoc,
+        past: [...state.past, state.doc].slice(-HISTORY_LIMIT),
+        future: state.future.slice(1),
+      };
+    }
+
+    default:
+      return state;
+  }
+}
+
+interface EditorContextValue {
+  state: EditorState;
+  dispatch: React.Dispatch<Action>;
+  canUndo: boolean;
+  canRedo: boolean;
+  selectedGroups: CaptionGroup[];
+  selectedUnit: { group: CaptionGroup; unitId: string } | null;
+  styleById: (id: string) => AssStyle;
+  currentGroup: CaptionGroup | null;
+}
+
+const EditorContext = createContext<EditorContextValue | null>(null);
+
+export function EditorProvider({ children }: { children: ReactNode }) {
+  const [state, dispatch] = useReducer(reducer, initialState);
+
+  const styleById = useCallback(
+    (id: string) =>
+      state.doc.styles.find((s) => s.id === id) ?? defaultStyle,
+    [state.doc.styles],
+  );
+
+  const selectedGroups = useMemo(
+    () =>
+      state.doc.groups.filter((g) =>
+        state.doc.selection.groupIds.includes(g.id),
+      ),
+    [state.doc.groups, state.doc.selection.groupIds],
+  );
+
+  const selectedUnit = useMemo(() => {
+    const unitId = state.doc.selection.unitIds?.[0];
+    if (!unitId || selectedGroups.length !== 1) return null;
+    const group = selectedGroups[0];
+    if (!group.units.some((u) => u.id === unitId)) return null;
+    return { group, unitId };
+  }, [selectedGroups, state.doc.selection.unitIds]);
+
+  const currentGroup = useMemo(() => {
+    const currentMs = state.currentMs;
+    return (
+      state.doc.groups.find(
+        (g) => currentMs >= g.startMs && currentMs < g.endMs,
+      ) ?? null
+    );
+  }, [state.doc.groups, state.currentMs]);
+
+  const value: EditorContextValue = {
+    state,
+    dispatch,
+    canUndo: state.past.length > 0,
+    canRedo: state.future.length > 0,
+    selectedGroups,
+    selectedUnit,
+    styleById,
+    currentGroup,
+  };
+
+  return (
+    <EditorContext.Provider value={value}>{children}</EditorContext.Provider>
+  );
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useEditor() {
+  const ctx = useContext(EditorContext);
+  if (!ctx) throw new Error("useEditor must be used within EditorProvider");
+  return ctx;
+}
