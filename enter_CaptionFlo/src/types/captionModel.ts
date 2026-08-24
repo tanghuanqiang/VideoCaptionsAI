@@ -15,12 +15,14 @@ export type {
   WordTimestamp,
 } from "./subtitleTypes";
 export type TimingSource = "asr-word" | "estimated";
+export type CaptionReviewStatus = "draft" | "needs-review" | "reviewed";
 
 export interface CaptionGroup {
   id: string;
   text: string;
   secondaryText?: string;
   speaker?: string;
+  reviewStatus?: CaptionReviewStatus;
   startMs: number;
   endMs: number;
   baseStyleId: string;
@@ -62,6 +64,7 @@ export const captionGroupToSubtitle = (group: CaptionGroup): Subtitle => ({
   text: group.text,
   secondaryText: group.secondaryText,
   speaker: group.speaker,
+  reviewStatus: group.reviewStatus,
   style: group.baseStyleId,
   group: "",
   overrides: group.overrides,
@@ -86,6 +89,7 @@ export const subtitleToCaptionGroup = (
   text: subtitle.text,
   secondaryText: subtitle.secondaryText,
   speaker: subtitle.speaker,
+  reviewStatus: subtitle.reviewStatus,
   startMs: Math.round(toSeconds(subtitle.start) * 1000),
   endMs: Math.round(toSeconds(subtitle.end) * 1000),
   baseStyleId: styleId,
@@ -220,6 +224,7 @@ export const mergeCaptionGroups = (
     text: ordered.map((group) => group.text).join(""),
     secondaryText: mergeSecondaryText(ordered.map((group) => group.secondaryText)),
     speaker: mergeSpeaker(ordered.map((group) => group.speaker)),
+    reviewStatus: mergeReviewStatus(ordered.map((group) => group.reviewStatus)),
     startMs: Math.min(...ordered.map((group) => group.startMs)),
     endMs: Math.max(...ordered.map((group) => group.endMs)),
     units: mergedUnits,
@@ -240,6 +245,10 @@ function mergeSecondaryText(parts: Array<string | undefined>): string | undefine
 function mergeSpeaker(parts: Array<string | undefined>): string | undefined {
   const speakers = [...new Set(parts.map((part) => part?.trim()).filter(Boolean))];
   return speakers.length === 1 ? speakers[0] : undefined;
+}
+
+function mergeReviewStatus(parts: Array<CaptionReviewStatus | undefined>): CaptionReviewStatus {
+  return parts.every((status) => status === "reviewed") ? "reviewed" : "needs-review";
 }
 
 export const mergeOverrides = (

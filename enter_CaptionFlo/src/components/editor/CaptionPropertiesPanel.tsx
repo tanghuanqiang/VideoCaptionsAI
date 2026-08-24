@@ -4,6 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useEditor } from "@/state/EditorContext";
 import { formatMs } from "@/lib/editorUtils";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
   ColorField,
   FieldRow,
@@ -11,7 +12,7 @@ import {
   SectionTitle,
 } from "./PropertyControls";
 import { StyleAssignRow } from "./StylePresetsPanel";
-import type { CaptionGroup, CaptionOverrides } from "@/types/captionModel";
+import type { CaptionGroup, CaptionOverrides, CaptionReviewStatus } from "@/types/captionModel";
 
 export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
   const { dispatch, styleById } = useEditor();
@@ -39,6 +40,9 @@ export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
       patch: { speaker: speaker.trim() || undefined },
       commit: true,
     });
+
+  const setReviewStatus = (reviewStatus: CaptionReviewStatus) =>
+    dispatch({ type: "UPDATE_GROUP", id: group.id, patch: { reviewStatus }, commit: true });
 
   const setTime = (patch: { startMs?: number; endMs?: number }) =>
     dispatch({ type: "UPDATE_GROUP", id: group.id, patch, commit: true });
@@ -99,6 +103,27 @@ export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
           className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus:border-primary"
           placeholder="可选：例如 主持人、嘉宾 A"
         />
+        <SectionTitle>审校状态</SectionTitle>
+        <div className="grid grid-cols-3 gap-1 rounded-md bg-foreground/5 p-1">
+          {([
+            ["draft", "草稿"],
+            ["needs-review", "待复核"],
+            ["reviewed", "已审校"],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => setReviewStatus(value)}
+              className={cn(
+                "rounded px-1 py-1.5 text-[11px] transition-colors",
+                (group.reviewStatus ?? "draft") === value
+                  ? "bg-card font-medium text-primary shadow-soft"
+                  : "text-foreground/55 hover:bg-card/60",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
         <SectionTitle>基础样式</SectionTitle>
         <StyleAssignRow

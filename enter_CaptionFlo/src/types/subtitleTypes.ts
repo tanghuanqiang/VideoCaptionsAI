@@ -46,6 +46,7 @@ export interface SubtitleEvent {
   text: string;
   secondaryText?: string;
   speaker?: string;
+  reviewStatus?: "draft" | "needs-review" | "reviewed";
   words?: WordTimestamp[];
   style?: string;
   overrides?: CaptionOverrides;

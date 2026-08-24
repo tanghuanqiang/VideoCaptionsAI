@@ -133,6 +133,16 @@ export function SubtitleList() {
                         {g.speaker}
                       </span>
                     )}
+                    {(g.reviewStatus ?? "draft") !== "draft" && (
+                      <span className={cn(
+                        "ml-1 inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium",
+                        g.reviewStatus === "reviewed"
+                          ? "bg-success/15 text-success"
+                          : "bg-warning/15 text-warning",
+                      )}>
+                        {g.reviewStatus === "reviewed" ? "已审校" : "待复核"}
+                      </span>
+                    )}
                     {g.secondaryText && (
                       <p className="mt-1 line-clamp-1 text-[11px] leading-4 text-foreground/50">
                         {g.secondaryText}
