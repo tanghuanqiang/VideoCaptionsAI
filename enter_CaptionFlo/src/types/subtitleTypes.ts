@@ -100,6 +100,7 @@ export interface Subtitle {
   end: string | number;
   text: string;
   secondaryText?: string;
+  speaker?: string;
   style: string;
   group: string;
   selected?: boolean;

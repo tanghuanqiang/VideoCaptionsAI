@@ -10,6 +10,7 @@ export interface ContentHighlight {
   endMs: number;
   text: string;
   secondaryText?: string;
+  speaker?: string;
   score: number;
 }
 
@@ -69,6 +70,7 @@ export function deriveContentHighlights(groups: CaptionGroup[], limit = 5): Cont
       endMs: group.endMs,
       text: compact(group.text),
       secondaryText: group.secondaryText?.trim() || undefined,
+      speaker: group.speaker?.trim() || undefined,
       score: highlightScore(group),
     }))
     .filter((item) => item.score > 0)
@@ -94,6 +96,7 @@ export function buildContentPackageMarkdown(projectName: string, groups: Caption
     highlights.length
       ? highlights.flatMap((highlight) => [
         `- [${timestamp(highlight.startMs)} - ${timestamp(highlight.endMs)}] ${highlight.text}`,
+        ...(highlight.speaker ? [`  - 说话人：${highlight.speaker}`] : []),
         ...(highlight.secondaryText ? [`  - ${highlight.secondaryText}`] : []),
       ])
       : ["- 未检测到足够明确的高光信号"]

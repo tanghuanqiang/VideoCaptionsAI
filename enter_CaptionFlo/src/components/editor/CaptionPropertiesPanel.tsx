@@ -32,6 +32,14 @@ export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
       commit: true,
     });
 
+  const setSpeaker = (speaker: string) =>
+    dispatch({
+      type: "UPDATE_GROUP",
+      id: group.id,
+      patch: { speaker: speaker.trim() || undefined },
+      commit: true,
+    });
+
   const setTime = (patch: { startMs?: number; endMs?: number }) =>
     dispatch({ type: "UPDATE_GROUP", id: group.id, patch, commit: true });
 
@@ -68,6 +76,13 @@ export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
           onChange={(e) => setSecondaryText(e.target.value)}
           className="min-h-14 resize-none bg-card text-sm"
           placeholder="可选：输入第二语言或辅助说明"
+        />
+        <SectionTitle>说话人</SectionTitle>
+        <input
+          value={group.speaker ?? ""}
+          onChange={(e) => setSpeaker(e.target.value)}
+          className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus:border-primary"
+          placeholder="可选：例如 主持人、嘉宾 A"
         />
 
         <SectionTitle>基础样式</SectionTitle>

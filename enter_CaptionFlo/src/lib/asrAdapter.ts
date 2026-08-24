@@ -11,6 +11,7 @@ export function asrResponseToGroups(res: ASRResponse): CaptionGroup[] {
         start: evt.start,
         end: evt.end,
         text: evt.text,
+        speaker: evt.speaker,
         style: evt.style ?? "recommended",
         group: "",
         overrides: evt.overrides,

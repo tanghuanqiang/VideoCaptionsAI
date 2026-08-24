@@ -20,6 +20,7 @@ export interface CaptionGroup {
   id: string;
   text: string;
   secondaryText?: string;
+  speaker?: string;
   startMs: number;
   endMs: number;
   baseStyleId: string;
@@ -60,6 +61,7 @@ export const captionGroupToSubtitle = (group: CaptionGroup): Subtitle => ({
   end: group.endMs / 1000,
   text: group.text,
   secondaryText: group.secondaryText,
+  speaker: group.speaker,
   style: group.baseStyleId,
   group: "",
   overrides: group.overrides,
@@ -83,6 +85,7 @@ export const subtitleToCaptionGroup = (
   id: subtitle.id,
   text: subtitle.text,
   secondaryText: subtitle.secondaryText,
+  speaker: subtitle.speaker,
   startMs: Math.round(toSeconds(subtitle.start) * 1000),
   endMs: Math.round(toSeconds(subtitle.end) * 1000),
   baseStyleId: styleId,
@@ -216,6 +219,7 @@ export const mergeCaptionGroups = (
     ...first,
     text: ordered.map((group) => group.text).join(""),
     secondaryText: mergeSecondaryText(ordered.map((group) => group.secondaryText)),
+    speaker: mergeSpeaker(ordered.map((group) => group.speaker)),
     startMs: Math.min(...ordered.map((group) => group.startMs)),
     endMs: Math.max(...ordered.map((group) => group.endMs)),
     units: mergedUnits,
@@ -231,6 +235,11 @@ function mergeSecondaryText(parts: Array<string | undefined>): string | undefine
     const needsSpace = /[A-Za-z0-9]$/u.test(merged) && /^[A-Za-z0-9]/u.test(part);
     return `${merged}${needsSpace ? " " : ""}${part}`;
   }, "");
+}
+
+function mergeSpeaker(parts: Array<string | undefined>): string | undefined {
+  const speakers = [...new Set(parts.map((part) => part?.trim()).filter(Boolean))];
+  return speakers.length === 1 ? speakers[0] : undefined;
 }
 
 export const mergeOverrides = (
