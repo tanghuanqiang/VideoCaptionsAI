@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Gauge, Palette, SlidersHorizontal } from "lucide-react";
+import { Gauge, Palette, SlidersHorizontal, Sparkles } from "lucide-react";
 import { useEditor } from "@/state/EditorContext";
 import { StylePresetsPanel } from "./StylePresetsPanel";
 import { CaptionPropertiesPanel } from "./CaptionPropertiesPanel";
@@ -7,10 +7,11 @@ import { BatchPropertiesPanel } from "./BatchPropertiesPanel";
 import { UnitPropertiesPanel } from "./UnitPropertiesPanel";
 import { UnitPicker } from "./UnitPicker";
 import { CaptionQualityPanel } from "./CaptionQualityPanel";
+import { ContentOptimizationPanel } from "./ContentOptimizationPanel";
 import { analyzeCaptionQuality } from "@/lib/captionQuality";
 import { cn } from "@/lib/utils";
 
-type RightTab = "props" | "presets" | "quality";
+type RightTab = "props" | "presets" | "quality" | "optimize";
 
 export function RightPanel() {
   const { selectedGroups, selectedUnit, state } = useEditor();
@@ -23,7 +24,7 @@ export function RightPanel() {
 
   // When the selection state changes, follow it by default (user can still switch back).
   useEffect(() => {
-    setTab((current) => current === "quality" ? current : (hasSelection ? "props" : "presets"));
+    setTab((current) => current === "quality" || current === "optimize" ? current : (hasSelection ? "props" : "presets"));
   }, [hasSelection]);
 
   let propsContent: React.ReactNode;
@@ -76,10 +77,22 @@ export function RightPanel() {
           icon={<Gauge className="h-3.5 w-3.5" />}
           label={`体检${qualityIssueCount ? ` (${qualityIssueCount})` : ""}`}
         />
+        <TabButton
+          active={tab === "optimize"}
+          onClick={() => setTab("optimize")}
+          icon={<Sparkles className="h-3.5 w-3.5" />}
+          label="优化"
+        />
       </div>
 
       <div className="min-h-0 flex-1">
-        {tab === "props" ? propsContent : tab === "presets" ? <StylePresetsPanel /> : <CaptionQualityPanel />}
+        {tab === "props"
+          ? propsContent
+          : tab === "presets"
+            ? <StylePresetsPanel />
+            : tab === "quality"
+              ? <CaptionQualityPanel />
+              : <ContentOptimizationPanel />}
       </div>
     </aside>
   );
