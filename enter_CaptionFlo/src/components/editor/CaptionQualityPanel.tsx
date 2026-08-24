@@ -1,7 +1,12 @@
 import { useMemo } from "react";
-import { AlertCircle, CheckCircle2, Gauge, Info, Timer, TriangleAlert, WandSparkles } from "lucide-react";
+import { AlertCircle, CheckCircle2, Gauge, Info, Scissors, Timer, TriangleAlert, WandSparkles } from "lucide-react";
 import { toast } from "sonner";
-import { analyzeCaptionQuality, repairCaptionTiming, type CaptionQualityIssue } from "@/lib/captionQuality";
+import {
+  analyzeCaptionQuality,
+  repairCaptionSegmentation,
+  repairCaptionTiming,
+  type CaptionQualityIssue,
+} from "@/lib/captionQuality";
 import { useEditor } from "@/state/EditorContext";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +54,16 @@ export function CaptionQualityPanel() {
     toast.success(`已优化 ${report.repairableGroupIds.length} 条字幕的停留时间`);
   };
 
+  const splitLongCaptions = () => {
+    const next = repairCaptionSegmentation(state.doc.groups, report.segmentableGroupIds);
+    if (next.length === state.doc.groups.length) {
+      toast.info("没有可安全拆分的长字幕");
+      return;
+    }
+    dispatch({ type: "SET_GROUPS", groups: next, commit: true });
+    toast.success(`已按停顿拆分 ${report.segmentableGroupIds.length} 条长字幕`);
+  };
+
   if (state.doc.groups.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
@@ -64,7 +79,7 @@ export function CaptionQualityPanel() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold">字幕节奏体检</p>
-            <p className="mt-0.5 text-[11px] text-foreground/50">阅读速度、停留时间与时间重叠</p>
+            <p className="mt-0.5 text-[11px] text-foreground/50">阅读速度、停留时间、文本长度与时间重叠</p>
           </div>
           <div className={cn(
             "flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold tabular-nums",
@@ -85,6 +100,15 @@ export function CaptionQualityPanel() {
           >
             <WandSparkles className="h-3.5 w-3.5" />
             一键延长 {report.repairableGroupIds.length} 条字幕
+          </button>
+        )}
+        {report.segmentableGroupIds.length > 0 && (
+          <button
+            onClick={splitLongCaptions}
+            className="mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-primary/25 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+          >
+            <Scissors className="h-3.5 w-3.5" />
+            按停顿拆分 {report.segmentableGroupIds.length} 条长字幕
           </button>
         )}
       </div>

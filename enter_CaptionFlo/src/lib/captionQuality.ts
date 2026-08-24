@@ -23,6 +23,7 @@ export interface CaptionQualityReport {
   score: number;
   issues: CaptionQualityIssue[];
   repairableGroupIds: string[];
+  segmentableGroupIds: string[];
 }
 
 const MIN_DISPLAY_MS = 800;
@@ -31,6 +32,7 @@ const MAX_CJK_CHARS_PER_SECOND = 8;
 const MAX_LATIN_WORDS_PER_SECOND = 3;
 const MAX_CJK_CHARS = 22;
 const MAX_LATIN_WORDS = 12;
+const MIN_SEGMENT_DISPLAY_MS = 800;
 
 function graphemeCount(text: string): number {
   if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
@@ -61,6 +63,77 @@ function recommendedDurationMs(group: CaptionGroup): number {
   return Math.max(MIN_DISPLAY_MS, Math.ceil(Math.max(cjkDuration, latinDuration) / 100) * 100);
 }
 
+function findCaptionSplitIndex(text: string): number | null {
+  const graphemes = Array.from(text);
+  const minSideLength = Math.max(3, Math.ceil(graphemes.length * 0.25));
+  if (graphemes.length < minSideLength * 2) return null;
+
+  const midpoint = graphemes.length / 2;
+  const candidates: Array<{ index: number; punctuation: boolean }> = [];
+  graphemes.forEach((grapheme, index) => {
+    const splitIndex = index + 1;
+    if (splitIndex < minSideLength || graphemes.length - splitIndex < minSideLength) return;
+    if (/[，。！？；、,.!?;:：]/u.test(grapheme)) {
+      candidates.push({ index: splitIndex, punctuation: true });
+    } else if (/\s/u.test(grapheme)) {
+      candidates.push({ index, punctuation: false });
+    }
+  });
+
+  if (candidates.length > 0) {
+    return candidates.sort((a, b) => {
+      const aScore = Math.abs(a.index - midpoint) - (a.punctuation ? 0.65 : 0);
+      const bScore = Math.abs(b.index - midpoint) - (b.punctuation ? 0.65 : 0);
+      return aScore - bScore;
+    })[0].index;
+  }
+
+  return Math.round(midpoint);
+}
+
+function splitWordsAtTime(group: CaptionGroup, splitMs: number, splitRatio: number) {
+  const left = [] as NonNullable<CaptionGroup["words"]>;
+  const right = [] as NonNullable<CaptionGroup["words"]>;
+  for (const word of group.words ?? []) {
+    const midpoint = ((word.start + word.end) * 1000) / 2;
+    (midpoint < splitMs ? left : right).push(word);
+  }
+  if (group.words && group.words.length > 1 && (!left.length || !right.length)) {
+    const boundary = Math.min(
+      group.words.length - 1,
+      Math.max(1, Math.round(group.words.length * splitRatio)),
+    );
+    return { left: group.words.slice(0, boundary), right: group.words.slice(boundary) };
+  }
+  return { left, right };
+}
+
+function splitUnitsAtTime(
+  group: CaptionGroup,
+  splitMs: number,
+  splitRatio: number,
+  leftId: string,
+  rightId: string,
+) {
+  const left = [] as CaptionGroup["units"];
+  const right = [] as CaptionGroup["units"];
+  for (const unit of group.units) {
+    const midpoint = (unit.startMs + unit.endMs) / 2;
+    (midpoint < splitMs ? left : right).push(unit);
+  }
+  if (group.units.length > 1 && (!left.length || !right.length)) {
+    const boundary = Math.min(
+      group.units.length - 1,
+      Math.max(1, Math.round(group.units.length * splitRatio)),
+    );
+    left.splice(0, left.length, ...group.units.slice(0, boundary));
+    right.splice(0, right.length, ...group.units.slice(boundary));
+  }
+  const withNewIds = (units: CaptionGroup["units"], groupId: string) =>
+    units.map((unit, index) => ({ ...unit, id: `${groupId}-unit-${index + 1}`, order: index }));
+  return { left: withNewIds(left, leftId), right: withNewIds(right, rightId) };
+}
+
 /**
  * Detect issues that make a subtitle hard to read without changing the source timing.
  * CJK characters and Latin words use separate speed limits so mixed-language captions
@@ -73,6 +146,7 @@ export function analyzeCaptionQuality(
   const ordered = [...groups].sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
   const issues: CaptionQualityIssue[] = [];
   const repairableGroupIds = new Set<string>();
+  const segmentableGroupIds = new Set<string>();
 
   ordered.forEach((group, index) => {
     const durationMs = group.endMs - group.startMs;
@@ -130,6 +204,7 @@ export function analyzeCaptionQuality(
     }
 
     if (load.cjkCharacters > MAX_CJK_CHARS || load.latinWords > MAX_LATIN_WORDS || load.visibleCharacters > 36) {
+      const canSegment = durationMs >= MIN_SEGMENT_DISPLAY_MS * 2 && findCaptionSplitIndex(group.text) !== null;
       issues.push({
         id: `${group.id}:long-caption`,
         groupId: group.id,
@@ -137,8 +212,9 @@ export function analyzeCaptionQuality(
         severity: "info",
         message: "字幕文本偏长",
         detail: "建议在语义停顿处拆分为更短的字幕",
-        repairable: false,
+        repairable: canSegment,
       });
+      if (canSegment) segmentableGroupIds.add(group.id);
     }
 
     if (next && group.endMs > next.startMs) {
@@ -161,6 +237,7 @@ export function analyzeCaptionQuality(
     score: Math.max(0, 100 - penalty),
     issues,
     repairableGroupIds: [...repairableGroupIds],
+    segmentableGroupIds: [...segmentableGroupIds],
   };
 }
 
@@ -188,4 +265,67 @@ export function repairCaptionTiming(
   });
 
   return groups.map((group) => repaired.get(group.id) ?? group);
+}
+
+/**
+ * Split long captions at their nearest natural pause. Timing stays inside the
+ * original interval, while word/unit timing data is assigned to its new segment.
+ */
+export function repairCaptionSegmentation(
+  groups: CaptionGroup[],
+  groupIds: string[],
+): CaptionGroup[] {
+  const ids = new Set(groupIds);
+  const result: CaptionGroup[] = [];
+
+  for (const group of groups) {
+    const splitIndex = ids.has(group.id) ? findCaptionSplitIndex(group.text) : null;
+    const durationMs = group.endMs - group.startMs;
+    if (!splitIndex || durationMs < MIN_SEGMENT_DISPLAY_MS * 2) {
+      result.push(group);
+      continue;
+    }
+
+    const graphemes = Array.from(group.text);
+    const leftText = graphemes.slice(0, splitIndex).join("").trimEnd();
+    const rightText = graphemes.slice(splitIndex).join("").trimStart();
+    if (!leftText || !rightText) {
+      result.push(group);
+      continue;
+    }
+
+    const splitRatio = splitIndex / graphemes.length;
+    const splitMs = Math.round(group.startMs + durationMs * splitRatio);
+    if (splitMs - group.startMs < MIN_SEGMENT_DISPLAY_MS || group.endMs - splitMs < MIN_SEGMENT_DISPLAY_MS) {
+      result.push(group);
+      continue;
+    }
+
+    const leftId = `${group.id}-part-1`;
+    const rightId = `${group.id}-part-2`;
+    const words = splitWordsAtTime(group, splitMs, splitRatio);
+    const units = splitUnitsAtTime(group, splitMs, splitRatio, leftId, rightId);
+    result.push(
+      {
+        ...group,
+        id: leftId,
+        text: leftText,
+        endMs: splitMs,
+        units: units.left,
+        words: words.left.length ? words.left : undefined,
+        effect: undefined,
+      },
+      {
+        ...group,
+        id: rightId,
+        text: rightText,
+        startMs: splitMs,
+        units: units.right,
+        words: words.right.length ? words.right : undefined,
+        effect: undefined,
+      },
+    );
+  }
+
+  return result;
 }
