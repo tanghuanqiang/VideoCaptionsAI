@@ -1,4 +1,4 @@
-import { RotateCcw, SlidersHorizontal } from "lucide-react";
+import { Copy, RotateCcw, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useEditor } from "@/state/EditorContext";
@@ -50,6 +50,18 @@ export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
     });
   };
 
+  const copyTimedCaption = async () => {
+    const timestamp = `${formatMs(group.startMs)} → ${formatMs(group.endMs)}`;
+    const speaker = group.speaker ? `${group.speaker}: ` : "";
+    const secondary = group.secondaryText ? `\n${group.secondaryText}` : "";
+    try {
+      await navigator.clipboard.writeText(`[${timestamp}] ${speaker}${group.text}${secondary}`);
+      toast.success("已复制带时间码字幕");
+    } catch {
+      toast.error("无法访问剪贴板");
+    }
+  };
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-4 pb-2 pt-3.5">
@@ -59,6 +71,9 @@ export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
         </div>
         <Button variant="ghost" size="xs" onClick={reset}>
           <RotateCcw /> 重置
+        </Button>
+        <Button variant="ghost" size="xs" onClick={copyTimedCaption} title="复制带时间码字幕">
+          <Copy />
         </Button>
       </div>
 
