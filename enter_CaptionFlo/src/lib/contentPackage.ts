@@ -111,3 +111,29 @@ export function contentPackageFilename(projectName: string): string {
     .slice(0, 80) || "captions";
   return `${safeName}-content-package.md`;
 }
+
+function csvCell(value: string | undefined): string {
+  return `"${(value ?? "").replace(/"/gu, '""')}"`;
+}
+
+export function buildCaptionReviewCsv(groups: CaptionGroup[]): string {
+  const header = ["开始", "结束", "说话人", "审校状态", "主字幕", "副字幕"];
+  const rows = [...groups]
+    .sort((a, b) => a.startMs - b.startMs)
+    .map((group) => [
+      timestamp(group.startMs),
+      timestamp(group.endMs),
+      group.speaker,
+      group.reviewStatus ?? "draft",
+      compact(group.text),
+      group.secondaryText?.trim(),
+    ].map(csvCell).join(","));
+  return `\uFEFF${[header.map(csvCell).join(","), ...rows].join("\r\n")}\r\n`;
+}
+
+export function captionReviewFilename(projectName: string): string {
+  const safeName = compact(projectName)
+    .replace(/[<>:"/\\|?*]/gu, "-")
+    .slice(0, 80) || "captions";
+  return `${safeName}-review-sheet.csv`;
+}
