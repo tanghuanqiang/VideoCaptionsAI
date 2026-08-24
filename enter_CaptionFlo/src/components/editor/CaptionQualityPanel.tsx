@@ -3,6 +3,7 @@ import { AlertCircle, CheckCircle2, Gauge, Info, Scissors, Timer, TriangleAlert,
 import { toast } from "sonner";
 import {
   analyzeCaptionQuality,
+  captionQualityProfiles,
   repairCaptionSegmentation,
   repairCaptionTiming,
   type CaptionQualityIssue,
@@ -27,8 +28,8 @@ function IssueIcon({ issue }: { issue: CaptionQualityIssue }) {
 export function CaptionQualityPanel() {
   const { state, dispatch } = useEditor();
   const report = useMemo(
-    () => analyzeCaptionQuality(state.doc.groups, state.doc.durationMs),
-    [state.doc.groups, state.doc.durationMs],
+    () => analyzeCaptionQuality(state.doc.groups, state.doc.durationMs, state.doc.qualityProfile),
+    [state.doc.groups, state.doc.durationMs, state.doc.qualityProfile],
   );
   const errors = report.issues.filter((issue) => issue.severity === "error").length;
   const warnings = report.issues.filter((issue) => issue.severity === "warning").length;
@@ -45,6 +46,7 @@ export function CaptionQualityPanel() {
       state.doc.groups,
       report.repairableGroupIds,
       state.doc.durationMs,
+      state.doc.qualityProfile,
     );
     if (next.every((group, index) => group.endMs === state.doc.groups[index]?.endMs)) {
       toast.info("没有可安全延长的字幕");
@@ -55,7 +57,11 @@ export function CaptionQualityPanel() {
   };
 
   const splitLongCaptions = () => {
-    const next = repairCaptionSegmentation(state.doc.groups, report.segmentableGroupIds);
+    const next = repairCaptionSegmentation(
+      state.doc.groups,
+      report.segmentableGroupIds,
+      state.doc.qualityProfile,
+    );
     if (next.length === state.doc.groups.length) {
       toast.info("没有可安全拆分的长字幕");
       return;
@@ -87,6 +93,23 @@ export function CaptionQualityPanel() {
           )}>
             {report.score}
           </div>
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-1 rounded-md bg-foreground/5 p-0.5">
+          {Object.entries(captionQualityProfiles).map(([id, value]) => (
+            <button
+              key={id}
+              onClick={() => dispatch({ type: "SET_QUALITY_PROFILE", profile: id as keyof typeof captionQualityProfiles })}
+              className={cn(
+                "min-w-0 rounded px-1.5 py-1.5 text-[11px] font-medium transition-colors",
+                state.doc.qualityProfile === id
+                  ? "bg-card text-foreground shadow-soft"
+                  : "text-foreground/55 hover:bg-foreground/5",
+              )}
+              title={value.hint}
+            >
+              {value.label}
+            </button>
+          ))}
         </div>
         <div className="mt-3 flex items-center gap-3 text-[11px] text-foreground/60">
           <span>{errors} 个错误</span>

@@ -18,6 +18,10 @@ import {
   splitCaptionGroupAtGrapheme,
 } from "@/types/captionModel";
 import { defaultStyle, stylePresets } from "@/constants";
+import {
+  DEFAULT_CAPTION_QUALITY_PROFILE,
+  type CaptionQualityProfile,
+} from "@/lib/captionQuality";
 
 export type VideoStatus = "empty" | "loaded";
 export type AsrStatus = "idle" | "running" | "success" | "error";
@@ -32,6 +36,7 @@ export interface EditorDoc {
   videoFileId: string | null;
   videoPath: string | null;
   durationMs: number;
+  qualityProfile: CaptionQualityProfile;
   /** Real intrinsic video resolution; ASS PlayRes is aligned to this. */
   resolution: { width: number; height: number };
   groups: CaptionGroup[];
@@ -65,6 +70,7 @@ const initialDoc: EditorDoc = {
   videoFileId: null,
   videoPath: null,
   durationMs: 0,
+  qualityProfile: DEFAULT_CAPTION_QUALITY_PROFILE,
   resolution: { width: 1280, height: 720 },
   groups: [],
   styles: [defaultStyle, ...stylePresets.map((p) => p.style)],
@@ -96,6 +102,7 @@ type Action =
   | { type: "SET_VIDEO_SOURCE"; videoUrl?: string | null; videoFileId?: string | null; videoPath?: string | null }
   | { type: "LOAD_PROJECT"; doc: EditorDoc }
   | { type: "SET_DURATION"; durationMs: number }
+  | { type: "SET_QUALITY_PROFILE"; profile: CaptionQualityProfile }
   | { type: "SET_RESOLUTION"; width: number; height: number }
   | { type: "SET_CURRENT_MS"; ms: number }
   | { type: "SET_PLAYING"; playing: boolean }
@@ -204,6 +211,9 @@ function reducer(state: EditorState, action: Action): EditorState {
 
     case "SET_DURATION":
       return { ...state, doc: { ...doc, durationMs: action.durationMs } };
+
+    case "SET_QUALITY_PROFILE":
+      return commitDoc(state, { ...doc, qualityProfile: action.profile });
 
     case "SET_RESOLUTION":
       return {

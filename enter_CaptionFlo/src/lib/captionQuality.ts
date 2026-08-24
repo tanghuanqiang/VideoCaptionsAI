@@ -9,6 +9,52 @@ export type CaptionQualityIssueKind =
 
 export type CaptionQualitySeverity = "error" | "warning" | "info";
 
+export type CaptionQualityProfile = "short-form" | "education" | "accessibility";
+
+export const DEFAULT_CAPTION_QUALITY_PROFILE: CaptionQualityProfile = "short-form";
+
+export const captionQualityProfiles: Record<CaptionQualityProfile, {
+  label: string;
+  hint: string;
+  minDisplayMs: number;
+  maxCjkCharsPerSecond: number;
+  maxLatinWordsPerSecond: number;
+  maxCjkChars: number;
+  maxLatinWords: number;
+}> = {
+  "short-form": {
+    label: "短视频",
+    hint: "节奏更快，适合短视频浏览",
+    minDisplayMs: 700,
+    maxCjkCharsPerSecond: 9,
+    maxLatinWordsPerSecond: 3.5,
+    maxCjkChars: 20,
+    maxLatinWords: 11,
+  },
+  education: {
+    label: "课程讲解",
+    hint: "给术语与复杂表达更多阅读时间",
+    minDisplayMs: 1000,
+    maxCjkCharsPerSecond: 7,
+    maxLatinWordsPerSecond: 2.5,
+    maxCjkChars: 24,
+    maxLatinWords: 12,
+  },
+  accessibility: {
+    label: "无障碍",
+    hint: "更从容的阅读节奏与更短行长",
+    minDisplayMs: 1200,
+    maxCjkCharsPerSecond: 6,
+    maxLatinWordsPerSecond: 2.2,
+    maxCjkChars: 18,
+    maxLatinWords: 10,
+  },
+};
+
+export function isCaptionQualityProfile(value: unknown): value is CaptionQualityProfile {
+  return typeof value === "string" && Object.hasOwn(captionQualityProfiles, value);
+}
+
 export interface CaptionQualityIssue {
   id: string;
   groupId: string;
@@ -26,13 +72,7 @@ export interface CaptionQualityReport {
   segmentableGroupIds: string[];
 }
 
-const MIN_DISPLAY_MS = 800;
 const MIN_GAP_MS = 80;
-const MAX_CJK_CHARS_PER_SECOND = 8;
-const MAX_LATIN_WORDS_PER_SECOND = 3;
-const MAX_CJK_CHARS = 22;
-const MAX_LATIN_WORDS = 12;
-const MIN_SEGMENT_DISPLAY_MS = 800;
 
 function graphemeCount(text: string): number {
   if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
@@ -56,11 +96,12 @@ function readingLoad(text: string) {
   return { cjkCharacters, latinWords, visibleCharacters: graphemeCount(compact) };
 }
 
-function recommendedDurationMs(group: CaptionGroup): number {
+function recommendedDurationMs(group: CaptionGroup, profile: CaptionQualityProfile): number {
+  const rules = captionQualityProfiles[profile];
   const load = readingLoad(group.text);
-  const cjkDuration = (load.cjkCharacters / MAX_CJK_CHARS_PER_SECOND) * 1000;
-  const latinDuration = (load.latinWords / MAX_LATIN_WORDS_PER_SECOND) * 1000;
-  return Math.max(MIN_DISPLAY_MS, Math.ceil(Math.max(cjkDuration, latinDuration) / 100) * 100);
+  const cjkDuration = (load.cjkCharacters / rules.maxCjkCharsPerSecond) * 1000;
+  const latinDuration = (load.latinWords / rules.maxLatinWordsPerSecond) * 1000;
+  return Math.max(rules.minDisplayMs, Math.ceil(Math.max(cjkDuration, latinDuration) / 100) * 100);
 }
 
 function findCaptionSplitIndex(text: string): number | null {
@@ -142,7 +183,9 @@ function splitUnitsAtTime(
 export function analyzeCaptionQuality(
   groups: CaptionGroup[],
   videoDurationMs?: number,
+  profile: CaptionQualityProfile = DEFAULT_CAPTION_QUALITY_PROFILE,
 ): CaptionQualityReport {
+  const rules = captionQualityProfiles[profile];
   const ordered = [...groups].sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
   const issues: CaptionQualityIssue[] = [];
   const repairableGroupIds = new Set<string>();
@@ -158,7 +201,7 @@ export function analyzeCaptionQuality(
       : videoDurationMs && videoDurationMs > 0
         ? videoDurationMs
         : Number.POSITIVE_INFINITY;
-    const canExtend = availableEndMs >= group.startMs + recommendedDurationMs(group);
+    const canExtend = availableEndMs >= group.startMs + recommendedDurationMs(group, profile);
 
     if (durationMs <= 0) {
       issues.push({
@@ -171,14 +214,14 @@ export function analyzeCaptionQuality(
         repairable: false,
       });
     } else {
-      if (durationMs < MIN_DISPLAY_MS) {
+      if (durationMs < rules.minDisplayMs) {
         issues.push({
           id: `${group.id}:short-duration`,
           groupId: group.id,
           kind: "short-duration",
           severity: "warning",
           message: "停留时间过短",
-          detail: `当前 ${(durationMs / 1000).toFixed(1)} 秒，建议至少 ${(recommendedDurationMs(group) / 1000).toFixed(1)} 秒`,
+          detail: `当前 ${(durationMs / 1000).toFixed(1)} 秒，${rules.label}建议至少 ${(recommendedDurationMs(group, profile) / 1000).toFixed(1)} 秒`,
           repairable: canExtend,
         });
         if (canExtend) repairableGroupIds.add(group.id);
@@ -186,8 +229,8 @@ export function analyzeCaptionQuality(
 
       const cjkRate = load.cjkCharacters / durationSeconds;
       const latinRate = load.latinWords / durationSeconds;
-      if (cjkRate > MAX_CJK_CHARS_PER_SECOND || latinRate > MAX_LATIN_WORDS_PER_SECOND) {
-        const metric = cjkRate > MAX_CJK_CHARS_PER_SECOND
+      if (cjkRate > rules.maxCjkCharsPerSecond || latinRate > rules.maxLatinWordsPerSecond) {
+        const metric = cjkRate > rules.maxCjkCharsPerSecond
           ? `${cjkRate.toFixed(1)} 字/秒`
           : `${latinRate.toFixed(1)} 词/秒`;
         issues.push({
@@ -203,8 +246,8 @@ export function analyzeCaptionQuality(
       }
     }
 
-    if (load.cjkCharacters > MAX_CJK_CHARS || load.latinWords > MAX_LATIN_WORDS || load.visibleCharacters > 36) {
-      const canSegment = durationMs >= MIN_SEGMENT_DISPLAY_MS * 2 && findCaptionSplitIndex(group.text) !== null;
+    if (load.cjkCharacters > rules.maxCjkChars || load.latinWords > rules.maxLatinWords || load.visibleCharacters > 36) {
+      const canSegment = durationMs >= rules.minDisplayMs * 2 && findCaptionSplitIndex(group.text) !== null;
       issues.push({
         id: `${group.id}:long-caption`,
         groupId: group.id,
@@ -246,6 +289,7 @@ export function repairCaptionTiming(
   groups: CaptionGroup[],
   groupIds: string[],
   videoDurationMs?: number,
+  profile: CaptionQualityProfile = DEFAULT_CAPTION_QUALITY_PROFILE,
 ): CaptionGroup[] {
   const ids = new Set(groupIds);
   const ordered = [...groups].sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
@@ -259,7 +303,7 @@ export function repairCaptionTiming(
       : videoDurationMs && videoDurationMs > 0
         ? videoDurationMs
         : Number.POSITIVE_INFINITY;
-    const targetEndMs = group.startMs + recommendedDurationMs(group);
+    const targetEndMs = group.startMs + recommendedDurationMs(group, profile);
     const endMs = Math.min(targetEndMs, latestEndMs);
     if (endMs > group.endMs) repaired.set(group.id, { ...group, endMs });
   });
@@ -274,14 +318,16 @@ export function repairCaptionTiming(
 export function repairCaptionSegmentation(
   groups: CaptionGroup[],
   groupIds: string[],
+  profile: CaptionQualityProfile = DEFAULT_CAPTION_QUALITY_PROFILE,
 ): CaptionGroup[] {
+  const rules = captionQualityProfiles[profile];
   const ids = new Set(groupIds);
   const result: CaptionGroup[] = [];
 
   for (const group of groups) {
     const splitIndex = ids.has(group.id) ? findCaptionSplitIndex(group.text) : null;
     const durationMs = group.endMs - group.startMs;
-    if (!splitIndex || durationMs < MIN_SEGMENT_DISPLAY_MS * 2) {
+    if (!splitIndex || durationMs < rules.minDisplayMs * 2) {
       result.push(group);
       continue;
     }
@@ -296,7 +342,7 @@ export function repairCaptionSegmentation(
 
     const splitRatio = splitIndex / graphemes.length;
     const splitMs = Math.round(group.startMs + durationMs * splitRatio);
-    if (splitMs - group.startMs < MIN_SEGMENT_DISPLAY_MS || group.endMs - splitMs < MIN_SEGMENT_DISPLAY_MS) {
+    if (splitMs - group.startMs < rules.minDisplayMs || group.endMs - splitMs < rules.minDisplayMs) {
       result.push(group);
       continue;
     }

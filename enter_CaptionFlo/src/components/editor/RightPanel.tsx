@@ -16,8 +16,8 @@ export function RightPanel() {
   const { selectedGroups, selectedUnit, state } = useEditor();
   const hasSelection = selectedGroups.length > 0 || !!selectedUnit;
   const qualityIssueCount = useMemo(
-    () => analyzeCaptionQuality(state.doc.groups, state.doc.durationMs).issues.length,
-    [state.doc.groups, state.doc.durationMs],
+    () => analyzeCaptionQuality(state.doc.groups, state.doc.durationMs, state.doc.qualityProfile).issues.length,
+    [state.doc.groups, state.doc.durationMs, state.doc.qualityProfile],
   );
   const [tab, setTab] = useState<RightTab>(hasSelection ? "props" : "presets");
 

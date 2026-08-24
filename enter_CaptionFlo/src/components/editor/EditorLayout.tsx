@@ -10,6 +10,10 @@ import { buildAss } from "@/lib/assBuilder";
 import { DEMO_VIDEO_NAME, DEMO_VIDEO_URL } from "@/services/mockData";
 import { API_CONFIG } from "@/services/apiConfig";
 import { defaultStyle, stylePresets, type RecognitionQuality } from "@/constants";
+import {
+  DEFAULT_CAPTION_QUALITY_PROFILE,
+  isCaptionQualityProfile,
+} from "@/lib/captionQuality";
 import { TopBar } from "./TopBar";
 import { SubtitleList } from "./SubtitleList";
 import { VideoStage } from "./VideoStage";
@@ -47,6 +51,9 @@ function normalizeProjectDoc(raw: unknown): EditorDoc | null {
     durationMs: typeof doc.durationMs === "number" && Number.isFinite(doc.durationMs)
       ? doc.durationMs
       : 0,
+    qualityProfile: isCaptionQualityProfile(doc.qualityProfile)
+      ? doc.qualityProfile
+      : DEFAULT_CAPTION_QUALITY_PROFILE,
     resolution: {
       width: typeof resolution.width === "number" && Number.isFinite(resolution.width)
         ? resolution.width
