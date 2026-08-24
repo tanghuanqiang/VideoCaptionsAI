@@ -1,7 +1,12 @@
 import { useMemo } from "react";
-import { MessageSquareText, Sparkles } from "lucide-react";
+import { Highlighter, MessageSquareText, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import { findFillerWordIssues, repairFillerWords } from "@/lib/captionTextTools";
+import {
+  applyKeywordHighlights,
+  findFillerWordIssues,
+  findKeywordHighlightIssues,
+  repairFillerWords,
+} from "@/lib/captionTextTools";
 import { useEditor } from "@/state/EditorContext";
 
 export function ContentOptimizationPanel() {
@@ -11,6 +16,11 @@ export function ContentOptimizationPanel() {
     [state.doc.groups],
   );
   const totalFillers = fillerIssues.reduce((total, issue) => total + issue.count, 0);
+  const keywordIssues = useMemo(
+    () => findKeywordHighlightIssues(state.doc.groups),
+    [state.doc.groups],
+  );
+  const keywordCount = keywordIssues.reduce((total, issue) => total + issue.terms.length, 0);
 
   const focusIssue = (groupId: string) => {
     const group = state.doc.groups.find((item) => item.id === groupId);
@@ -30,6 +40,19 @@ export function ContentOptimizationPanel() {
     }
     dispatch({ type: "SET_GROUPS", groups: next, commit: true });
     toast.success(`已清理 ${totalFillers} 处口头填充词`);
+  };
+
+  const highlightKeywords = () => {
+    const next = applyKeywordHighlights(
+      state.doc.groups,
+      keywordIssues.map((issue) => issue.groupId),
+    );
+    if (next.every((group, index) => group.units === state.doc.groups[index]?.units)) {
+      toast.info("没有可安全强调的数字或术语");
+      return;
+    }
+    dispatch({ type: "SET_GROUPS", groups: next, commit: true });
+    toast.success(`已强调 ${keywordCount} 个数字或术语`);
   };
 
   if (state.doc.groups.length === 0) {
@@ -63,11 +86,16 @@ export function ContentOptimizationPanel() {
       </div>
 
       <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-2">
-        {fillerIssues.length === 0 ? (
+        {fillerIssues.length === 0 && keywordCount === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
             <MessageSquareText className="h-7 w-7 text-success" />
             <p className="text-sm font-medium">文稿节奏干净</p>
-            <p className="text-xs text-foreground/50">没有检测到可安全清理的口头填充词。</p>
+            <p className="text-xs text-foreground/50">没有检测到可安全清理或强调的内容。</p>
+          </div>
+        ) : fillerIssues.length === 0 ? (
+          <div className="flex items-center gap-2 rounded-md px-2.5 py-2 text-foreground/55">
+            <MessageSquareText className="h-4 w-4 text-success" />
+            <p className="text-xs">没有检测到可安全清理的口头填充词。</p>
           </div>
         ) : (
           <ul className="space-y-1.5">
@@ -91,6 +119,32 @@ export function ContentOptimizationPanel() {
             ))}
           </ul>
         )}
+
+        <div className="mt-3 border-t border-border/60 px-2 pt-3">
+          <div className="flex items-center gap-2">
+            <Highlighter className="h-4 w-4 text-primary" />
+            <div>
+              <p className="text-xs font-medium">数字与术语强调</p>
+              <p className="mt-0.5 text-[11px] text-foreground/50">不会覆盖已有逐字设计</p>
+            </div>
+          </div>
+          {keywordCount > 0 ? (
+            <>
+              <button
+                onClick={highlightKeywords}
+                className="mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-primary/25 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+              >
+                <Highlighter className="h-3.5 w-3.5" />
+                强调 {keywordCount} 个数字与术语
+              </button>
+              <p className="mt-2 truncate text-[11px] text-foreground/55">
+                {keywordIssues.flatMap((issue) => issue.terms).join("、")}
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 text-[11px] text-foreground/50">没有可安全自动强调的内容。</p>
+          )}
+        </div>
       </div>
     </div>
   );
