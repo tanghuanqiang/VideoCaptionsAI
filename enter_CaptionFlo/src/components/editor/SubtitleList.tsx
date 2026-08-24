@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, ListFilter, Captions } from "lucide-react";
+import { Search, ListFilter, Captions, ClipboardCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useEditor } from "@/state/EditorContext";
 import { formatMs, isGroupEstimated } from "@/lib/editorUtils";
@@ -10,15 +10,17 @@ export function SubtitleList() {
   const { state, dispatch } = useEditor();
   const [query, setQuery] = useState("");
   const [onlyEstimated, setOnlyEstimated] = useState(false);
+  const [onlyUnreviewed, setOnlyUnreviewed] = useState(false);
   const { groups, selection } = state.doc;
 
   const filtered = useMemo(() => {
     return groups.filter((g) => {
       if (query && !g.text.toLowerCase().includes(query.toLowerCase())) return false;
       if (onlyEstimated && !isGroupEstimated(g)) return false;
+      if (onlyUnreviewed && g.reviewStatus === "reviewed") return false;
       return true;
     });
-  }, [groups, query, onlyEstimated]);
+  }, [groups, query, onlyEstimated, onlyUnreviewed]);
 
   const handleSelect = (group: CaptionGroup, e: React.MouseEvent) => {
     const ids = selection.groupIds;
@@ -49,16 +51,28 @@ export function SubtitleList() {
             {groups.length}
           </span>
         </div>
-        <button
-          onClick={() => setOnlyEstimated((v) => !v)}
-          className={cn(
-            "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
-            onlyEstimated ? "bg-primary/15 text-primary" : "text-foreground/50 hover:bg-foreground/5",
-          )}
-          title="仅显示估算时间戳"
-        >
-          <ListFilter className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setOnlyUnreviewed((v) => !v)}
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+              onlyUnreviewed ? "bg-warning/15 text-warning" : "text-foreground/50 hover:bg-foreground/5",
+            )}
+            title="仅显示待审校字幕"
+          >
+            <ClipboardCheck className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setOnlyEstimated((v) => !v)}
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+              onlyEstimated ? "bg-primary/15 text-primary" : "text-foreground/50 hover:bg-foreground/5",
+            )}
+            title="仅显示估算时间戳"
+          >
+            <ListFilter className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <div className="px-3 pb-2">
