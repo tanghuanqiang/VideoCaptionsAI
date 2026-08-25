@@ -33,6 +33,18 @@ export function CaptionQualityPanel() {
   );
   const errors = report.issues.filter((issue) => issue.severity === "error").length;
   const warnings = report.issues.filter((issue) => issue.severity === "warning").length;
+  const speakerStats = useMemo(() => {
+    const map = new Map<string, { count: number; duration: number; pending: number }>();
+    for (const group of state.doc.groups) {
+      const key = group.speaker?.trim() || "未标注";
+      const current = map.get(key) ?? { count: 0, duration: 0, pending: 0 };
+      current.count += 1;
+      current.duration += Math.max(0, group.endMs - group.startMs);
+      if ((group.reviewStatus ?? "draft") !== "reviewed") current.pending += 1;
+      map.set(key, current);
+    }
+    return [...map.entries()].sort((a, b) => b[1].duration - a[1].duration);
+  }, [state.doc.groups]);
 
   const focusIssue = (issue: CaptionQualityIssue) => {
     const group = state.doc.groups.find((item) => item.id === issue.groupId);
@@ -137,6 +149,20 @@ export function CaptionQualityPanel() {
       </div>
 
       <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-2">
+        <div className="mb-3 rounded-md border border-border/60 p-2.5">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-medium">说话人与审校分布</span>
+            <span className="text-[10px] text-foreground/45">{speakerStats.length} 位</span>
+          </div>
+          <div className="space-y-1.5">
+            {speakerStats.slice(0, 5).map(([speaker, stat]) => (
+              <div key={speaker} className="flex items-center justify-between gap-2 text-[11px]">
+                <span className="min-w-0 truncate text-foreground/75">{speaker}</span>
+                <span className="shrink-0 tabular-nums text-foreground/50">{stat.count} 条 · {stat.pending} 待审</span>
+              </div>
+            ))}
+          </div>
+        </div>
         {report.issues.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
             <CheckCircle2 className="h-7 w-7 text-success" />

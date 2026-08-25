@@ -280,9 +280,12 @@ function reducer(state: EditorState, action: Action): EditorState {
       const ids = new Set(doc.selection.groupIds);
       if (ids.size === 0 || !Number.isFinite(action.deltaMs)) return state;
       const delta = Math.round(action.deltaMs);
-      const groups = doc.groups.map((g) => ids.has(g.id)
-        ? { ...g, startMs: Math.max(0, g.startMs + delta), endMs: Math.max(0, g.endMs + delta) }
-        : g);
+      const groups = doc.groups.map((g) => {
+        if (!ids.has(g.id)) return g;
+        const duration = Math.max(1, g.endMs - g.startMs);
+        const startMs = Math.min(Math.max(0, g.startMs + delta), Math.max(0, doc.durationMs - duration));
+        return { ...g, startMs, endMs: startMs + duration };
+      });
       return commitDoc(state, { ...doc, groups: sortGroups(groups) });
     }
 
@@ -294,7 +297,8 @@ function reducer(state: EditorState, action: Action): EditorState {
       const updates = new Map<string, CaptionGroup>();
       for (const group of selected) {
         const duration = Math.max(1, group.endMs - group.startMs);
-        const next = { ...group, startMs: cursor, endMs: cursor + duration };
+        const startMs = Math.min(cursor, Math.max(0, doc.durationMs - duration));
+        const next = { ...group, startMs, endMs: startMs + duration };
         updates.set(group.id, next);
         cursor = next.endMs + gap;
       }

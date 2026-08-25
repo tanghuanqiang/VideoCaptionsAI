@@ -11,16 +11,22 @@ export function SubtitleList() {
   const [query, setQuery] = useState("");
   const [onlyEstimated, setOnlyEstimated] = useState(false);
   const [onlyUnreviewed, setOnlyUnreviewed] = useState(false);
+  const [speakerFilter, setSpeakerFilter] = useState("all");
   const { groups, selection } = state.doc;
+  const speakers = useMemo(
+    () => [...new Set(groups.map((g) => g.speaker?.trim()).filter((v): v is string => !!v))].sort(),
+    [groups],
+  );
 
   const filtered = useMemo(() => {
     return groups.filter((g) => {
       if (query && !g.text.toLowerCase().includes(query.toLowerCase())) return false;
       if (onlyEstimated && !isGroupEstimated(g)) return false;
       if (onlyUnreviewed && g.reviewStatus === "reviewed") return false;
+      if (speakerFilter !== "all" && (g.speaker?.trim() || "未标注") !== speakerFilter) return false;
       return true;
     });
-  }, [groups, query, onlyEstimated, onlyUnreviewed]);
+  }, [groups, query, onlyEstimated, onlyUnreviewed, speakerFilter]);
 
   const handleSelect = (group: CaptionGroup, e: React.MouseEvent) => {
     const ids = selection.groupIds;
@@ -85,6 +91,18 @@ export function SubtitleList() {
             className="h-8 border-transparent bg-foreground/5 pl-8 text-xs"
           />
         </div>
+        {speakers.length > 0 && (
+          <select
+            value={speakerFilter}
+            onChange={(e) => setSpeakerFilter(e.target.value)}
+            className="mt-2 h-8 w-full rounded-md border border-input bg-foreground/5 px-2 text-xs"
+            aria-label="按说话人筛选"
+          >
+            <option value="all">所有说话人</option>
+            {speakers.map((speaker) => <option key={speaker} value={speaker}>{speaker}</option>)}
+            <option value="未标注">未标注</option>
+          </select>
+        )}
       </div>
 
       <div className="scrollbar-thin flex-1 overflow-y-auto px-2 pb-3">

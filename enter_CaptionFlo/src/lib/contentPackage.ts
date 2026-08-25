@@ -112,6 +112,20 @@ export function contentPackageFilename(projectName: string): string {
   return `${safeName}-content-package.md`;
 }
 
+export function buildContentPackageJson(projectName: string, groups: CaptionGroup[]): string {
+  return JSON.stringify({
+    projectName: compact(projectName) || "未命名项目",
+    generatedAt: new Date().toISOString(),
+    chapters: deriveContentChapters(groups),
+    highlights: deriveContentHighlights(groups),
+  }, null, 2) + "\n";
+}
+
+export function contentPackageJsonFilename(projectName: string): string {
+  const safeName = compact(projectName).replace(/[<>:"/\\|?*]/gu, "-").slice(0, 80) || "captions";
+  return `${safeName}-content-package.json`;
+}
+
 function csvCell(value: string | undefined): string {
   return `"${(value ?? "").replace(/"/gu, '""')}"`;
 }

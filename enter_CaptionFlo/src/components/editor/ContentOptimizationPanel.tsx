@@ -9,9 +9,11 @@ import {
 } from "@/lib/captionTextTools";
 import {
   buildContentPackageMarkdown,
+  buildContentPackageJson,
   buildCaptionReviewCsv,
   captionReviewFilename,
   contentPackageFilename,
+  contentPackageJsonFilename,
   deriveContentChapters,
   deriveContentHighlights,
 } from "@/lib/contentPackage";
@@ -74,6 +76,17 @@ export function ContentOptimizationPanel() {
     link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     toast.success("内容清单已导出");
+  };
+
+  const exportContentPackageJson = () => {
+    const json = buildContentPackageJson(state.doc.projectName, state.doc.groups);
+    const url = URL.createObjectURL(new Blob([json], { type: "application/json;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = contentPackageJsonFilename(state.doc.projectName);
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    toast.success("内容清单 JSON 已导出");
   };
 
   const exportReviewSheet = () => {
@@ -201,6 +214,13 @@ export function ContentOptimizationPanel() {
           >
             <FileOutput className="h-3.5 w-3.5" />
             导出审校 CSV
+          </button>
+          <button
+            onClick={exportContentPackageJson}
+            className="mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-border text-xs font-medium text-foreground/75 transition-colors hover:bg-foreground/5"
+          >
+            <FileOutput className="h-3.5 w-3.5" />
+            导出内容清单 JSON
           </button>
         </div>
       </div>
