@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { Search, ListFilter, Captions, ClipboardCheck, Gauge } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useEditor } from "@/state/EditorContext";
@@ -15,6 +15,8 @@ export function SubtitleList() {
   const [speakerFilter, setSpeakerFilter] = useState("all");
   const [onlyIssues, setOnlyIssues] = useState(false);
   const { groups, selection } = state.doc;
+  const deferredGroups = useDeferredValue(groups);
+  const deferredQuery = useDeferredValue(query);
   const speakers = useMemo(
     () => [...new Set(groups.map((g) => g.speaker?.trim()).filter((v): v is string => !!v))].sort(),
     [groups],
@@ -22,20 +24,20 @@ export function SubtitleList() {
   const reviewedCount = groups.filter((group) => group.reviewStatus === "reviewed").length;
   const reviewProgress = groups.length ? Math.round((reviewedCount / groups.length) * 100) : 0;
   const issueIds = useMemo(
-    () => new Set(analyzeCaptionQuality(groups, state.doc.durationMs, state.doc.qualityProfile).issues.map((issue) => issue.groupId)),
-    [groups, state.doc.durationMs, state.doc.qualityProfile],
+    () => new Set(analyzeCaptionQuality(deferredGroups, state.doc.durationMs, state.doc.qualityProfile).issues.map((issue) => issue.groupId)),
+    [deferredGroups, state.doc.durationMs, state.doc.qualityProfile],
   );
 
   const filtered = useMemo(() => {
     return groups.filter((g) => {
-      if (query && !g.text.toLowerCase().includes(query.toLowerCase())) return false;
+      if (deferredQuery && !g.text.toLowerCase().includes(deferredQuery.toLowerCase())) return false;
       if (onlyEstimated && !isGroupEstimated(g)) return false;
       if (onlyUnreviewed && g.reviewStatus === "reviewed") return false;
       if (speakerFilter !== "all" && (g.speaker?.trim() || "未标注") !== speakerFilter) return false;
       if (onlyIssues && !issueIds.has(g.id)) return false;
       return true;
     });
-  }, [groups, query, onlyEstimated, onlyUnreviewed, speakerFilter, onlyIssues, issueIds]);
+  }, [groups, deferredQuery, onlyEstimated, onlyUnreviewed, speakerFilter, onlyIssues, issueIds]);
 
   const handleSelect = (group: CaptionGroup, e: React.MouseEvent) => {
     const ids = selection.groupIds;

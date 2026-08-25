@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useDeferredValue, useMemo } from "react";
 import { AlertCircle, CheckCircle2, FileOutput, Gauge, Info, Scissors, Timer, TriangleAlert, WandSparkles } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -30,16 +30,17 @@ function IssueIcon({ issue }: { issue: CaptionQualityIssue }) {
 
 export function CaptionQualityPanel() {
   const { state, dispatch } = useEditor();
+  const deferredGroups = useDeferredValue(state.doc.groups);
   const report = useMemo(
-    () => analyzeCaptionQuality(state.doc.groups, state.doc.durationMs, state.doc.qualityProfile),
-    [state.doc.groups, state.doc.durationMs, state.doc.qualityProfile],
+    () => analyzeCaptionQuality(deferredGroups, state.doc.durationMs, state.doc.qualityProfile),
+    [deferredGroups, state.doc.durationMs, state.doc.qualityProfile],
   );
   const errors = report.issues.filter((issue) => issue.severity === "error").length;
   const warnings = report.issues.filter((issue) => issue.severity === "warning").length;
   const overlapCount = report.issues.filter((issue) => issue.kind === "overlap").length;
   const speakerStats = useMemo(() => {
     const map = new Map<string, { count: number; duration: number; pending: number }>();
-    for (const group of state.doc.groups) {
+    for (const group of deferredGroups) {
       const key = group.speaker?.trim() || "未标注";
       const current = map.get(key) ?? { count: 0, duration: 0, pending: 0 };
       current.count += 1;
@@ -48,7 +49,7 @@ export function CaptionQualityPanel() {
       map.set(key, current);
     }
     return [...map.entries()].sort((a, b) => b[1].duration - a[1].duration);
-  }, [state.doc.groups]);
+  }, [deferredGroups]);
 
   const focusIssue = (issue: CaptionQualityIssue) => {
     const group = state.doc.groups.find((item) => item.id === issue.groupId);
