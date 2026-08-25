@@ -60,6 +60,26 @@ export function repairFillerWords(groups: CaptionGroup[], groupIds: string[]): C
   });
 }
 
+/** Insert one readable line break near the visual midpoint without changing timing. */
+export function smartLineBreak(text: string, maxLineLength = 18): string {
+  if (text.includes("\n")) return text;
+  const graphemes = Array.from(text.trim());
+  if (graphemes.length <= maxLineLength) return text;
+  const midpoint = Math.floor(graphemes.length / 2);
+  const candidates = graphemes
+    .map((value, index) => ({ value, index: index + 1 }))
+    .filter(({ value, index }) => index >= 3 && graphemes.length - index >= 3 && /[，。！？；、,.!?;:\s]/u.test(value));
+  const split = candidates.sort((a, b) => Math.abs(a.index - midpoint) - Math.abs(b.index - midpoint))[0]?.index ?? midpoint;
+  const left = graphemes.slice(0, split).join("").trimEnd();
+  const right = graphemes.slice(split).join("").trimStart();
+  return left && right ? `${left}\n${right}` : text;
+}
+
+export function applySmartLineBreak(group: CaptionGroup): CaptionGroup {
+  const text = smartLineBreak(group.text);
+  return text === group.text ? group : { ...group, text, units: [], words: undefined, effect: undefined };
+}
+
 function emphasisRanges(text: string): Array<{ start: number; end: number; text: string }> {
   const patterns = [
     /[“「][^”」]{1,16}[”」]/gu,

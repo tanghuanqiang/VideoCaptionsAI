@@ -6,6 +6,7 @@ import { formatMs } from "@/lib/editorUtils";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { graphemesOf } from "@/types/captionModel";
+import { applySmartLineBreak } from "@/lib/captionTextTools";
 import {
   ColorField,
   FieldRow,
@@ -70,6 +71,16 @@ export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
     }
   };
 
+  const smartBreak = () => {
+    const next = applySmartLineBreak(group);
+    if (next.text === group.text) {
+      toast.info("当前字幕无需断行");
+      return;
+    }
+    dispatch({ type: "UPDATE_GROUP", id: group.id, patch: next, commit: true });
+    toast.success("已按语义停顿插入断行");
+  };
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-4 pb-2 pt-3.5">
@@ -87,6 +98,9 @@ export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
 
       <div className="scrollbar-thin flex-1 overflow-y-auto px-4 pb-4">
         <SectionTitle>文本</SectionTitle>
+        <div className="mb-1 flex justify-end">
+          <Button variant="ghost" size="xs" onClick={smartBreak} title="按语义停顿智能断行">智能断行</Button>
+        </div>
         <Textarea
           value={group.text}
           onChange={(e) => setText(e.target.value)}
