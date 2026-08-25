@@ -19,6 +19,8 @@ interface ExportDialogProps {
   kind: "subtitle" | "video";
   format: "ass" | "srt";
   onFormatChange: (f: "ass" | "srt") => void;
+  scope: "all" | "selected";
+  onScopeChange: (scope: "all" | "selected") => void;
   onConfirm: () => void;
   onRetry: () => void;
 }
@@ -29,6 +31,8 @@ export function ExportDialog({
   kind,
   format,
   onFormatChange,
+  scope,
+  onScopeChange,
   onConfirm,
   onRetry,
 }: ExportDialogProps) {
@@ -44,6 +48,7 @@ export function ExportDialog({
   const warnings = quality.issues.filter((issue) => issue.severity === "warning").length;
   const reviewed = state.doc.groups.filter((group) => group.reviewStatus === "reviewed").length;
   const diagnostics = diagnoseCaptionGroups(state.doc.groups, state.doc.durationMs, state.doc.styles.map((style) => style.id));
+  const hasSelection = state.doc.selection.groupIds.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -79,6 +84,24 @@ export function ExportDialog({
                 </p>
               </button>
             ))}
+          </div>
+        )}
+
+        {idle && (
+          <div className="mt-3">
+            <p className="mb-1.5 text-xs font-medium text-foreground/65">导出范围</p>
+            <div className="grid grid-cols-2 gap-2">
+              {([["all", `全部字幕（${state.doc.groups.length}）`], ["selected", `仅所选（${state.doc.selection.groupIds.length}）`]] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  disabled={value === "selected" && !hasSelection}
+                  onClick={() => onScopeChange(value)}
+                  className={cn("rounded-md border px-2 py-2 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-35", scope === value ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-foreground/5")}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

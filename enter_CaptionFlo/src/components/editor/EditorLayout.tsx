@@ -107,6 +107,7 @@ export function EditorLayout() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [format, setFormat] = useState<"ass" | "srt">("ass");
+  const [exportScope, setExportScope] = useState<"all" | "selected">("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recoveryPrompted = useRef(false);
 
@@ -269,7 +270,10 @@ export function EditorLayout() {
     try {
       const onProgress = (p: number, label?: string) =>
         dispatch({ type: "EXPORT_PROGRESS", progress: p, label: label ?? "" });
-      const ass = buildAss(state.doc.groups, state.doc.styles, {
+      const exportGroups = exportScope === "selected" && state.doc.selection.groupIds.length > 0
+        ? state.doc.groups.filter((group) => state.doc.selection.groupIds.includes(group.id))
+        : state.doc.groups;
+      const ass = buildAss(exportGroups, state.doc.styles, {
         playResX: state.doc.resolution.width,
         playResY: state.doc.resolution.height,
         title: state.doc.projectName,
@@ -295,7 +299,7 @@ export function EditorLayout() {
       dispatch({ type: "EXPORT_ERROR", error: err instanceof Error ? err.message : "未知错误" });
       toast.error(err instanceof Error ? err.message : "导出失败");
     }
-  }, [dispatch, exportKind, format, state.doc]);
+  }, [dispatch, exportKind, exportScope, format, state.doc]);
 
   return (
     <div className="flex h-full w-full flex-col gap-2 bg-background p-2">
@@ -342,6 +346,8 @@ export function EditorLayout() {
         kind={exportKind}
         format={format}
         onFormatChange={setFormat}
+        scope={exportScope}
+        onScopeChange={setExportScope}
         onConfirm={runExport}
         onRetry={runExport}
       />
