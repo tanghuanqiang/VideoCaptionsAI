@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 import { useEditor, type EditorDoc } from "@/state/EditorContext";
 import { useTheme } from "@/hooks/useTheme";
@@ -23,6 +23,7 @@ import { RightPanel } from "./RightPanel";
 import { CopilotPanel } from "./CopilotPanel";
 import { ExportDialog } from "./ExportDialog";
 import { KeyboardHints } from "./KeyboardHints";
+import { clearRecoverySnapshot, readRecoverySnapshot, saveRecoverySnapshot } from "@/lib/projectRecovery";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -107,6 +108,33 @@ export function EditorLayout() {
   const [exportOpen, setExportOpen] = useState(false);
   const [format, setFormat] = useState<"ass" | "srt">("ass");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recoveryPrompted = useRef(false);
+
+  useEffect(() => {
+    if (recoveryPrompted.current) return;
+    recoveryPrompted.current = true;
+    const snapshot = readRecoverySnapshot();
+    if (!snapshot || snapshot.doc.groups.length === 0) return;
+    const ageMinutes = Math.max(1, Math.round((Date.now() - snapshot.savedAt) / 60_000));
+    toast("发现本地恢复草稿", {
+      description: `${snapshot.doc.projectName} · ${ageMinutes} 分钟前保存`,
+      action: {
+        label: "恢复",
+        onClick: () => {
+          dispatch({ type: "LOAD_PROJECT", doc: snapshot.doc });
+          clearRecoverySnapshot();
+          toast.success("已恢复本地草稿");
+        },
+      },
+      cancel: { label: "忽略", onClick: clearRecoverySnapshot },
+    });
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (state.doc.groups.length === 0) return;
+    const timer = window.setTimeout(() => saveRecoverySnapshot(state.doc), 1200);
+    return () => window.clearTimeout(timer);
+  }, [state.doc]);
 
   const selectedVideoRef = useMemo<VideoReference>(() => (
     state.doc.videoFileId
@@ -217,6 +245,7 @@ export function EditorLayout() {
   const handleSave = useCallback(async () => {
     try {
       await subtitleService.saveProject(state.doc);
+      clearRecoverySnapshot();
       toast.success("项目已保存");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "保存失败");
