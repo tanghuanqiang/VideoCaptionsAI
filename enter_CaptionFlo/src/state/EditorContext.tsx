@@ -112,7 +112,10 @@ type Action =
   | { type: "ADD_STYLE"; style: AssStyle }
   | { type: "SELECT"; selection: CaptionSelection }
   | { type: "UPDATE_GROUP"; id: string; patch: Partial<CaptionGroup>; commit?: boolean }
+  | { type: "UPDATE_GROUP_METADATA"; ids: string[]; patch: Partial<Pick<CaptionGroup, "speaker" | "secondaryText" | "reviewStatus">> }
   | { type: "UPDATE_GROUP_OVERRIDES"; ids: string[]; patch: CaptionOverrides }
+  | { type: "SHIFT_SELECTED_TIME"; deltaMs: number }
+  | { type: "NORMALIZE_SELECTED_TIMING"; gapMs: number }
   | { type: "RESET_GROUP_OVERRIDES"; ids: string[] }
   | { type: "APPLY_STYLE"; ids: string[]; styleId: string }
   | { type: "UPDATE_UNIT"; groupId: string; unitId: string; patch: Partial<CaptionOverrides> }
@@ -257,6 +260,13 @@ function reducer(state: EditorState, action: Action): EditorState {
       return action.commit ? commitDoc(state, next) : { ...state, doc: next };
     }
 
+    case "UPDATE_GROUP_METADATA": {
+      const groups = doc.groups.map((g) =>
+        action.ids.includes(g.id) ? { ...g, ...action.patch } : g,
+      );
+      return commitDoc(state, { ...doc, groups: sortGroups(groups) });
+    }
+
     case "UPDATE_GROUP_OVERRIDES": {
       const groups = doc.groups.map((g) =>
         action.ids.includes(g.id)
@@ -264,6 +274,32 @@ function reducer(state: EditorState, action: Action): EditorState {
           : g,
       );
       return commitDoc(state, { ...doc, groups });
+    }
+
+    case "SHIFT_SELECTED_TIME": {
+      const ids = new Set(doc.selection.groupIds);
+      if (ids.size === 0 || !Number.isFinite(action.deltaMs)) return state;
+      const delta = Math.round(action.deltaMs);
+      const groups = doc.groups.map((g) => ids.has(g.id)
+        ? { ...g, startMs: Math.max(0, g.startMs + delta), endMs: Math.max(0, g.endMs + delta) }
+        : g);
+      return commitDoc(state, { ...doc, groups: sortGroups(groups) });
+    }
+
+    case "NORMALIZE_SELECTED_TIMING": {
+      const selected = doc.groups.filter((g) => doc.selection.groupIds.includes(g.id)).sort((a, b) => a.startMs - b.startMs);
+      if (selected.length < 2) return state;
+      const gap = Math.max(0, Math.round(action.gapMs));
+      let cursor = selected[0].startMs;
+      const updates = new Map<string, CaptionGroup>();
+      for (const group of selected) {
+        const duration = Math.max(1, group.endMs - group.startMs);
+        const next = { ...group, startMs: cursor, endMs: cursor + duration };
+        updates.set(group.id, next);
+        cursor = next.endMs + gap;
+      }
+      const groups = doc.groups.map((g) => updates.get(g.id) ?? g);
+      return commitDoc(state, { ...doc, groups: sortGroups(groups) });
     }
 
     case "RESET_GROUP_OVERRIDES": {
