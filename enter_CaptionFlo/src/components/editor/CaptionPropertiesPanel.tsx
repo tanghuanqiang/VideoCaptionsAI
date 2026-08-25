@@ -5,6 +5,7 @@ import { useEditor } from "@/state/EditorContext";
 import { formatMs } from "@/lib/editorUtils";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { graphemesOf } from "@/types/captionModel";
 import {
   ColorField,
   FieldRow,
@@ -18,6 +19,9 @@ export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
   const { dispatch, styleById } = useEditor();
   const style = styleById(group.baseStyleId);
   const o = group.overrides;
+  const durationSeconds = Math.max(0.001, (group.endMs - group.startMs) / 1000);
+  const charsPerSecond = graphemesOf(group.text).length / durationSeconds;
+  const readingTone = charsPerSecond > 9 ? "text-destructive" : charsPerSecond > 7 ? "text-warning-foreground" : "text-success";
 
   const setOverride = (patch: CaptionOverrides) =>
     dispatch({ type: "UPDATE_GROUP_OVERRIDES", ids: [group.id], patch });
@@ -215,6 +219,16 @@ export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
         </FieldRow>
 
         <SectionTitle>时间范围</SectionTitle>
+        <div className="mb-2 grid grid-cols-2 gap-2 rounded-md bg-foreground/5 px-2.5 py-2 text-[11px]">
+          <div>
+            <span className="block text-foreground/45">阅读速度</span>
+            <span className={cn("font-mono tabular-nums", readingTone)}>{charsPerSecond.toFixed(1)} 字/秒</span>
+          </div>
+          <div>
+            <span className="block text-foreground/45">可读性提示</span>
+            <span className="text-foreground/65">{charsPerSecond > 9 ? "建议延长或拆分" : charsPerSecond > 7 ? "接近上限" : "节奏舒适"}</span>
+          </div>
+        </div>
         <FieldRow label="开始">
           <NumberField
             value={group.startMs}
