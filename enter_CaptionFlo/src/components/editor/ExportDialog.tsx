@@ -1,4 +1,4 @@
-import { CheckCircle2, AlertCircle, Loader2, FileText, Film } from "lucide-react";
+import { CheckCircle2, AlertCircle, Loader2, FileText, Film, ShieldAlert } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useEditor } from "@/state/EditorContext";
 import { cn } from "@/lib/utils";
+import { analyzeCaptionQuality } from "@/lib/captionQuality";
 
 interface ExportDialogProps {
   open: boolean;
@@ -37,6 +38,10 @@ export function ExportDialog({
   const done = ex.status === "success";
   const failed = ex.status === "error";
   const idle = ex.status === "idle";
+  const quality = analyzeCaptionQuality(state.doc.groups, state.doc.durationMs, state.doc.qualityProfile);
+  const errors = quality.issues.filter((issue) => issue.severity === "error").length;
+  const warnings = quality.issues.filter((issue) => issue.severity === "warning").length;
+  const reviewed = state.doc.groups.filter((group) => group.reviewStatus === "reviewed").length;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -72,6 +77,21 @@ export function ExportDialog({
                 </p>
               </button>
             ))}
+          </div>
+        )}
+
+        {idle && (
+          <div className={cn(
+            "mt-3 rounded-md border px-3 py-2.5 text-xs",
+            errors > 0 ? "border-destructive/30 bg-destructive/10" : warnings > 0 ? "border-warning/30 bg-warning/10" : "border-success/25 bg-success/10",
+          )}>
+            <div className="flex items-center gap-2 font-medium">
+              <ShieldAlert className="h-4 w-4" />
+              <span>{errors > 0 ? "存在质量错误，请确认后导出" : warnings > 0 ? "可以导出，但建议先处理提醒" : "导出检查通过"}</span>
+            </div>
+            <p className="mt-1 text-[11px] text-foreground/60">
+              {errors} 个错误 · {warnings} 个提醒 · 已审校 {reviewed}/{state.doc.groups.length} 条
+            </p>
           </div>
         )}
 
