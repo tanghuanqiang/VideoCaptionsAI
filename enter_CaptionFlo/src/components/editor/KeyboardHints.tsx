@@ -9,11 +9,14 @@ import {
 const shortcuts: Array<{ keys: string[]; desc: string }> = [
   { keys: ["Space"], desc: "播放 / 暂停" },
   { keys: ["←", "→"], desc: "后退 / 前进 5 秒" },
+  { keys: ["↑", "↓"], desc: "切换相邻字幕" },
+  { keys: ["Shift", "↑", "↓"], desc: "跳到上一条 / 下一条待审校字幕" },
   { keys: ["Cmd", "Z"], desc: "撤销" },
   { keys: ["Cmd", "Shift", "Z"], desc: "重做" },
   { keys: ["C"], desc: "切换切割模式" },
   { keys: ["E"], desc: "切换编辑模式" },
   { keys: ["M"], desc: "合并所选字幕" },
+  { keys: ["D"], desc: "复制所选字幕" },
   { keys: ["Delete"], desc: "删除所选字幕" },
   { keys: ["Esc"], desc: "取消选择 / 退出切割" },
 ];

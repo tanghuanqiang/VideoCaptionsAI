@@ -34,9 +34,14 @@ export function useKeyboardShortcuts({
         const groups = [...state.doc.groups].sort((a, b) => a.startMs - b.startMs);
         const currentId = state.doc.selection.groupIds[0];
         const currentIndex = Math.max(0, groups.findIndex((group) => group.id === currentId));
-        const nextIndex = e.key === "ArrowUp"
-          ? Math.max(0, currentIndex - 1)
-          : Math.min(Math.max(0, groups.length - 1), currentIndex + 1);
+        const direction = e.key === "ArrowUp" ? -1 : 1;
+        const candidates = e.shiftKey
+          ? groups.map((group, index) => ({ group, index })).filter(({ group }) => group.reviewStatus !== "reviewed")
+          : groups.map((group, index) => ({ group, index }));
+        const orderedCandidates = direction > 0 ? candidates : [...candidates].reverse();
+        const nextCandidate = orderedCandidates.find(({ index }) => direction > 0 ? index > currentIndex : index < currentIndex);
+        const fallback = direction > 0 ? candidates[0] : candidates[candidates.length - 1];
+        const nextIndex = nextCandidate?.index ?? fallback?.index ?? currentIndex;
         const next = groups[nextIndex];
         if (next) {
           dispatch({ type: "SELECT", selection: { groupIds: [next.id], unitIds: [] } });
