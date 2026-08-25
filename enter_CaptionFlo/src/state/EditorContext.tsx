@@ -152,9 +152,18 @@ function normalizeDocSelection(doc: EditorDoc): EditorDoc {
   return { ...doc, selection: normalizeSelection(doc, doc.selection) };
 }
 
+function sameDoc(left: EditorDoc, right: EditorDoc): boolean {
+  try {
+    return JSON.stringify(left) === JSON.stringify(right);
+  } catch {
+    return left === right;
+  }
+}
+
 /** Wrap a doc mutation with history push. */
 function commitDoc(state: EditorState, next: EditorDoc): EditorState {
   const normalized = normalizeDocSelection(next);
+  if (sameDoc(state.doc, normalized)) return state;
   return {
     ...state,
     doc: normalized,
