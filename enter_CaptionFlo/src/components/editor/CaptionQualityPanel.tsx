@@ -13,6 +13,7 @@ import {
 } from "@/lib/captionQuality";
 import { useEditor } from "@/state/EditorContext";
 import { cn } from "@/lib/utils";
+import { diagnoseCaptionGroups } from "@/lib/projectDiagnostics";
 
 const severityClass = {
   error: "bg-destructive/10 text-destructive",
@@ -34,6 +35,10 @@ export function CaptionQualityPanel() {
   const report = useMemo(
     () => analyzeCaptionQuality(deferredGroups, state.doc.durationMs, state.doc.qualityProfile),
     [deferredGroups, state.doc.durationMs, state.doc.qualityProfile],
+  );
+  const diagnostics = useMemo(
+    () => diagnoseCaptionGroups(deferredGroups, state.doc.durationMs, state.doc.styles.map((style) => style.id)),
+    [deferredGroups, state.doc.durationMs, state.doc.styles],
   );
   const errors = report.issues.filter((issue) => issue.severity === "error").length;
   const warnings = report.issues.filter((issue) => issue.severity === "warning").length;
@@ -150,6 +155,14 @@ export function CaptionQualityPanel() {
           <span>{warnings} 个需关注</span>
           <span>{report.issues.length} 个问题</span>
         </div>
+        {diagnostics.length > 0 && (
+          <div className="mt-2 rounded-md border border-destructive/20 bg-destructive/5 px-2.5 py-2">
+            <div className="text-[11px] font-medium text-destructive">数据完整性：{diagnostics.length} 项</div>
+            <div className="mt-1 space-y-0.5 text-[10px] text-foreground/60">
+              {diagnostics.slice(0, 3).map((diagnostic) => <div key={diagnostic.id}>{diagnostic.message}</div>)}
+            </div>
+          </div>
+        )}
         <button
           onClick={exportReport}
           className="mt-3 flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-border text-xs font-medium text-foreground/75 transition-colors hover:bg-foreground/5"

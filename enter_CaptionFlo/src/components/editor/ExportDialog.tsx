@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useEditor } from "@/state/EditorContext";
 import { cn } from "@/lib/utils";
 import { analyzeCaptionQuality } from "@/lib/captionQuality";
+import { diagnoseCaptionGroups } from "@/lib/projectDiagnostics";
 
 interface ExportDialogProps {
   open: boolean;
@@ -42,6 +43,7 @@ export function ExportDialog({
   const errors = quality.issues.filter((issue) => issue.severity === "error").length;
   const warnings = quality.issues.filter((issue) => issue.severity === "warning").length;
   const reviewed = state.doc.groups.filter((group) => group.reviewStatus === "reviewed").length;
+  const diagnostics = diagnoseCaptionGroups(state.doc.groups, state.doc.durationMs, state.doc.styles.map((style) => style.id));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -90,7 +92,7 @@ export function ExportDialog({
               <span>{errors > 0 ? "存在质量错误，请确认后导出" : warnings > 0 ? "可以导出，但建议先处理提醒" : "导出检查通过"}</span>
             </div>
             <p className="mt-1 text-[11px] text-foreground/60">
-              {errors} 个错误 · {warnings} 个提醒 · 已审校 {reviewed}/{state.doc.groups.length} 条
+              {errors} 个错误 · {warnings} 个提醒 · 数据异常 {diagnostics.length} 项 · 已审校 {reviewed}/{state.doc.groups.length} 条
             </p>
           </div>
         )}
