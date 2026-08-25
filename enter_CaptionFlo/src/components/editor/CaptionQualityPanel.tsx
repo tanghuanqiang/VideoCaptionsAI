@@ -5,6 +5,7 @@ import {
   analyzeCaptionQuality,
   captionQualityProfiles,
   repairCaptionSegmentation,
+  repairCaptionOverlaps,
   repairCaptionTiming,
   type CaptionQualityIssue,
 } from "@/lib/captionQuality";
@@ -33,6 +34,7 @@ export function CaptionQualityPanel() {
   );
   const errors = report.issues.filter((issue) => issue.severity === "error").length;
   const warnings = report.issues.filter((issue) => issue.severity === "warning").length;
+  const overlapCount = report.issues.filter((issue) => issue.kind === "overlap").length;
   const speakerStats = useMemo(() => {
     const map = new Map<string, { count: number; duration: number; pending: number }>();
     for (const group of state.doc.groups) {
@@ -80,6 +82,12 @@ export function CaptionQualityPanel() {
     }
     dispatch({ type: "SET_GROUPS", groups: next, commit: true });
     toast.success(`已按停顿拆分 ${report.segmentableGroupIds.length} 条长字幕`);
+  };
+
+  const fixOverlaps = () => {
+    if (overlapCount === 0) return;
+    dispatch({ type: "SET_GROUPS", groups: repairCaptionOverlaps(state.doc.groups), commit: true });
+    toast.success(`已修复 ${overlapCount} 处时间重叠`);
   };
 
   if (state.doc.groups.length === 0) {
@@ -144,6 +152,14 @@ export function CaptionQualityPanel() {
           >
             <Scissors className="h-3.5 w-3.5" />
             按停顿拆分 {report.segmentableGroupIds.length} 条长字幕
+          </button>
+        )}
+        {overlapCount > 0 && (
+          <button
+            onClick={fixOverlaps}
+            className="mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-destructive/25 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
+          >
+            修复 {overlapCount} 处时间重叠
           </button>
         )}
       </div>

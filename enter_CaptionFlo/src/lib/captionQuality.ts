@@ -311,6 +311,20 @@ export function repairCaptionTiming(
   return groups.map((group) => repaired.get(group.id) ?? group);
 }
 
+/** Trim only the earlier caption when adjacent captions overlap. */
+export function repairCaptionOverlaps(groups: CaptionGroup[]): CaptionGroup[] {
+  const ordered = [...groups].sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
+  const repaired = new Map<string, CaptionGroup>();
+  for (let index = 0; index < ordered.length - 1; index += 1) {
+    const current = repaired.get(ordered[index].id) ?? ordered[index];
+    const next = repaired.get(ordered[index + 1].id) ?? ordered[index + 1];
+    if (current.endMs > next.startMs) {
+      repaired.set(current.id, { ...current, endMs: Math.max(current.startMs + 1, next.startMs) });
+    }
+  }
+  return groups.map((group) => repaired.get(group.id) ?? group);
+}
+
 /**
  * Split long captions at their nearest natural pause. Timing stays inside the
  * original interval, while word/unit timing data is assigned to its new segment.
