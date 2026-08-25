@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { Search, ListFilter, Captions, ClipboardCheck } from "lucide-react";
+import { Search, ListFilter, Captions, ClipboardCheck, Gauge } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useEditor } from "@/state/EditorContext";
 import { formatMs, isGroupEstimated } from "@/lib/editorUtils";
 import { cn } from "@/lib/utils";
 import type { CaptionGroup } from "@/types/captionModel";
+import { analyzeCaptionQuality } from "@/lib/captionQuality";
 
 export function SubtitleList() {
   const { state, dispatch } = useEditor();
@@ -12,6 +13,7 @@ export function SubtitleList() {
   const [onlyEstimated, setOnlyEstimated] = useState(false);
   const [onlyUnreviewed, setOnlyUnreviewed] = useState(false);
   const [speakerFilter, setSpeakerFilter] = useState("all");
+  const [onlyIssues, setOnlyIssues] = useState(false);
   const { groups, selection } = state.doc;
   const speakers = useMemo(
     () => [...new Set(groups.map((g) => g.speaker?.trim()).filter((v): v is string => !!v))].sort(),
@@ -19,6 +21,10 @@ export function SubtitleList() {
   );
   const reviewedCount = groups.filter((group) => group.reviewStatus === "reviewed").length;
   const reviewProgress = groups.length ? Math.round((reviewedCount / groups.length) * 100) : 0;
+  const issueIds = useMemo(
+    () => new Set(analyzeCaptionQuality(groups, state.doc.durationMs, state.doc.qualityProfile).issues.map((issue) => issue.groupId)),
+    [groups, state.doc.durationMs, state.doc.qualityProfile],
+  );
 
   const filtered = useMemo(() => {
     return groups.filter((g) => {
@@ -26,9 +32,10 @@ export function SubtitleList() {
       if (onlyEstimated && !isGroupEstimated(g)) return false;
       if (onlyUnreviewed && g.reviewStatus === "reviewed") return false;
       if (speakerFilter !== "all" && (g.speaker?.trim() || "未标注") !== speakerFilter) return false;
+      if (onlyIssues && !issueIds.has(g.id)) return false;
       return true;
     });
-  }, [groups, query, onlyEstimated, onlyUnreviewed, speakerFilter]);
+  }, [groups, query, onlyEstimated, onlyUnreviewed, speakerFilter, onlyIssues, issueIds]);
 
   const handleSelect = (group: CaptionGroup, e: React.MouseEvent) => {
     const ids = selection.groupIds;
@@ -69,6 +76,16 @@ export function SubtitleList() {
             title="仅显示待审校字幕"
           >
             <ClipboardCheck className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setOnlyIssues((v) => !v)}
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+              onlyIssues ? "bg-destructive/15 text-destructive" : "text-foreground/50 hover:bg-foreground/5",
+            )}
+            title="仅显示体检有问题的字幕"
+          >
+            <Gauge className="h-4 w-4" />
           </button>
           <button
             onClick={() => setOnlyEstimated((v) => !v)}
