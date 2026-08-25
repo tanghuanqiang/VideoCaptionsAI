@@ -3,6 +3,7 @@ import type { CaptionGroup } from "@/types/captionModel";
 export interface ContentChapter {
   startMs: number;
   title: string;
+  confirmed?: boolean;
 }
 
 export interface ContentHighlight {
@@ -12,6 +13,7 @@ export interface ContentHighlight {
   secondaryText?: string;
   speaker?: string;
   score: number;
+  confirmed?: boolean;
 }
 
 const CHAPTER_GAP_MS = 3500;
@@ -53,13 +55,20 @@ export function deriveContentChapters(groups: CaptionGroup[]): ContentChapter[] 
     .sort((a, b) => a.startMs - b.startMs);
   if (ordered.length === 0) return [];
 
-  return ordered.flatMap((group, index) => {
+  const confirmed = ordered.filter((group) => group.contentTag === "chapter").map((group) => ({
+    startMs: group.startMs,
+    title: titleFromCaption(group.text),
+    confirmed: true,
+  }));
+  const confirmedStarts = new Set(confirmed.map((chapter) => chapter.startMs));
+  const inferred = ordered.flatMap((group, index) => {
     const previous = ordered[index - 1];
     const gapMs = previous ? group.startMs - previous.endMs : CHAPTER_GAP_MS;
-    return gapMs >= CHAPTER_GAP_MS
-      ? [{ startMs: group.startMs, title: titleFromCaption(group.text) }]
+    return gapMs >= CHAPTER_GAP_MS && !confirmedStarts.has(group.startMs)
+      ? [{ startMs: group.startMs, title: titleFromCaption(group.text), confirmed: false }]
       : [];
   });
+  return [...confirmed, ...inferred].sort((a, b) => a.startMs - b.startMs);
 }
 
 export function deriveContentHighlights(groups: CaptionGroup[], limit = 5): ContentHighlight[] {
@@ -71,7 +80,8 @@ export function deriveContentHighlights(groups: CaptionGroup[], limit = 5): Cont
       text: compact(group.text),
       secondaryText: group.secondaryText?.trim() || undefined,
       speaker: group.speaker?.trim() || undefined,
-      score: highlightScore(group),
+      score: highlightScore(group) + (group.contentTag === "highlight" ? 100 : 0),
+      confirmed: group.contentTag === "highlight",
     }))
     .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score || a.startMs - b.startMs)

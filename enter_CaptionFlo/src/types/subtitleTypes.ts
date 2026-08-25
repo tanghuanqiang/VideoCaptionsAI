@@ -47,6 +47,7 @@ export interface SubtitleEvent {
   secondaryText?: string;
   speaker?: string;
   reviewStatus?: "draft" | "needs-review" | "reviewed";
+  contentTag?: "chapter" | "highlight";
   words?: WordTimestamp[];
   style?: string;
   overrides?: CaptionOverrides;
@@ -102,6 +103,7 @@ export interface Subtitle {
   text: string;
   secondaryText?: string;
   speaker?: string;
+  contentTag?: "chapter" | "highlight";
   style: string;
   group: string;
   selected?: boolean;

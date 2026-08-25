@@ -16,6 +16,7 @@ export type {
 } from "./subtitleTypes";
 export type TimingSource = "asr-word" | "estimated";
 export type CaptionReviewStatus = "draft" | "needs-review" | "reviewed";
+export type CaptionContentTag = "chapter" | "highlight";
 
 export interface CaptionGroup {
   id: string;
@@ -23,6 +24,7 @@ export interface CaptionGroup {
   secondaryText?: string;
   speaker?: string;
   reviewStatus?: CaptionReviewStatus;
+  contentTag?: CaptionContentTag;
   startMs: number;
   endMs: number;
   baseStyleId: string;
@@ -65,6 +67,7 @@ export const captionGroupToSubtitle = (group: CaptionGroup): Subtitle => ({
   secondaryText: group.secondaryText,
   speaker: group.speaker,
   reviewStatus: group.reviewStatus,
+  contentTag: group.contentTag,
   style: group.baseStyleId,
   group: "",
   overrides: group.overrides,
@@ -90,6 +93,7 @@ export const subtitleToCaptionGroup = (
   secondaryText: subtitle.secondaryText,
   speaker: subtitle.speaker,
   reviewStatus: subtitle.reviewStatus,
+  contentTag: subtitle.contentTag,
   startMs: Math.round(toSeconds(subtitle.start) * 1000),
   endMs: Math.round(toSeconds(subtitle.end) * 1000),
   baseStyleId: styleId,

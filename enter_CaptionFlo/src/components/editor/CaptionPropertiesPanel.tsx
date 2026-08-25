@@ -14,7 +14,7 @@ import {
   SectionTitle,
 } from "./PropertyControls";
 import { StyleAssignRow } from "./StylePresetsPanel";
-import type { CaptionGroup, CaptionOverrides, CaptionReviewStatus } from "@/types/captionModel";
+import type { CaptionContentTag, CaptionGroup, CaptionOverrides, CaptionReviewStatus } from "@/types/captionModel";
 
 export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
   const { dispatch, styleById } = useEditor();
@@ -48,6 +48,9 @@ export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
 
   const setReviewStatus = (reviewStatus: CaptionReviewStatus) =>
     dispatch({ type: "UPDATE_GROUP", id: group.id, patch: { reviewStatus }, commit: true });
+
+  const setContentTag = (contentTag?: CaptionContentTag) =>
+    dispatch({ type: "UPDATE_GROUP", id: group.id, patch: { contentTag }, commit: true });
 
   const setTime = (patch: { startMs?: number; endMs?: number }) =>
     dispatch({ type: "UPDATE_GROUP", id: group.id, patch, commit: true });
@@ -136,6 +139,21 @@ export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
                 (group.reviewStatus ?? "draft") === value
                   ? "bg-card font-medium text-primary shadow-soft"
                   : "text-foreground/55 hover:bg-card/60",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <SectionTitle>内容资产</SectionTitle>
+        <div className="grid grid-cols-3 gap-1 rounded-md bg-foreground/5 p-1">
+          {([[undefined, "普通"], ["chapter", "章节"], ["highlight", "高光"]] as const).map(([value, label]) => (
+            <button
+              key={label}
+              onClick={() => setContentTag(value)}
+              className={cn(
+                "rounded px-1 py-1.5 text-[11px] transition-colors",
+                group.contentTag === value ? "bg-card font-medium text-primary shadow-soft" : "text-foreground/55 hover:bg-card/60",
               )}
             >
               {label}
