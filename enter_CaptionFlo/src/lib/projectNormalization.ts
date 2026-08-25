@@ -59,7 +59,8 @@ export function normalizeCaptionGroup(value: unknown, index: number, durationMs:
   if (!entry) return null;
   const id = stringValue(entry.id).trim() || `caption-${index + 1}`;
   const text = stringValue(entry.text);
-  const startMs = Math.max(0, finiteNumber(entry.startMs, 0));
+  const rawStartMs = Math.max(0, finiteNumber(entry.startMs, 0));
+  const startMs = durationMs > 0 ? Math.min(rawStartMs, Math.max(0, durationMs - 1)) : rawStartMs;
   const rawEndMs = finiteNumber(entry.endMs, startMs + 1000);
   const maxEnd = durationMs > 0 ? durationMs : Number.POSITIVE_INFINITY;
   const endMs = Math.min(maxEnd, Math.max(startMs + 1, rawEndMs));

@@ -1,8 +1,10 @@
 import type { EditorDoc } from "@/state/EditorContext";
 
 const RECOVERY_KEY = "captionflo:recovery:v1";
+const RECOVERY_VERSION = 1;
 
 interface RecoverySnapshot {
+  version: number;
   savedAt: number;
   doc: EditorDoc;
 }
@@ -14,6 +16,7 @@ function canUseStorage(): boolean {
 export function saveRecoverySnapshot(doc: EditorDoc): void {
   if (!canUseStorage() || doc.groups.length === 0) return;
   const snapshot: RecoverySnapshot = {
+    version: RECOVERY_VERSION,
     savedAt: Date.now(),
     doc: {
       ...doc,
@@ -36,7 +39,7 @@ export function readRecoverySnapshot(): RecoverySnapshot | null {
     const raw = window.localStorage.getItem(RECOVERY_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<RecoverySnapshot>;
-    if (!parsed || typeof parsed.savedAt !== "number" || !parsed.doc || !Array.isArray(parsed.doc.groups)) return null;
+    if (!parsed || parsed.version !== RECOVERY_VERSION || typeof parsed.savedAt !== "number" || !parsed.doc || !Array.isArray(parsed.doc.groups)) return null;
     return parsed as RecoverySnapshot;
   } catch {
     return null;

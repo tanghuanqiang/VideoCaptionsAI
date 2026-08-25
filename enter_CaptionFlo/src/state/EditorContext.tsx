@@ -18,6 +18,7 @@ import {
   splitCaptionGroupAtGrapheme,
 } from "@/types/captionModel";
 import { defaultStyle, stylePresets } from "@/constants";
+import { normalizeCaptionGroups, normalizeStyles } from "@/lib/projectNormalization";
 import {
   DEFAULT_CAPTION_QUALITY_PROFILE,
   type CaptionQualityProfile,
@@ -216,12 +217,14 @@ function reducer(state: EditorState, action: Action): EditorState {
       {
       const loadedDoc = normalizeDocSelection({
         ...action.doc,
+        projectName: action.doc.projectName?.trim() || "未命名项目",
+        durationMs: Number.isFinite(action.doc.durationMs) ? Math.max(0, action.doc.durationMs) : 0,
         selection: action.doc.selection ?? { groupIds: [], unitIds: [] },
-        styles: action.doc.styles?.length ? action.doc.styles : doc.styles,
+        styles: normalizeStyles(action.doc.styles, doc.styles),
         videoFileId: action.doc.videoFileId ?? null,
         videoPath: action.doc.videoPath ?? null,
         videoUrl: action.doc.videoUrl ?? null,
-        groups: Array.isArray(action.doc.groups) ? action.doc.groups : [],
+        groups: normalizeCaptionGroups(action.doc.groups, Number.isFinite(action.doc.durationMs) ? Math.max(0, action.doc.durationMs) : 0, doc.styles[0]?.id ?? "Default"),
       });
       return {
         ...state,
