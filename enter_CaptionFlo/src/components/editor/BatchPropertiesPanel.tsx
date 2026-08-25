@@ -144,6 +144,17 @@ export function BatchPropertiesPanel({ groups }: { groups: CaptionGroup[] }) {
             variant="subtle"
             size="sm"
             className="flex-1"
+            onClick={() => {
+              dispatch({ type: "DUPLICATE_SELECTED" });
+              toast.success(`已复制 ${ids.length} 条字幕，偏移 250ms`);
+            }}
+          >
+            复制所选
+          </Button>
+          <Button
+            variant="subtle"
+            size="sm"
+            className="flex-1"
             onClick={() => dispatch({ type: "MERGE_SELECTED" })}
           >
             合并所选

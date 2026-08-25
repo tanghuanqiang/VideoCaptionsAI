@@ -29,6 +29,22 @@ export function useKeyboardShortcuts({
         return;
       }
 
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        e.preventDefault();
+        const groups = [...state.doc.groups].sort((a, b) => a.startMs - b.startMs);
+        const currentId = state.doc.selection.groupIds[0];
+        const currentIndex = Math.max(0, groups.findIndex((group) => group.id === currentId));
+        const nextIndex = e.key === "ArrowUp"
+          ? Math.max(0, currentIndex - 1)
+          : Math.min(Math.max(0, groups.length - 1), currentIndex + 1);
+        const next = groups[nextIndex];
+        if (next) {
+          dispatch({ type: "SELECT", selection: { groupIds: [next.id], unitIds: [] } });
+          dispatch({ type: "SET_CURRENT_MS", ms: next.startMs });
+        }
+        return;
+      }
+
       switch (e.key) {
         case " ":
           e.preventDefault();
@@ -55,6 +71,11 @@ export function useKeyboardShortcuts({
           if (state.doc.selection.groupIds.length >= 2)
             dispatch({ type: "MERGE_SELECTED" });
           break;
+        case "d":
+        case "D":
+          if (state.doc.selection.groupIds.length > 0)
+            dispatch({ type: "DUPLICATE_SELECTED" });
+          break;
         case "Backspace":
         case "Delete":
           if (state.doc.selection.groupIds.length > 0)
@@ -69,5 +90,5 @@ export function useKeyboardShortcuts({
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [dispatch, onTogglePlay, onSeek, state.doc.selection.groupIds.length]);
+  }, [dispatch, onTogglePlay, onSeek, state.doc.groups, state.doc.selection.groupIds]);
 }

@@ -123,6 +123,7 @@ type Action =
   | { type: "SPLIT_GROUP"; groupId: string; graphemeIndex: number }
   | { type: "MERGE_SELECTED" }
   | { type: "DELETE_SELECTED" }
+  | { type: "DUPLICATE_SELECTED"; offsetMs?: number }
   | { type: "ASR_START" }
   | { type: "ASR_PROGRESS"; progress: number; label: string }
   | { type: "ASR_SUCCESS"; groups: CaptionGroup[]; styles?: AssStyle[] }
@@ -389,6 +390,31 @@ function reducer(state: EditorState, action: Action): EditorState {
         ...doc,
         groups,
         selection: { groupIds: [], unitIds: [] },
+      });
+    }
+
+    case "DUPLICATE_SELECTED": {
+      const selected = doc.groups.filter((g) => doc.selection.groupIds.includes(g.id));
+      if (selected.length === 0) return state;
+      const offset = Math.max(1, Math.round(action.offsetMs ?? 250));
+      const makeId = (base: string, index: number) => `${base}-copy-${Date.now()}-${index}`;
+      const copies = selected.map((group, index) => ({
+        ...group,
+        id: makeId(group.id, index),
+        startMs: group.startMs + offset,
+        endMs: group.endMs + offset,
+        units: group.units.map((unit, unitIndex) => ({
+          ...unit,
+          id: `${makeId(group.id, index)}-unit-${unitIndex + 1}`,
+          startMs: unit.startMs + offset,
+          endMs: unit.endMs + offset,
+        })),
+        words: group.words?.map((word) => ({ ...word, start: word.start + offset / 1000, end: word.end + offset / 1000 })),
+      }));
+      return commitDoc(state, {
+        ...doc,
+        groups: sortGroups([...doc.groups, ...copies]),
+        selection: { groupIds: copies.map((group) => group.id), unitIds: [] },
       });
     }
 
