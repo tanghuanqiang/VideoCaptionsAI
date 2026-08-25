@@ -57,7 +57,10 @@ export function NumberField({
         max={max}
         step={step}
         placeholder={mixed ? "混合" : undefined}
-        onChange={(e) => onChange(Number(e.target.value))}
+        onChange={(e) => {
+          const value = Number(e.target.value);
+          if (Number.isFinite(value)) onChange(value);
+        }}
         className="h-8 w-full rounded-md border border-input bg-card px-2 pr-6 text-right text-xs tabular-nums outline-none focus:border-primary focus:ring-1 focus:ring-primary"
       />
       {suffix && (

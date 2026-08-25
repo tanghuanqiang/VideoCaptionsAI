@@ -182,6 +182,20 @@ function shiftedRange(startMs: number, endMs: number, offsetMs: number, duration
   return { startMs: nextStart, endMs: nextStart + duration };
 }
 
+function clampMs(ms: number, durationMs: number): number {
+  if (!Number.isFinite(ms)) return 0;
+  return durationMs > 0 ? Math.min(Math.max(0, ms), durationMs) : Math.max(0, ms);
+}
+
+function normalizeGroupTiming(group: CaptionGroup, durationMs: number, patch: Partial<CaptionGroup>): Partial<CaptionGroup> {
+  const startMs = clampMs(Number.isFinite(patch.startMs) ? patch.startMs as number : group.startMs, durationMs);
+  const rawEnd = Number.isFinite(patch.endMs) ? patch.endMs as number : group.endMs;
+  const endMs = durationMs > 0
+    ? Math.min(durationMs, Math.max(startMs + 1, rawEnd))
+    : Math.max(startMs + 1, rawEnd);
+  return { ...patch, startMs, endMs };
+}
+
 function reducer(state: EditorState, action: Action): EditorState {
   const { doc } = state;
   switch (action.type) {
@@ -189,6 +203,8 @@ function reducer(state: EditorState, action: Action): EditorState {
       return { ...state, doc: { ...doc, projectName: action.name } };
 
     case "LOAD_VIDEO":
+      {
+      const durationMs = Number.isFinite(action.durationMs) ? Math.max(0, action.durationMs ?? 0) : doc.durationMs;
       return {
         ...state,
         video: "loaded",
@@ -198,9 +214,10 @@ function reducer(state: EditorState, action: Action): EditorState {
           videoName: action.name,
           videoFileId: action.fileId ?? doc.videoFileId,
           videoPath: action.filePath ?? doc.videoPath,
-          durationMs: action.durationMs ?? doc.durationMs,
+          durationMs,
         },
       };
+      }
 
     case "SET_VIDEO_SOURCE":
       return {
@@ -248,7 +265,10 @@ function reducer(state: EditorState, action: Action): EditorState {
       }
 
     case "SET_DURATION":
-      return { ...state, doc: { ...doc, durationMs: action.durationMs } };
+      {
+      const durationMs = Number.isFinite(action.durationMs) ? Math.max(0, action.durationMs) : doc.durationMs;
+      return { ...state, doc: { ...doc, durationMs }, currentMs: clampMs(state.currentMs, durationMs) };
+      }
 
     case "SET_QUALITY_PROFILE":
       return commitDoc(state, { ...doc, qualityProfile: action.profile });
@@ -263,7 +283,7 @@ function reducer(state: EditorState, action: Action): EditorState {
       };
 
     case "SET_CURRENT_MS":
-      return { ...state, currentMs: action.ms };
+      return { ...state, currentMs: clampMs(action.ms, doc.durationMs) };
 
     case "SET_PLAYING":
       return { ...state, isPlaying: action.playing };
@@ -288,8 +308,13 @@ function reducer(state: EditorState, action: Action): EditorState {
       return { ...state, doc: { ...doc, selection: normalizeSelection(doc, action.selection) } };
 
     case "UPDATE_GROUP": {
+      const currentGroup = doc.groups.find((group) => group.id === action.id);
+      if (!currentGroup) return state;
+      const safePatch = action.patch.startMs !== undefined || action.patch.endMs !== undefined
+        ? normalizeGroupTiming(currentGroup, doc.durationMs, action.patch)
+        : action.patch;
       const groups = doc.groups.map((g) =>
-        g.id === action.id ? { ...g, ...action.patch } : g,
+        g.id === action.id ? { ...g, ...safePatch } : g,
       );
       const next = normalizeDocSelection({ ...doc, groups: sortGroups(groups) });
       return action.commit ? commitDoc(state, next) : { ...state, doc: next };
