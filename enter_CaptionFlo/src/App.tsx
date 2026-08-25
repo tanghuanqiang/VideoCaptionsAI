@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { EditorProvider } from "@/state/EditorContext";
 import { routers } from "./router";
+import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -16,7 +17,9 @@ const App = () => {
         <EditorProvider>
           <Toaster />
           <Sonner />
-          <RouterProvider router={router} />
+          <AppErrorBoundary>
+            <RouterProvider router={router} />
+          </AppErrorBoundary>
         </EditorProvider>
       </TooltipProvider>
     </QueryClientProvider>
