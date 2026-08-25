@@ -1,20 +1,22 @@
 import { useMemo, useRef, useState } from "react";
-import { Scissors, Film, Captions } from "lucide-react";
+import { Scissors, Film, Captions, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import { useEditor } from "@/state/EditorContext";
 import { formatClock, isGroupEstimated } from "@/lib/editorUtils";
 import { graphemesOf } from "@/types/captionModel";
 import { cn } from "@/lib/utils";
 import type { CaptionGroup } from "@/types/captionModel";
 
-const PX_PER_SEC = 80;
+const BASE_PX_PER_SEC = 80;
 
 export function Timeline() {
   const { state, dispatch } = useEditor();
   const { doc, currentMs, mode } = state;
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  const pxPerSec = BASE_PX_PER_SEC * zoom;
 
   const durationMs = doc.durationMs || 20000;
-  const totalWidth = (durationMs / 1000) * PX_PER_SEC;
+  const totalWidth = (durationMs / 1000) * pxPerSec;
 
   const ticks = useMemo(() => {
     const arr: number[] = [];
@@ -23,13 +25,13 @@ export function Timeline() {
     return arr;
   }, [durationMs]);
 
-  const msToX = (ms: number) => (ms / 1000) * PX_PER_SEC;
+  const msToX = (ms: number) => (ms / 1000) * pxPerSec;
 
   const handleRulerClick = (e: React.MouseEvent) => {
     if (mode === "cut") return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left + (scrollRef.current?.scrollLeft ?? 0);
-    dispatch({ type: "SET_CURRENT_MS", ms: (x / PX_PER_SEC) * 1000 });
+    dispatch({ type: "SET_CURRENT_MS", ms: (x / pxPerSec) * 1000 });
   };
 
   return (
@@ -43,7 +45,11 @@ export function Timeline() {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3 text-[11px] text-foreground/50">
+        <div className="flex items-center gap-2 text-[11px] text-foreground/50">
+          <button onClick={() => setZoom((value) => Math.max(0.5, Number((value - 0.25).toFixed(2))))} className="flex h-6 w-6 items-center justify-center rounded hover:bg-foreground/5" title="缩小时间轴"><ZoomOut className="h-3.5 w-3.5" /></button>
+          <span className="w-9 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
+          <button onClick={() => setZoom((value) => Math.min(4, Number((value + 0.25).toFixed(2))))} className="flex h-6 w-6 items-center justify-center rounded hover:bg-foreground/5" title="放大时间轴"><ZoomIn className="h-3.5 w-3.5" /></button>
+          <button onClick={() => setZoom(1)} className="flex h-6 w-6 items-center justify-center rounded hover:bg-foreground/5" title="重置时间轴缩放"><Maximize2 className="h-3.5 w-3.5" /></button>
           <span className="flex items-center gap-1">
             <span className="h-1.5 w-1.5 rounded-full bg-timing-asr" /> 已校准
           </span>
