@@ -28,6 +28,14 @@ function timestamp(ms: number): string {
     : `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+function parseTimestamp(value: string): number | null {
+  const parts = value.trim().split(":").map(Number);
+  if (parts.some((part) => !Number.isFinite(part))) return null;
+  if (parts.length === 2) return (parts[0] * 60 + parts[1]) * 1000;
+  if (parts.length === 3) return (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
+  return null;
+}
+
 function compact(text: string): string {
   return text.replace(/\s+/gu, " ").trim();
 }
@@ -153,6 +161,57 @@ export function buildCaptionReviewCsv(groups: CaptionGroup[]): string {
       group.secondaryText?.trim(),
     ].map(csvCell).join(","));
   return `\uFEFF${[header.map(csvCell).join(","), ...rows].join("\r\n")}\r\n`;
+}
+
+function parseCsvRow(row: string): string[] {
+  const values: string[] = [];
+  let value = "";
+  let quoted = false;
+  for (let index = 0; index < row.length; index += 1) {
+    const char = row[index];
+    if (char === "\"" && quoted && row[index + 1] === "\"") { value += "\""; index += 1; continue; }
+    if (char === "\"") { quoted = !quoted; continue; }
+    if (char === "," && !quoted) { values.push(value); value = ""; continue; }
+    value += char;
+  }
+  values.push(value);
+  return values;
+}
+
+export function importCaptionReviewCsv(csv: string, groups: CaptionGroup[]): { groups: CaptionGroup[]; updated: number } {
+  const rows = csv.replace(/^\uFEFF/u, "").split(/\r?\n/u).filter(Boolean);
+  if (rows.length < 2) return { groups, updated: 0 };
+  const header = parseCsvRow(rows[0]);
+  const indexOf = (name: string) => header.indexOf(name);
+  const startIndex = indexOf("开始");
+  const endIndex = indexOf("结束");
+  if (startIndex < 0 || endIndex < 0) return { groups, updated: 0 };
+  const speakerIndex = indexOf("说话人");
+  const reviewIndex = indexOf("审校状态");
+  const textIndex = indexOf("主字幕");
+  const secondaryIndex = indexOf("副字幕");
+  let updated = 0;
+  const next = groups.map((group) => {
+    const row = rows.slice(1).map(parseCsvRow).find((values) => {
+      const start = parseTimestamp(values[startIndex] ?? "");
+      const end = parseTimestamp(values[endIndex] ?? "");
+      return start !== null && end !== null && Math.abs(start - group.startMs) <= 20 && Math.abs(end - group.endMs) <= 20;
+    });
+    if (!row) return group;
+    updated += 1;
+    const review = row[reviewIndex] === "reviewed" || row[reviewIndex] === "needs-review" || row[reviewIndex] === "draft" ? row[reviewIndex] : group.reviewStatus;
+    return {
+      ...group,
+      text: textIndex >= 0 && row[textIndex] !== undefined ? row[textIndex] : group.text,
+      secondaryText: secondaryIndex >= 0 ? row[secondaryIndex] || undefined : group.secondaryText,
+      speaker: speakerIndex >= 0 ? row[speakerIndex] || undefined : group.speaker,
+      reviewStatus: review,
+      units: textIndex >= 0 && row[textIndex] !== group.text ? [] : group.units,
+      words: textIndex >= 0 && row[textIndex] !== group.text ? undefined : group.words,
+      effect: textIndex >= 0 && row[textIndex] !== group.text ? undefined : group.effect,
+    };
+  });
+  return { groups: next, updated };
 }
 
 export function captionReviewFilename(projectName: string): string {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { FileOutput, Highlighter, MessageSquareText, Replace, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -11,6 +11,7 @@ import {
   buildContentPackageMarkdown,
   buildContentPackageJson,
   buildCaptionReviewCsv,
+  importCaptionReviewCsv,
   captionReviewFilename,
   contentPackageFilename,
   contentPackageJsonFilename,
@@ -21,6 +22,7 @@ import { useEditor } from "@/state/EditorContext";
 
 export function ContentOptimizationPanel() {
   const { state, dispatch } = useEditor();
+  const reviewFileRef = useRef<HTMLInputElement>(null);
   const [searchText, setSearchText] = useState("");
   const [replacementText, setReplacementText] = useState("");
   const replaceCount = useMemo(
@@ -106,6 +108,17 @@ export function ContentOptimizationPanel() {
     toast.success("审校表已导出");
   };
 
+  const importReviewSheet = async (file: File) => {
+    const csv = await file.text();
+    const result = importCaptionReviewCsv(csv, state.doc.groups);
+    if (result.updated === 0) {
+      toast.error("没有找到可匹配的字幕时间码");
+      return;
+    }
+    dispatch({ type: "SET_GROUPS", groups: result.groups, commit: true });
+    toast.success(`已回导 ${result.updated} 条审校记录`);
+  };
+
   if (state.doc.groups.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
@@ -117,6 +130,17 @@ export function ContentOptimizationPanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <input
+        ref={reviewFileRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (file) void importReviewSheet(file);
+        }}
+      />
       <div className="border-b border-border/60 px-4 py-3">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" />
@@ -243,6 +267,13 @@ export function ContentOptimizationPanel() {
           >
             <FileOutput className="h-3.5 w-3.5" />
             导出审校 CSV
+          </button>
+          <button
+            onClick={() => reviewFileRef.current?.click()}
+            className="mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-border text-xs font-medium text-foreground/75 transition-colors hover:bg-foreground/5"
+          >
+            <FileOutput className="h-3.5 w-3.5" />
+            回导审校 CSV
           </button>
           <button
             onClick={exportContentPackageJson}
