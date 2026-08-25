@@ -17,6 +17,8 @@ export function SubtitleList() {
     () => [...new Set(groups.map((g) => g.speaker?.trim()).filter((v): v is string => !!v))].sort(),
     [groups],
   );
+  const reviewedCount = groups.filter((group) => group.reviewStatus === "reviewed").length;
+  const reviewProgress = groups.length ? Math.round((reviewedCount / groups.length) * 100) : 0;
 
   const filtered = useMemo(() => {
     return groups.filter((g) => {
@@ -82,6 +84,15 @@ export function SubtitleList() {
       </div>
 
       <div className="px-3 pb-2">
+        <div className="mb-2 rounded-md bg-foreground/5 px-2.5 py-2">
+          <div className="flex items-center justify-between text-[10px] text-foreground/55">
+            <span>审校进度</span>
+            <span className="tabular-nums">{reviewedCount}/{groups.length} · {reviewProgress}%</span>
+          </div>
+          <div className="mt-1 h-1 overflow-hidden rounded-full bg-foreground/10">
+            <div className="h-full rounded-full bg-success transition-[width]" style={{ width: `${reviewProgress}%` }} />
+          </div>
+        </div>
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-foreground/40" />
           <Input
