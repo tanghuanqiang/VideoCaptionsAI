@@ -139,11 +139,24 @@ type Action =
 
 const HISTORY_LIMIT = 50;
 
+function normalizeSelection(doc: EditorDoc, selection: CaptionSelection): CaptionSelection {
+  const groupIds = [...new Set(selection.groupIds)].filter((id) => doc.groups.some((group) => group.id === id));
+  if (groupIds.length !== 1) return { groupIds, unitIds: [] };
+  const group = doc.groups.find((item) => item.id === groupIds[0]);
+  const unitIds = (selection.unitIds ?? []).filter((unitId) => group?.units.some((unit) => unit.id === unitId));
+  return { groupIds, unitIds };
+}
+
+function normalizeDocSelection(doc: EditorDoc): EditorDoc {
+  return { ...doc, selection: normalizeSelection(doc, doc.selection) };
+}
+
 /** Wrap a doc mutation with history push. */
 function commitDoc(state: EditorState, next: EditorDoc): EditorState {
+  const normalized = normalizeDocSelection(next);
   return {
     ...state,
-    doc: next,
+    doc: normalized,
     past: [...state.past, state.doc].slice(-HISTORY_LIMIT),
     future: [],
   };
@@ -200,18 +213,20 @@ function reducer(state: EditorState, action: Action): EditorState {
       };
 
     case "LOAD_PROJECT":
+      {
+      const loadedDoc = normalizeDocSelection({
+        ...action.doc,
+        selection: action.doc.selection ?? { groupIds: [], unitIds: [] },
+        styles: action.doc.styles?.length ? action.doc.styles : doc.styles,
+        videoFileId: action.doc.videoFileId ?? null,
+        videoPath: action.doc.videoPath ?? null,
+        videoUrl: action.doc.videoUrl ?? null,
+        groups: Array.isArray(action.doc.groups) ? action.doc.groups : [],
+      });
       return {
         ...state,
-        video: action.doc.videoUrl || action.doc.videoFileId || action.doc.videoPath ? "loaded" : "empty",
-        doc: {
-          ...action.doc,
-          selection: action.doc.selection ?? { groupIds: [], unitIds: [] },
-          styles: action.doc.styles?.length ? action.doc.styles : doc.styles,
-          videoFileId: action.doc.videoFileId ?? null,
-          videoPath: action.doc.videoPath ?? null,
-          videoUrl: action.doc.videoUrl ?? null,
-          groups: Array.isArray(action.doc.groups) ? action.doc.groups : [],
-        },
+        video: loadedDoc.videoUrl || loadedDoc.videoFileId || loadedDoc.videoPath ? "loaded" : "empty",
+        doc: loadedDoc,
         past: [],
         future: [],
         currentMs: 0,
@@ -227,6 +242,7 @@ function reducer(state: EditorState, action: Action): EditorState {
           resultName: null,
         },
       };
+      }
 
     case "SET_DURATION":
       return { ...state, doc: { ...doc, durationMs: action.durationMs } };
@@ -253,7 +269,7 @@ function reducer(state: EditorState, action: Action): EditorState {
       return { ...state, mode: action.mode };
 
     case "SET_GROUPS": {
-      const next = { ...doc, groups: sortGroups(action.groups) };
+      const next = normalizeDocSelection({ ...doc, groups: sortGroups(action.groups) });
       return action.commit ? commitDoc(state, next) : { ...state, doc: next };
     }
 
@@ -266,13 +282,13 @@ function reducer(state: EditorState, action: Action): EditorState {
       return commitDoc(state, { ...doc, styles: [...doc.styles, action.style] });
 
     case "SELECT":
-      return { ...state, doc: { ...doc, selection: action.selection } };
+      return { ...state, doc: { ...doc, selection: normalizeSelection(doc, action.selection) } };
 
     case "UPDATE_GROUP": {
       const groups = doc.groups.map((g) =>
         g.id === action.id ? { ...g, ...action.patch } : g,
       );
-      const next = { ...doc, groups: sortGroups(groups) };
+      const next = normalizeDocSelection({ ...doc, groups: sortGroups(groups) });
       return action.commit ? commitDoc(state, next) : { ...state, doc: next };
     }
 
