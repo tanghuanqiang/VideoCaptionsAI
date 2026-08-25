@@ -72,6 +72,28 @@ export interface CaptionQualityReport {
   segmentableGroupIds: string[];
 }
 
+export function buildCaptionQualityReportJson(
+  projectName: string,
+  report: CaptionQualityReport,
+): string {
+  return JSON.stringify({
+    projectName: projectName.trim() || "未命名项目",
+    generatedAt: new Date().toISOString(),
+    score: report.score,
+    summary: {
+      errors: report.issues.filter((issue) => issue.severity === "error").length,
+      warnings: report.issues.filter((issue) => issue.severity === "warning").length,
+      info: report.issues.filter((issue) => issue.severity === "info").length,
+    },
+    issues: report.issues,
+  }, null, 2) + "\n";
+}
+
+export function captionQualityReportFilename(projectName: string): string {
+  const safe = (projectName.trim() || "captions").replace(/[<>:"/\\|?*]/gu, "-").slice(0, 80);
+  return `${safe}-quality-report.json`;
+}
+
 const MIN_GAP_MS = 80;
 
 function graphemeCount(text: string): number {

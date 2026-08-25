@@ -1,11 +1,13 @@
 import { useMemo } from "react";
-import { AlertCircle, CheckCircle2, Gauge, Info, Scissors, Timer, TriangleAlert, WandSparkles } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileOutput, Gauge, Info, Scissors, Timer, TriangleAlert, WandSparkles } from "lucide-react";
 import { toast } from "sonner";
 import {
   analyzeCaptionQuality,
   captionQualityProfiles,
   repairCaptionSegmentation,
   repairCaptionOverlaps,
+  buildCaptionQualityReportJson,
+  captionQualityReportFilename,
   repairCaptionTiming,
   type CaptionQualityIssue,
 } from "@/lib/captionQuality";
@@ -90,6 +92,17 @@ export function CaptionQualityPanel() {
     toast.success(`已修复 ${overlapCount} 处时间重叠`);
   };
 
+  const exportReport = () => {
+    const json = buildCaptionQualityReportJson(state.doc.projectName, report);
+    const url = URL.createObjectURL(new Blob([json], { type: "application/json;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = captionQualityReportFilename(state.doc.projectName);
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    toast.success("质量报告已导出");
+  };
+
   if (state.doc.groups.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
@@ -136,6 +149,13 @@ export function CaptionQualityPanel() {
           <span>{warnings} 个需关注</span>
           <span>{report.issues.length} 个问题</span>
         </div>
+        <button
+          onClick={exportReport}
+          className="mt-3 flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-border text-xs font-medium text-foreground/75 transition-colors hover:bg-foreground/5"
+        >
+          <FileOutput className="h-3.5 w-3.5" />
+          导出质量报告 JSON
+        </button>
         {report.repairableGroupIds.length > 0 && (
           <button
             onClick={repairAll}
