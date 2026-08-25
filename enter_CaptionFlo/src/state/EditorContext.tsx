@@ -153,6 +153,21 @@ function sortGroups(groups: CaptionGroup[]): CaptionGroup[] {
   return [...groups].sort((a, b) => a.startMs - b.startMs);
 }
 
+function uniqueId(base: string, used: Set<string>): string {
+  let candidate = `${base}-copy`;
+  let suffix = 2;
+  while (used.has(candidate)) candidate = `${base}-copy-${suffix++}`;
+  used.add(candidate);
+  return candidate;
+}
+
+function shiftedRange(startMs: number, endMs: number, offsetMs: number, durationMs: number) {
+  const duration = Math.max(1, endMs - startMs);
+  const maxStart = durationMs > 0 ? Math.max(0, durationMs - duration) : Number.POSITIVE_INFINITY;
+  const nextStart = Math.min(Math.max(0, startMs + offsetMs), maxStart);
+  return { startMs: nextStart, endMs: nextStart + duration };
+}
+
 function reducer(state: EditorState, action: Action): EditorState {
   const { doc } = state;
   switch (action.type) {
@@ -397,20 +412,24 @@ function reducer(state: EditorState, action: Action): EditorState {
       const selected = doc.groups.filter((g) => doc.selection.groupIds.includes(g.id));
       if (selected.length === 0) return state;
       const offset = Math.max(1, Math.round(action.offsetMs ?? 250));
-      const makeId = (base: string, index: number) => `${base}-copy-${Date.now()}-${index}`;
-      const copies = selected.map((group, index) => ({
-        ...group,
-        id: makeId(group.id, index),
-        startMs: group.startMs + offset,
-        endMs: group.endMs + offset,
-        units: group.units.map((unit, unitIndex) => ({
+      const usedIds = new Set(doc.groups.map((group) => group.id));
+      const copies = selected.map((group) => {
+        const id = uniqueId(group.id, usedIds);
+        const range = shiftedRange(group.startMs, group.endMs, offset, doc.durationMs);
+        const actualOffset = range.startMs - group.startMs;
+        const units = group.units.map((unit, unitIndex) => ({
           ...unit,
-          id: `${makeId(group.id, index)}-unit-${unitIndex + 1}`,
-          startMs: unit.startMs + offset,
-          endMs: unit.endMs + offset,
-        })),
-        words: group.words?.map((word) => ({ ...word, start: word.start + offset / 1000, end: word.end + offset / 1000 })),
-      }));
+          id: `${id}-unit-${unitIndex + 1}`,
+          startMs: Math.max(range.startMs, Math.min(range.endMs - 1, unit.startMs + actualOffset)),
+          endMs: Math.min(range.endMs, Math.max(range.startMs + 1, unit.endMs + actualOffset)),
+        }));
+        const words = group.words?.flatMap((word) => {
+          const start = Math.max(range.startMs, word.start * 1000 + actualOffset);
+          const end = Math.min(range.endMs, word.end * 1000 + actualOffset);
+          return end > start ? [{ ...word, start: start / 1000, end: end / 1000 }] : [];
+        });
+        return { ...group, id, ...range, units, words };
+      });
       return commitDoc(state, {
         ...doc,
         groups: sortGroups([...doc.groups, ...copies]),
