@@ -14,6 +14,7 @@ import {
   DEFAULT_CAPTION_QUALITY_PROFILE,
   isCaptionQualityProfile,
 } from "@/lib/captionQuality";
+import { normalizeCaptionGroups, normalizeStyles } from "@/lib/projectNormalization";
 import { TopBar } from "./TopBar";
 import { SubtitleList } from "./SubtitleList";
 import { VideoStage } from "./VideoStage";
@@ -62,10 +63,8 @@ function normalizeProjectDoc(raw: unknown): EditorDoc | null {
         ? resolution.height
         : 720,
     },
-    groups: Array.isArray(doc.groups) ? (doc.groups as EditorDoc["groups"]) : [],
-    styles: Array.isArray(doc.styles) && doc.styles.length
-      ? (doc.styles as EditorDoc["styles"])
-      : [defaultStyle, ...stylePresets.map((p) => p.style)],
+    groups: normalizeCaptionGroups(doc.groups, typeof doc.durationMs === "number" ? doc.durationMs : 0, "Default"),
+    styles: normalizeStyles(doc.styles, [defaultStyle, ...stylePresets.map((p) => p.style)]),
     selection: {
       groupIds: stringArray(selection.groupIds),
       unitIds: stringArray(selection.unitIds),
