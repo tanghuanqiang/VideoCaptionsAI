@@ -1,4 +1,5 @@
-import { Layers, RotateCcw, Timer } from "lucide-react";
+import { Layers, RotateCcw, Timer, Wand2 } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "@/state/EditorContext";
 import { toast } from "sonner";
@@ -20,6 +21,9 @@ function shared<T>(items: (T | undefined)[]): { value: T | undefined; mixed: boo
 
 export function BatchPropertiesPanel({ groups }: { groups: CaptionGroup[] }) {
   const { dispatch } = useEditor();
+  const [prefix, setPrefix] = useState("");
+  const [suffix, setSuffix] = useState("");
+  const [normalizeWhitespace, setNormalizeWhitespace] = useState(false);
   const ids = groups.map((g) => g.id);
 
   const fontSize = shared(groups.map((g) => g.overrides.fontSize));
@@ -131,6 +135,29 @@ export function BatchPropertiesPanel({ groups }: { groups: CaptionGroup[] }) {
         <FieldRow label="副字幕">
           <TextField value={shared(groups.map((g) => g.secondaryText)).value} mixed={shared(groups.map((g) => g.secondaryText)).mixed} onChange={(v) => applyMetadata({ secondaryText: v.trim() || undefined })} />
         </FieldRow>
+        <div className="mt-2 rounded-md border border-border/60 p-2">
+          <div className="mb-1 flex items-center gap-1 text-[11px] font-medium text-foreground/65"><Wand2 className="h-3.5 w-3.5" /> 文本变换</div>
+          <div className="grid grid-cols-2 gap-2">
+            <input value={prefix} onChange={(e) => setPrefix(e.target.value)} placeholder="前缀" className="h-8 rounded-md border border-input bg-card px-2 text-xs" />
+            <input value={suffix} onChange={(e) => setSuffix(e.target.value)} placeholder="后缀" className="h-8 rounded-md border border-input bg-card px-2 text-xs" />
+          </div>
+          <label className="mt-2 flex items-center gap-2 text-[11px] text-foreground/60">
+            <input type="checkbox" checked={normalizeWhitespace} onChange={(e) => setNormalizeWhitespace(e.target.checked)} />
+            统一空白字符
+          </label>
+          <Button
+            variant="subtle"
+            size="sm"
+            className="mt-2 w-full"
+            disabled={!prefix && !suffix && !normalizeWhitespace}
+            onClick={() => {
+              dispatch({ type: "TRANSFORM_SELECTED_TEXT", prefix, suffix, normalizeWhitespace });
+              toast.success(`已变换 ${ids.length} 条字幕文本`);
+            }}
+          >
+            应用到所选字幕
+          </Button>
+        </div>
         <div className="mt-2 rounded-md border border-border/60 p-2">
           <div className="mb-1 flex items-center gap-1 text-[11px] font-medium text-foreground/65"><Timer className="h-3.5 w-3.5" /> 时间校准</div>
           <div className="flex gap-2">

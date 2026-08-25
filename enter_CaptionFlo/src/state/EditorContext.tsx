@@ -125,6 +125,8 @@ type Action =
   | { type: "MERGE_SELECTED" }
   | { type: "DELETE_SELECTED" }
   | { type: "DUPLICATE_SELECTED"; offsetMs?: number }
+  | { type: "TRANSFORM_SELECTED_TEXT"; prefix?: string; suffix?: string; normalizeWhitespace?: boolean }
+  | { type: "REPLACE_TEXT"; search: string; replacement: string; ids?: string[] }
   | { type: "ASR_START" }
   | { type: "ASR_PROGRESS"; progress: number; label: string }
   | { type: "ASR_SUCCESS"; groups: CaptionGroup[]; styles?: AssStyle[] }
@@ -488,6 +490,30 @@ function reducer(state: EditorState, action: Action): EditorState {
         groups: sortGroups([...doc.groups, ...copies]),
         selection: { groupIds: copies.map((group) => group.id), unitIds: [] },
       });
+    }
+
+    case "TRANSFORM_SELECTED_TEXT": {
+      const ids = new Set(doc.selection.groupIds);
+      if (ids.size === 0) return state;
+      const prefix = action.prefix ?? "";
+      const suffix = action.suffix ?? "";
+      const groups = doc.groups.map((group) => {
+        if (!ids.has(group.id)) return group;
+        const normalized = action.normalizeWhitespace ? group.text.replace(/\s+/gu, " ").trim() : group.text;
+        return { ...group, text: `${prefix}${normalized}${suffix}`, units: [], words: undefined, effect: undefined };
+      });
+      return commitDoc(state, { ...doc, groups });
+    }
+
+    case "REPLACE_TEXT": {
+      if (!action.search) return state;
+      const ids = action.ids ? new Set(action.ids) : null;
+      const groups = doc.groups.map((group) => {
+        if (ids && !ids.has(group.id)) return group;
+        const text = group.text.split(action.search).join(action.replacement);
+        return text === group.text ? group : { ...group, text, units: [], words: undefined, effect: undefined };
+      });
+      return commitDoc(state, { ...doc, groups });
     }
 
     case "ASR_START":
