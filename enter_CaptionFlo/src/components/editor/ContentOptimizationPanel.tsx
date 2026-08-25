@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { FileOutput, Highlighter, MessageSquareText, Sparkles } from "lucide-react";
+import { useMemo, useState } from "react";
+import { FileOutput, Highlighter, MessageSquareText, Replace, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import {
   applyKeywordHighlights,
@@ -21,6 +21,12 @@ import { useEditor } from "@/state/EditorContext";
 
 export function ContentOptimizationPanel() {
   const { state, dispatch } = useEditor();
+  const [searchText, setSearchText] = useState("");
+  const [replacementText, setReplacementText] = useState("");
+  const replaceCount = useMemo(
+    () => searchText ? state.doc.groups.filter((group) => group.text.includes(searchText)).length : 0,
+    [searchText, state.doc.groups],
+  );
   const fillerIssues = useMemo(
     () => findFillerWordIssues(state.doc.groups),
     [state.doc.groups],
@@ -131,6 +137,29 @@ export function ContentOptimizationPanel() {
       </div>
 
       <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-2">
+        <div className="mb-3 border-b border-border/60 px-2 pb-3">
+          <div className="flex items-center gap-2">
+            <Replace className="h-4 w-4 text-primary" />
+            <div>
+              <p className="text-xs font-medium">查找与替换</p>
+              <p className="mt-0.5 text-[11px] text-foreground/50">修改文本会清空受影响字幕的逐字时间</p>
+            </div>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="查找" className="h-8 rounded-md border border-input bg-card px-2 text-xs" />
+            <input value={replacementText} onChange={(e) => setReplacementText(e.target.value)} placeholder="替换为" className="h-8 rounded-md border border-input bg-card px-2 text-xs" />
+          </div>
+          <button
+            disabled={!searchText || replaceCount === 0}
+            onClick={() => {
+              dispatch({ type: "REPLACE_TEXT", search: searchText, replacement: replacementText });
+              toast.success(`已替换 ${replaceCount} 条字幕`);
+            }}
+            className="mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-primary/25 text-xs font-medium text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            替换全部（{replaceCount} 条）
+          </button>
+        </div>
         {fillerIssues.length === 0 && keywordCount === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
             <MessageSquareText className="h-7 w-7 text-success" />
