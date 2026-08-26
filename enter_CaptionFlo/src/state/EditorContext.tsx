@@ -9,6 +9,7 @@ import {
 import type { AssStyle } from "@/types/subtitleTypes";
 import type {
   CaptionEffect,
+  CaptionGlossaryEntry,
   CaptionGroup,
   CaptionOverrides,
   CaptionSelection,
@@ -38,6 +39,7 @@ export interface EditorDoc {
   videoPath: string | null;
   durationMs: number;
   frameRate: number;
+  glossary: CaptionGlossaryEntry[];
   qualityProfile: CaptionQualityProfile;
   /** Real intrinsic video resolution; ASS PlayRes is aligned to this. */
   resolution: { width: number; height: number };
@@ -73,6 +75,7 @@ const initialDoc: EditorDoc = {
   videoPath: null,
   durationMs: 0,
   frameRate: 30,
+  glossary: [],
   qualityProfile: DEFAULT_CAPTION_QUALITY_PROFILE,
   resolution: { width: 1280, height: 720 },
   groups: [],
@@ -106,6 +109,7 @@ type Action =
   | { type: "LOAD_PROJECT"; doc: EditorDoc }
   | { type: "SET_DURATION"; durationMs: number }
   | { type: "SET_FRAME_RATE"; frameRate: number }
+  | { type: "SET_GLOSSARY"; glossary: CaptionGlossaryEntry[] }
   | { type: "SET_QUALITY_PROFILE"; profile: CaptionQualityProfile }
   | { type: "SET_RESOLUTION"; width: number; height: number }
   | { type: "SET_CURRENT_MS"; ms: number }
@@ -296,6 +300,9 @@ function reducer(state: EditorState, action: Action): EditorState {
 
     case "SET_FRAME_RATE":
       return commitDoc(state, { ...doc, frameRate: normalizedFrameRate(action.frameRate) });
+
+    case "SET_GLOSSARY":
+      return commitDoc(state, { ...doc, glossary: action.glossary });
 
     case "SET_QUALITY_PROFILE":
       return commitDoc(state, { ...doc, qualityProfile: action.profile });

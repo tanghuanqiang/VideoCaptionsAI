@@ -18,6 +18,12 @@ export type TimingSource = "asr-word" | "estimated";
 export type CaptionReviewStatus = "draft" | "needs-review" | "reviewed";
 export type CaptionContentTag = "chapter" | "highlight";
 
+export interface CaptionGlossaryEntry {
+  id: string;
+  preferred: string;
+  variants: string[];
+}
+
 export interface CaptionGroup {
   id: string;
   text: string;

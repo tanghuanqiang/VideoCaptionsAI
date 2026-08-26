@@ -14,7 +14,7 @@ import {
   DEFAULT_CAPTION_QUALITY_PROFILE,
   isCaptionQualityProfile,
 } from "@/lib/captionQuality";
-import { normalizeCaptionGroups, normalizeStyles } from "@/lib/projectNormalization";
+import { normalizeCaptionGlossary, normalizeCaptionGroups, normalizeStyles } from "@/lib/projectNormalization";
 import { TopBar } from "./TopBar";
 import { SubtitleList } from "./SubtitleList";
 import { VideoStage } from "./VideoStage";
@@ -56,6 +56,7 @@ function normalizeProjectDoc(raw: unknown): EditorDoc | null {
     frameRate: typeof doc.frameRate === "number" && Number.isFinite(doc.frameRate)
       ? Math.min(120, Math.max(1, doc.frameRate))
       : 30,
+    glossary: normalizeCaptionGlossary(doc.glossary),
     qualityProfile: isCaptionQualityProfile(doc.qualityProfile)
       ? doc.qualityProfile
       : DEFAULT_CAPTION_QUALITY_PROFILE,

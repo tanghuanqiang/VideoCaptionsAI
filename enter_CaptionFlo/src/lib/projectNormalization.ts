@@ -1,5 +1,6 @@
 import type { AssStyle, CaptionUnit, WordTimestamp } from "@/types/subtitleTypes";
 import type { CaptionGroup, CaptionReviewStatus } from "@/types/captionModel";
+import type { CaptionGlossaryEntry } from "@/types/captionModel";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -97,6 +98,25 @@ export function normalizeCaptionGroups(value: unknown, durationMs: number, fallb
     used.add(id);
     return [{ ...group, id, units: group.units.map((unit, unitIndex) => ({ ...unit, id: `${id}-unit-${unitIndex + 1}` })) }];
   }).sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
+}
+
+export function normalizeCaptionGlossary(value: unknown): CaptionGlossaryEntry[] {
+  if (!Array.isArray(value)) return [];
+  const used = new Set<string>();
+  return value.flatMap((item, index) => {
+    const entry = record(item);
+    const preferred = stringValue(entry?.preferred).trim();
+    if (!preferred) return [];
+    const variants = Array.isArray(entry?.variants)
+      ? [...new Set(entry.variants.filter((variant): variant is string => typeof variant === "string").map((variant) => variant.trim()).filter((variant) => variant && variant !== preferred))]
+      : [];
+    const baseId = stringValue(entry?.id).trim() || `term-${index + 1}`;
+    let id = baseId;
+    let suffix = 2;
+    while (used.has(id)) id = `${baseId}-${suffix++}`;
+    used.add(id);
+    return [{ id, preferred, variants }];
+  });
 }
 
 export function normalizeStyles(value: unknown, fallback: AssStyle[]): AssStyle[] {

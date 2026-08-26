@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { FileOutput, Highlighter, MessageSquareText, Replace, Sparkles } from "lucide-react";
+import { BookText, FileOutput, Highlighter, MessageSquareText, Plus, Replace, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   applyKeywordHighlights,
@@ -7,6 +7,7 @@ import {
   findKeywordHighlightIssues,
   repairFillerWords,
 } from "@/lib/captionTextTools";
+import { applyCaptionGlossary, findCaptionGlossaryIssues } from "@/lib/captionGlossary";
 import {
   buildContentPackageMarkdown,
   buildContentPackageJson,
@@ -25,6 +26,8 @@ export function ContentOptimizationPanel() {
   const reviewFileRef = useRef<HTMLInputElement>(null);
   const [searchText, setSearchText] = useState("");
   const [replacementText, setReplacementText] = useState("");
+  const [preferredTerm, setPreferredTerm] = useState("");
+  const [termVariants, setTermVariants] = useState("");
   const replaceCount = useMemo(
     () => searchText ? state.doc.groups.filter((group) => group.text.includes(searchText)).length : 0,
     [searchText, state.doc.groups],
@@ -39,6 +42,11 @@ export function ContentOptimizationPanel() {
     [state.doc.groups],
   );
   const keywordCount = keywordIssues.reduce((total, issue) => total + issue.terms.length, 0);
+  const glossaryIssues = useMemo(
+    () => findCaptionGlossaryIssues(state.doc.groups, state.doc.glossary)
+      .filter((issue) => !state.doc.groups.find((group) => group.id === issue.groupId)?.locked),
+    [state.doc.glossary, state.doc.groups],
+  );
   const chapters = useMemo(() => deriveContentChapters(state.doc.groups), [state.doc.groups]);
   const highlights = useMemo(() => deriveContentHighlights(state.doc.groups), [state.doc.groups]);
 
@@ -119,6 +127,31 @@ export function ContentOptimizationPanel() {
     toast.success(`已回导 ${result.updated} 条审校记录`);
   };
 
+  const addGlossaryEntry = () => {
+    const preferred = preferredTerm.trim();
+    const variants = [...new Set(termVariants.split(/[，,\n]/u).map((value) => value.trim()).filter((value) => value && value !== preferred))];
+    if (!preferred || variants.length === 0) {
+      toast.error("请填写标准术语和至少一个旧写法");
+      return;
+    }
+    dispatch({
+      type: "SET_GLOSSARY",
+      glossary: [...state.doc.glossary, { id: `term-${Date.now()}`, preferred, variants }],
+    });
+    setPreferredTerm("");
+    setTermVariants("");
+  };
+
+  const applyGlossary = () => {
+    const next = applyCaptionGlossary(state.doc.groups, state.doc.glossary);
+    if (next.every((group, index) => group.text === state.doc.groups[index]?.text)) {
+      toast.info("术语已保持一致");
+      return;
+    }
+    dispatch({ type: "SET_GROUPS", groups: next, commit: true });
+    toast.success(`已统一 ${glossaryIssues.length} 处术语写法`);
+  };
+
   if (state.doc.groups.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
@@ -183,6 +216,45 @@ export function ContentOptimizationPanel() {
           >
             替换全部（{replaceCount} 条）
           </button>
+        </div>
+        <div className="mb-3 border-b border-border/60 px-2 pb-3">
+          <div className="flex items-center gap-2">
+            <BookText className="h-4 w-4 text-primary" />
+            <div>
+              <p className="text-xs font-medium">项目术语表</p>
+              <p className="mt-0.5 text-[11px] text-foreground/50">{state.doc.glossary.length} 个术语，{glossaryIssues.length} 处待统一</p>
+            </div>
+          </div>
+          <div className="mt-2 grid grid-cols-[1fr_1.25fr_auto] gap-1.5">
+            <input value={preferredTerm} onChange={(event) => setPreferredTerm(event.target.value)} placeholder="标准写法" className="h-8 min-w-0 rounded-md border border-input bg-card px-2 text-xs" />
+            <input value={termVariants} onChange={(event) => setTermVariants(event.target.value)} placeholder="旧写法，逗号分隔" className="h-8 min-w-0 rounded-md border border-input bg-card px-2 text-xs" />
+            <button onClick={addGlossaryEntry} className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-foreground/65 hover:bg-foreground/5" title="添加术语"><Plus className="h-4 w-4" /></button>
+          </div>
+          {state.doc.glossary.length > 0 && (
+            <>
+              <div className="mt-2 space-y-1">
+                {state.doc.glossary.map((entry) => (
+                  <div key={entry.id} className="flex items-center gap-2 rounded-md bg-foreground/5 px-2 py-1.5 text-[11px]">
+                    <span className="min-w-0 flex-1 truncate font-medium">{entry.preferred}</span>
+                    <span className="min-w-0 flex-[1.5] truncate text-foreground/50">{entry.variants.join("、")}</span>
+                    <button
+                      onClick={() => dispatch({ type: "SET_GLOSSARY", glossary: state.doc.glossary.filter((item) => item.id !== entry.id) })}
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-foreground/45 hover:bg-foreground/10 hover:text-destructive"
+                      title="移除术语"
+                    ><X className="h-3.5 w-3.5" /></button>
+                  </div>
+                ))}
+              </div>
+              <button
+                disabled={glossaryIssues.length === 0}
+                onClick={applyGlossary}
+                className="mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-primary/25 text-xs font-medium text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <BookText className="h-3.5 w-3.5" />
+                统一术语（{glossaryIssues.length} 处）
+              </button>
+            </>
+          )}
         </div>
         {fillerIssues.length === 0 && keywordCount === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
