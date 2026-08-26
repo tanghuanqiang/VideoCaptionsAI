@@ -1,4 +1,4 @@
-import { Copy, Lock, RotateCcw, SlidersHorizontal, Unlock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, Lock, RotateCcw, SlidersHorizontal, Unlock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useEditor } from "@/state/EditorContext";
@@ -17,10 +17,11 @@ import { StyleAssignRow } from "./StylePresetsPanel";
 import type { CaptionContentTag, CaptionGroup, CaptionOverrides, CaptionReviewStatus } from "@/types/captionModel";
 
 export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
-  const { dispatch, styleById } = useEditor();
+  const { state, dispatch, styleById } = useEditor();
   const style = styleById(group.baseStyleId);
   const o = group.overrides;
   const isLocked = group.locked === true;
+  const frameMs = 1000 / state.doc.frameRate;
   const durationSeconds = Math.max(0.001, (group.endMs - group.startMs) / 1000);
   const charsPerSecond = graphemesOf(group.text).length / durationSeconds;
   const readingTone = charsPerSecond > 9 ? "text-destructive" : charsPerSecond > 7 ? "text-warning-foreground" : "text-success";
@@ -290,25 +291,30 @@ export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
           </div>
         </div>
         <FieldRow label="开始">
-          <NumberField
-            value={group.startMs}
-            onChange={(v) => setTime({ startMs: v })}
-            step={10}
-            width="w-24"
-            suffix="ms"
-          />
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="xs" disabled={isLocked} title="向前一帧" onClick={() => dispatch({ type: "NUDGE_GROUP_EDGE", id: group.id, edge: "start", deltaFrames: -1 })}><ChevronLeft /></Button>
+            <NumberField value={group.startMs} onChange={(v) => setTime({ startMs: v })} step={10} width="w-24" suffix="ms" />
+            <Button variant="ghost" size="xs" disabled={isLocked} title="向后一帧" onClick={() => dispatch({ type: "NUDGE_GROUP_EDGE", id: group.id, edge: "start", deltaFrames: 1 })}><ChevronRight /></Button>
+          </div>
         </FieldRow>
         <FieldRow label="结束">
-          <NumberField
-            value={group.endMs}
-            onChange={(v) => setTime({ endMs: v })}
-            step={10}
-            width="w-24"
-            suffix="ms"
-          />
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="xs" disabled={isLocked} title="向前一帧" onClick={() => dispatch({ type: "NUDGE_GROUP_EDGE", id: group.id, edge: "end", deltaFrames: -1 })}><ChevronLeft /></Button>
+            <NumberField value={group.endMs} onChange={(v) => setTime({ endMs: v })} step={10} width="w-24" suffix="ms" />
+            <Button variant="ghost" size="xs" disabled={isLocked} title="向后一帧" onClick={() => dispatch({ type: "NUDGE_GROUP_EDGE", id: group.id, edge: "end", deltaFrames: 1 })}><ChevronRight /></Button>
+          </div>
+        </FieldRow>
+        <FieldRow label="帧率">
+          <select
+            value={state.doc.frameRate}
+            onChange={(event) => dispatch({ type: "SET_FRAME_RATE", frameRate: Number(event.target.value) })}
+            className="h-8 w-24 rounded-md border border-input bg-card px-2 text-xs"
+          >
+            {[23.976, 24, 25, 29.97, 30, 50, 59.94, 60].map((rate) => <option key={rate} value={rate}>{rate} fps</option>)}
+          </select>
         </FieldRow>
         <p className="mt-1 text-right font-mono text-[11px] text-foreground/45">
-          时长 {formatMs(group.endMs - group.startMs)}
+          时长 {formatMs(group.endMs - group.startMs)} · 1 帧 {frameMs.toFixed(1)}ms
         </p>
       </div>
     </div>

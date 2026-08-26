@@ -180,6 +180,11 @@ export function BatchPropertiesPanel({ groups }: { groups: CaptionGroup[] }) {
             <Button variant="subtle" size="sm" className="flex-1" onClick={() => dispatch({ type: "SHIFT_SELECTED_TIME", deltaMs: 100 })}>后移 100ms</Button>
           </div>
           <Button variant="ghost" size="sm" className="mt-1 w-full" onClick={() => dispatch({ type: "NORMALIZE_SELECTED_TIMING", gapMs: 0 })}>按当前时长连续排列</Button>
+          <div className="mt-2 flex gap-2">
+            <Button variant="ghost" size="sm" className="flex-1" onClick={() => dispatch({ type: "RIPPLE_SHIFT_AFTER_SELECTED", deltaMs: -500 })}>后续前移 0.5 秒</Button>
+            <Button variant="ghost" size="sm" className="flex-1" onClick={() => dispatch({ type: "RIPPLE_SHIFT_AFTER_SELECTED", deltaMs: 500 })}>后续后移 0.5 秒</Button>
+          </div>
+          <p className="mt-1 text-[10px] text-foreground/45">从所选字幕之后波纹移位，已保护字幕保持不动。</p>
         </div>
         <div className="flex gap-2">
           <Button

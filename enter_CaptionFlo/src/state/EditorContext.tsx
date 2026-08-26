@@ -37,6 +37,7 @@ export interface EditorDoc {
   videoFileId: string | null;
   videoPath: string | null;
   durationMs: number;
+  frameRate: number;
   qualityProfile: CaptionQualityProfile;
   /** Real intrinsic video resolution; ASS PlayRes is aligned to this. */
   resolution: { width: number; height: number };
@@ -71,6 +72,7 @@ const initialDoc: EditorDoc = {
   videoFileId: null,
   videoPath: null,
   durationMs: 0,
+  frameRate: 30,
   qualityProfile: DEFAULT_CAPTION_QUALITY_PROFILE,
   resolution: { width: 1280, height: 720 },
   groups: [],
@@ -103,6 +105,7 @@ type Action =
   | { type: "SET_VIDEO_SOURCE"; videoUrl?: string | null; videoFileId?: string | null; videoPath?: string | null }
   | { type: "LOAD_PROJECT"; doc: EditorDoc }
   | { type: "SET_DURATION"; durationMs: number }
+  | { type: "SET_FRAME_RATE"; frameRate: number }
   | { type: "SET_QUALITY_PROFILE"; profile: CaptionQualityProfile }
   | { type: "SET_RESOLUTION"; width: number; height: number }
   | { type: "SET_CURRENT_MS"; ms: number }
@@ -116,6 +119,8 @@ type Action =
   | { type: "UPDATE_GROUP_METADATA"; ids: string[]; patch: Partial<Pick<CaptionGroup, "speaker" | "secondaryText" | "reviewStatus" | "reviewNote" | "locked">> }
   | { type: "UPDATE_GROUP_OVERRIDES"; ids: string[]; patch: CaptionOverrides }
   | { type: "SHIFT_SELECTED_TIME"; deltaMs: number }
+  | { type: "RIPPLE_SHIFT_AFTER_SELECTED"; deltaMs: number }
+  | { type: "NUDGE_GROUP_EDGE"; id: string; edge: "start" | "end"; deltaFrames: number }
   | { type: "NORMALIZE_SELECTED_TIMING"; gapMs: number }
   | { type: "RESET_GROUP_OVERRIDES"; ids: string[] }
   | { type: "APPLY_STYLE"; ids: string[]; styleId: string }
@@ -196,6 +201,10 @@ function shiftedRange(startMs: number, endMs: number, offsetMs: number, duration
 function clampMs(ms: number, durationMs: number): number {
   if (!Number.isFinite(ms)) return 0;
   return durationMs > 0 ? Math.min(Math.max(0, ms), durationMs) : Math.max(0, ms);
+}
+
+function normalizedFrameRate(frameRate: number): number {
+  return Number.isFinite(frameRate) ? Math.min(120, Math.max(1, frameRate)) : 30;
 }
 
 function normalizeGroupTiming(group: CaptionGroup, durationMs: number, patch: Partial<CaptionGroup>): Partial<CaptionGroup> {
@@ -285,6 +294,9 @@ function reducer(state: EditorState, action: Action): EditorState {
       return { ...state, doc: { ...doc, durationMs }, currentMs: clampMs(state.currentMs, durationMs) };
       }
 
+    case "SET_FRAME_RATE":
+      return commitDoc(state, { ...doc, frameRate: normalizedFrameRate(action.frameRate) });
+
     case "SET_QUALITY_PROFILE":
       return commitDoc(state, { ...doc, qualityProfile: action.profile });
 
@@ -363,6 +375,31 @@ function reducer(state: EditorState, action: Action): EditorState {
         const startMs = Math.min(Math.max(0, g.startMs + delta), Math.max(0, doc.durationMs - duration));
         return { ...g, startMs, endMs: startMs + duration };
       });
+      return commitDoc(state, { ...doc, groups: sortGroups(groups) });
+    }
+
+    case "RIPPLE_SHIFT_AFTER_SELECTED": {
+      const selected = doc.groups.filter((group) => doc.selection.groupIds.includes(group.id));
+      if (selected.length === 0 || !Number.isFinite(action.deltaMs)) return state;
+      const anchorMs = Math.max(...selected.map((group) => group.endMs));
+      const delta = Math.round(action.deltaMs);
+      const groups = doc.groups.map((group) => {
+        if (group.startMs < anchorMs || group.locked) return group;
+        const range = shiftedRange(group.startMs, group.endMs, delta, doc.durationMs);
+        return { ...group, ...range };
+      });
+      return commitDoc(state, { ...doc, groups: sortGroups(groups) });
+    }
+
+    case "NUDGE_GROUP_EDGE": {
+      const group = doc.groups.find((item) => item.id === action.id);
+      if (!group || group.locked || !Number.isFinite(action.deltaFrames)) return state;
+      const deltaMs = (1000 / normalizedFrameRate(doc.frameRate)) * action.deltaFrames;
+      const patch = action.edge === "start"
+        ? { startMs: Math.round(group.startMs + deltaMs) }
+        : { endMs: Math.round(group.endMs + deltaMs) };
+      const nextGroup = { ...group, ...normalizeGroupTiming(group, doc.durationMs, patch) };
+      const groups = doc.groups.map((item) => item.id === group.id ? nextGroup : item);
       return commitDoc(state, { ...doc, groups: sortGroups(groups) });
     }
 

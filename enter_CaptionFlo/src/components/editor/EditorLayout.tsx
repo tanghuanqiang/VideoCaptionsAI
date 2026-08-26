@@ -53,6 +53,9 @@ function normalizeProjectDoc(raw: unknown): EditorDoc | null {
     durationMs: typeof doc.durationMs === "number" && Number.isFinite(doc.durationMs)
       ? doc.durationMs
       : 0,
+    frameRate: typeof doc.frameRate === "number" && Number.isFinite(doc.frameRate)
+      ? Math.min(120, Math.max(1, doc.frameRate))
+      : 30,
     qualityProfile: isCaptionQualityProfile(doc.qualityProfile)
       ? doc.qualityProfile
       : DEFAULT_CAPTION_QUALITY_PROFILE,
@@ -83,6 +86,12 @@ function parseResolutionText(value: unknown): { width: number; height: number } 
     return null;
   }
   return { width, height };
+}
+
+function parseFrameRate(value: unknown): number | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const parsed = Number(String(value).replace(/fps$/iu, "").trim());
+  return Number.isFinite(parsed) && parsed >= 1 && parsed <= 120 ? parsed : null;
 }
 
 function triggerDownload(url: string, filename: string) {
@@ -234,6 +243,8 @@ export function EditorLayout() {
       if (parsedResolution) {
         dispatch({ type: "SET_RESOLUTION", ...parsedResolution });
       }
+      const parsedFrameRate = parseFrameRate(res.fps);
+      if (parsedFrameRate) dispatch({ type: "SET_FRAME_RATE", frameRate: parsedFrameRate });
       dispatch({ type: "ASR_SUCCESS", groups, styles });
       toast.success(`识别完成，生成 ${groups.length} 条字幕`);
     } catch (err) {
