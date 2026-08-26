@@ -318,7 +318,7 @@ export function repairCaptionTiming(
   const repaired = new Map<string, CaptionGroup>();
 
   ordered.forEach((group, index) => {
-    if (!ids.has(group.id)) return;
+    if (!ids.has(group.id) || group.locked) return;
     const next = ordered[index + 1];
     const latestEndMs = next
       ? next.startMs - MIN_GAP_MS
@@ -340,7 +340,7 @@ export function repairCaptionOverlaps(groups: CaptionGroup[]): CaptionGroup[] {
   for (let index = 0; index < ordered.length - 1; index += 1) {
     const current = repaired.get(ordered[index].id) ?? ordered[index];
     const next = repaired.get(ordered[index + 1].id) ?? ordered[index + 1];
-    if (current.endMs > next.startMs) {
+    if (!current.locked && current.endMs > next.startMs) {
       repaired.set(current.id, { ...current, endMs: Math.max(current.startMs + 1, next.startMs) });
     }
   }
@@ -361,7 +361,7 @@ export function repairCaptionSegmentation(
   const result: CaptionGroup[] = [];
 
   for (const group of groups) {
-    const splitIndex = ids.has(group.id) ? findCaptionSplitIndex(group.text) : null;
+    const splitIndex = ids.has(group.id) && !group.locked ? findCaptionSplitIndex(group.text) : null;
     const durationMs = group.endMs - group.startMs;
     if (!splitIndex || durationMs < rules.minDisplayMs * 2) {
       result.push(group);

@@ -33,6 +33,7 @@ export function BatchPropertiesPanel({ groups }: { groups: CaptionGroup[] }) {
   const opacity = shared(groups.map((g) => g.overrides.opacity));
   const speaker = shared(groups.map((g) => g.speaker));
   const reviewStatus = shared(groups.map((g) => g.reviewStatus ?? "draft"));
+  const locked = shared(groups.map((g) => g.locked ?? false));
 
   const reset = () => {
     dispatch({ type: "RESET_GROUP_OVERRIDES", ids });
@@ -45,7 +46,7 @@ export function BatchPropertiesPanel({ groups }: { groups: CaptionGroup[] }) {
     dispatch({ type: "UPDATE_GROUP_OVERRIDES", ids, patch });
   };
 
-  const applyMetadata = (patch: { speaker?: string; secondaryText?: string; reviewStatus?: CaptionReviewStatus }) =>
+  const applyMetadata = (patch: { speaker?: string; secondaryText?: string; reviewStatus?: CaptionReviewStatus; locked?: boolean }) =>
     dispatch({ type: "UPDATE_GROUP_METADATA", ids, patch });
 
   return (
@@ -130,6 +131,20 @@ export function BatchPropertiesPanel({ groups }: { groups: CaptionGroup[] }) {
             <option value="draft">草稿</option>
             <option value="needs-review">待复核</option>
             <option value="reviewed">已审校</option>
+          </select>
+        </FieldRow>
+        <FieldRow label="保护字幕">
+          <select
+            value={locked.mixed ? "mixed" : locked.value ? "locked" : "unlocked"}
+            onChange={(e) => {
+              if (e.target.value === "locked") applyMetadata({ locked: true });
+              if (e.target.value === "unlocked") applyMetadata({ locked: false });
+            }}
+            className="h-8 w-32 rounded-md border border-input bg-card px-2 text-xs"
+          >
+            {locked.mixed && <option value="mixed">混合</option>}
+            <option value="unlocked">可编辑</option>
+            <option value="locked">已保护</option>
           </select>
         </FieldRow>
         <FieldRow label="副字幕">

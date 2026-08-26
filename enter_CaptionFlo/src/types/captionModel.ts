@@ -24,6 +24,8 @@ export interface CaptionGroup {
   secondaryText?: string;
   speaker?: string;
   reviewStatus?: CaptionReviewStatus;
+  reviewNote?: string;
+  locked?: boolean;
   contentTag?: CaptionContentTag;
   startMs: number;
   endMs: number;
@@ -67,6 +69,8 @@ export const captionGroupToSubtitle = (group: CaptionGroup): Subtitle => ({
   secondaryText: group.secondaryText,
   speaker: group.speaker,
   reviewStatus: group.reviewStatus,
+  reviewNote: group.reviewNote,
+  locked: group.locked,
   contentTag: group.contentTag,
   style: group.baseStyleId,
   group: "",
@@ -93,6 +97,8 @@ export const subtitleToCaptionGroup = (
   secondaryText: subtitle.secondaryText,
   speaker: subtitle.speaker,
   reviewStatus: subtitle.reviewStatus,
+  reviewNote: subtitle.reviewNote,
+  locked: subtitle.locked,
   contentTag: subtitle.contentTag,
   startMs: Math.round(toSeconds(subtitle.start) * 1000),
   endMs: Math.round(toSeconds(subtitle.end) * 1000),

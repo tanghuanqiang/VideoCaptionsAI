@@ -47,6 +47,8 @@ export interface SubtitleEvent {
   secondaryText?: string;
   speaker?: string;
   reviewStatus?: "draft" | "needs-review" | "reviewed";
+  reviewNote?: string;
+  locked?: boolean;
   contentTag?: "chapter" | "highlight";
   words?: WordTimestamp[];
   style?: string;
@@ -103,6 +105,9 @@ export interface Subtitle {
   text: string;
   secondaryText?: string;
   speaker?: string;
+  reviewStatus?: "draft" | "needs-review" | "reviewed";
+  reviewNote?: string;
+  locked?: boolean;
   contentTag?: "chapter" | "highlight";
   style: string;
   group: string;

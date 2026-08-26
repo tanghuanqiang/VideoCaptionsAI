@@ -149,7 +149,7 @@ function csvCell(value: string | undefined): string {
 }
 
 export function buildCaptionReviewCsv(groups: CaptionGroup[]): string {
-  const header = ["开始", "结束", "说话人", "审校状态", "主字幕", "副字幕"];
+  const header = ["开始", "结束", "说话人", "审校状态", "审校备注", "主字幕", "副字幕"];
   const rows = [...groups]
     .sort((a, b) => a.startMs - b.startMs)
     .map((group) => [
@@ -157,6 +157,7 @@ export function buildCaptionReviewCsv(groups: CaptionGroup[]): string {
       timestamp(group.endMs),
       group.speaker,
       group.reviewStatus ?? "draft",
+      group.reviewNote,
       compact(group.text),
       group.secondaryText?.trim(),
     ].map(csvCell).join(","));
@@ -188,6 +189,7 @@ export function importCaptionReviewCsv(csv: string, groups: CaptionGroup[]): { g
   if (startIndex < 0 || endIndex < 0) return { groups, updated: 0 };
   const speakerIndex = indexOf("说话人");
   const reviewIndex = indexOf("审校状态");
+  const noteIndex = indexOf("审校备注");
   const textIndex = indexOf("主字幕");
   const secondaryIndex = indexOf("副字幕");
   let updated = 0;
@@ -200,15 +202,17 @@ export function importCaptionReviewCsv(csv: string, groups: CaptionGroup[]): { g
     if (!row) return group;
     updated += 1;
     const review = row[reviewIndex] === "reviewed" || row[reviewIndex] === "needs-review" || row[reviewIndex] === "draft" ? row[reviewIndex] : group.reviewStatus;
+    const text = !group.locked && textIndex >= 0 && row[textIndex] !== undefined ? row[textIndex] : group.text;
     return {
       ...group,
-      text: textIndex >= 0 && row[textIndex] !== undefined ? row[textIndex] : group.text,
-      secondaryText: secondaryIndex >= 0 ? row[secondaryIndex] || undefined : group.secondaryText,
-      speaker: speakerIndex >= 0 ? row[speakerIndex] || undefined : group.speaker,
+      text,
+      secondaryText: !group.locked && secondaryIndex >= 0 ? row[secondaryIndex] || undefined : group.secondaryText,
+      speaker: !group.locked && speakerIndex >= 0 ? row[speakerIndex] || undefined : group.speaker,
       reviewStatus: review,
-      units: textIndex >= 0 && row[textIndex] !== group.text ? [] : group.units,
-      words: textIndex >= 0 && row[textIndex] !== group.text ? undefined : group.words,
-      effect: textIndex >= 0 && row[textIndex] !== group.text ? undefined : group.effect,
+      reviewNote: noteIndex >= 0 ? row[noteIndex] || undefined : group.reviewNote,
+      units: text !== group.text ? [] : group.units,
+      words: text !== group.text ? undefined : group.words,
+      effect: text !== group.text ? undefined : group.effect,
     };
   });
   return { groups: next, updated };

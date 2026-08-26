@@ -113,7 +113,7 @@ type Action =
   | { type: "ADD_STYLE"; style: AssStyle }
   | { type: "SELECT"; selection: CaptionSelection }
   | { type: "UPDATE_GROUP"; id: string; patch: Partial<CaptionGroup>; commit?: boolean }
-  | { type: "UPDATE_GROUP_METADATA"; ids: string[]; patch: Partial<Pick<CaptionGroup, "speaker" | "secondaryText" | "reviewStatus">> }
+  | { type: "UPDATE_GROUP_METADATA"; ids: string[]; patch: Partial<Pick<CaptionGroup, "speaker" | "secondaryText" | "reviewStatus" | "reviewNote" | "locked">> }
   | { type: "UPDATE_GROUP_OVERRIDES"; ids: string[]; patch: CaptionOverrides }
   | { type: "SHIFT_SELECTED_TIME"; deltaMs: number }
   | { type: "NORMALIZE_SELECTED_TIMING"; gapMs: number }
@@ -205,6 +205,10 @@ function normalizeGroupTiming(group: CaptionGroup, durationMs: number, patch: Pa
     ? Math.min(durationMs, Math.max(startMs + 1, rawEnd))
     : Math.max(startMs + 1, rawEnd);
   return { ...patch, startMs, endMs };
+}
+
+function mayEditLockedGroup(patch: object): boolean {
+  return Object.keys(patch).every((key) => key === "reviewStatus" || key === "reviewNote" || key === "locked");
 }
 
 function reducer(state: EditorState, action: Action): EditorState {
@@ -321,6 +325,7 @@ function reducer(state: EditorState, action: Action): EditorState {
     case "UPDATE_GROUP": {
       const currentGroup = doc.groups.find((group) => group.id === action.id);
       if (!currentGroup) return state;
+      if (currentGroup.locked && !mayEditLockedGroup(action.patch)) return state;
       const safePatch = action.patch.startMs !== undefined || action.patch.endMs !== undefined
         ? normalizeGroupTiming(currentGroup, doc.durationMs, action.patch)
         : action.patch;
@@ -333,7 +338,7 @@ function reducer(state: EditorState, action: Action): EditorState {
 
     case "UPDATE_GROUP_METADATA": {
       const groups = doc.groups.map((g) =>
-        action.ids.includes(g.id) ? { ...g, ...action.patch } : g,
+        action.ids.includes(g.id) && (!g.locked || mayEditLockedGroup(action.patch)) ? { ...g, ...action.patch } : g,
       );
       return commitDoc(state, { ...doc, groups: sortGroups(groups) });
     }
@@ -341,6 +346,7 @@ function reducer(state: EditorState, action: Action): EditorState {
     case "UPDATE_GROUP_OVERRIDES": {
       const groups = doc.groups.map((g) =>
         action.ids.includes(g.id)
+          && !g.locked
           ? { ...g, overrides: { ...g.overrides, ...action.patch } }
           : g,
       );
@@ -352,7 +358,7 @@ function reducer(state: EditorState, action: Action): EditorState {
       if (ids.size === 0 || !Number.isFinite(action.deltaMs)) return state;
       const delta = Math.round(action.deltaMs);
       const groups = doc.groups.map((g) => {
-        if (!ids.has(g.id)) return g;
+        if (!ids.has(g.id) || g.locked) return g;
         const duration = Math.max(1, g.endMs - g.startMs);
         const startMs = Math.min(Math.max(0, g.startMs + delta), Math.max(0, doc.durationMs - duration));
         return { ...g, startMs, endMs: startMs + duration };
@@ -367,6 +373,7 @@ function reducer(state: EditorState, action: Action): EditorState {
       let cursor = selected[0].startMs;
       const updates = new Map<string, CaptionGroup>();
       for (const group of selected) {
+        if (group.locked) continue;
         const duration = Math.max(1, group.endMs - group.startMs);
         const startMs = Math.min(cursor, Math.max(0, doc.durationMs - duration));
         const next = { ...group, startMs, endMs: startMs + duration };
@@ -379,21 +386,21 @@ function reducer(state: EditorState, action: Action): EditorState {
 
     case "RESET_GROUP_OVERRIDES": {
       const groups = doc.groups.map((g) =>
-        action.ids.includes(g.id) ? { ...g, overrides: {} } : g,
+        action.ids.includes(g.id) && !g.locked ? { ...g, overrides: {} } : g,
       );
       return commitDoc(state, { ...doc, groups });
     }
 
     case "APPLY_STYLE": {
       const groups = doc.groups.map((g) =>
-        action.ids.includes(g.id) ? { ...g, baseStyleId: action.styleId } : g,
+        action.ids.includes(g.id) && !g.locked ? { ...g, baseStyleId: action.styleId } : g,
       );
       return commitDoc(state, { ...doc, groups });
     }
 
     case "UPDATE_UNIT": {
       const groups = doc.groups.map((g) => {
-        if (g.id !== action.groupId) return g;
+        if (g.id !== action.groupId || g.locked) return g;
         return {
           ...g,
           units: g.units.map((u) =>
@@ -408,7 +415,7 @@ function reducer(state: EditorState, action: Action): EditorState {
 
     case "SET_UNIT_EFFECT": {
       const groups = doc.groups.map((g) => {
-        if (g.id !== action.groupId) return g;
+        if (g.id !== action.groupId || g.locked) return g;
         return {
           ...g,
           units: g.units.map((u) =>
@@ -421,7 +428,7 @@ function reducer(state: EditorState, action: Action): EditorState {
 
     case "SPLIT_GROUP": {
       const target = doc.groups.find((g) => g.id === action.groupId);
-      if (!target) return state;
+      if (!target || target.locked) return state;
       const result = splitCaptionGroupAtGrapheme(target, action.graphemeIndex);
       if (!result) return state;
       const groups = sortGroups([
@@ -439,6 +446,7 @@ function reducer(state: EditorState, action: Action): EditorState {
       const ids = doc.selection.groupIds;
       if (ids.length < 2) return state;
       const selected = doc.groups.filter((g) => ids.includes(g.id));
+      if (selected.some((group) => group.locked)) return state;
       const merged = mergeCaptionGroups(selected);
       if (!merged) return state;
       const groups = sortGroups([
@@ -455,7 +463,7 @@ function reducer(state: EditorState, action: Action): EditorState {
     case "DELETE_SELECTED": {
       const ids = doc.selection.groupIds;
       if (ids.length === 0) return state;
-      const groups = doc.groups.filter((g) => !ids.includes(g.id));
+      const groups = doc.groups.filter((g) => !ids.includes(g.id) || g.locked);
       return commitDoc(state, {
         ...doc,
         groups,
@@ -464,7 +472,7 @@ function reducer(state: EditorState, action: Action): EditorState {
     }
 
     case "DUPLICATE_SELECTED": {
-      const selected = doc.groups.filter((g) => doc.selection.groupIds.includes(g.id));
+      const selected = doc.groups.filter((g) => doc.selection.groupIds.includes(g.id) && !g.locked);
       if (selected.length === 0) return state;
       const offset = Math.max(1, Math.round(action.offsetMs ?? 250));
       const usedIds = new Set(doc.groups.map((group) => group.id));
@@ -498,7 +506,7 @@ function reducer(state: EditorState, action: Action): EditorState {
       const prefix = action.prefix ?? "";
       const suffix = action.suffix ?? "";
       const groups = doc.groups.map((group) => {
-        if (!ids.has(group.id)) return group;
+        if (!ids.has(group.id) || group.locked) return group;
         const normalized = action.normalizeWhitespace ? group.text.replace(/\s+/gu, " ").trim() : group.text;
         return { ...group, text: `${prefix}${normalized}${suffix}`, units: [], words: undefined, effect: undefined };
       });
@@ -509,7 +517,7 @@ function reducer(state: EditorState, action: Action): EditorState {
       if (!action.search) return state;
       const ids = action.ids ? new Set(action.ids) : null;
       const groups = doc.groups.map((group) => {
-        if (ids && !ids.has(group.id)) return group;
+        if ((ids && !ids.has(group.id)) || group.locked) return group;
         const text = group.text.split(action.search).join(action.replacement);
         return text === group.text ? group : { ...group, text, units: [], words: undefined, effect: undefined };
       });

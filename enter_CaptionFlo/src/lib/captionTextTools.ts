@@ -53,7 +53,7 @@ export function removeFillerWords(text: string): string {
 export function repairFillerWords(groups: CaptionGroup[], groupIds: string[]): CaptionGroup[] {
   const ids = new Set(groupIds);
   return groups.map((group) => {
-    if (!ids.has(group.id)) return group;
+    if (!ids.has(group.id) || group.locked) return group;
     const text = removeFillerWords(group.text);
     if (!text || text === group.text) return group;
     return { ...group, text, units: [], words: undefined, effect: undefined };
@@ -136,7 +136,7 @@ function buildHighlightUnits(group: CaptionGroup) {
 export function applyKeywordHighlights(groups: CaptionGroup[], groupIds: string[]): CaptionGroup[] {
   const ids = new Set(groupIds);
   return groups.map((group) => {
-    if (!ids.has(group.id) || group.units.length > 0) return group;
+    if (!ids.has(group.id) || group.locked || group.units.length > 0) return group;
     const units = buildHighlightUnits(group);
     return units.length ? { ...group, units } : group;
   });
