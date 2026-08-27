@@ -7,6 +7,7 @@ import re
 import time
 import uuid
 import hmac
+from urllib.parse import unquote
 from pathlib import Path
 
 warnings.filterwarnings("ignore", category=UserWarning, module="langchain_tavily")
@@ -39,6 +40,21 @@ def _api_auth_token(request: Request) -> str:
     if authorization.lower().startswith("bearer "):
         return authorization[7:].strip()
     return request.headers.get("X-Local-Auth", "").strip()
+
+
+_PRIVATE_OUTPUT_NAMES = {
+    "upload_index.json",
+    "queue_state.json",
+    "captionflo-project.json",
+}
+
+
+def _is_private_output_path(path: str) -> bool:
+    if not path.startswith("/outputs/"):
+        return False
+    relative = unquote(path[len("/outputs/"):]).lstrip("/")
+    first = relative.split("/", 1)[0].lower()
+    return first in _PRIVATE_OUTPUT_NAMES or first == "asr_cache"
 
 # ---- Path resolution ----
 if getattr(sys, "frozen", False):
@@ -171,6 +187,12 @@ async def local_only_requests(request: Request, call_next):
 
     def finalize(response, status_code: int):
         response.headers["X-Request-ID"] = request_id
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+        if request.url.path.startswith("/api/") or request.url.path == "/metrics":
+            response.headers["Cache-Control"] = "no-store"
         elapsed_ms = (time.perf_counter() - started_at) * 1000
         logger.info("request_id=%s method=%s path=%s status=%s duration_ms=%.1f", request_id, request.method, request.url.path, status_code, elapsed_ms)
         return response
@@ -179,6 +201,8 @@ async def local_only_requests(request: Request, call_next):
     if client is not None and not is_loopback_host(client.host):
         logger.warning("request_id=%s rejected non-local request for %s", request_id, request.url.path)
         return finalize(JSONResponse(status_code=403, content={"detail": "This local service only accepts loopback requests"}), 403)
+    if _is_private_output_path(request.url.path):
+        return finalize(JSONResponse(status_code=404, content={"detail": "Not found"}), 404)
 
     protected_path = request.url.path.startswith("/api/") or request.url.path == "/metrics"
     configured_token = os.environ.get("LOCAL_AUTH_TOKEN", "")
@@ -196,6 +220,19 @@ async def local_only_requests(request: Request, call_next):
                 return finalize(JSONResponse(status_code=413, content={"detail": "Request body is too large"}), 413)
         except ValueError:
             return finalize(JSONResponse(status_code=400, content={"detail": "Invalid Content-Length header"}), 400)
+    original_receive = request._receive
+    received_bytes = 0
+
+    async def limited_receive():
+        nonlocal received_bytes
+        message = await original_receive()
+        if message.get("type") == "http.request":
+            received_bytes += len(message.get("body", b""))
+            if received_bytes > MAX_REQUEST_SIZE:
+                raise HTTPException(status_code=413, detail="Request body is too large")
+        return message
+
+    request._receive = limited_receive
     response = await call_next(request)
     return finalize(response, response.status_code)
 

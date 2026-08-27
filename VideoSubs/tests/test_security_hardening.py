@@ -91,6 +91,20 @@ def test_optional_local_auth_token_protects_api(monkeypatch):
     assert health.status_code == 200
 
 
+def test_security_headers_and_private_outputs_are_enforced():
+    from src import app as application
+
+    assert application._is_private_output_path("/outputs/upload_index.json")
+    assert application._is_private_output_path("/outputs/asr_cache/abc.json")
+    assert not application._is_private_output_path("/outputs/uploads/default/video.mp4")
+
+    response = TestClient(application.app).get("/health")
+    assert response.status_code == 200
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["permissions-policy"] == "camera=(), microphone=(), geolocation=()"
+
+
 def test_ass_payload_limit_prevents_oversized_documents(monkeypatch):
     monkeypatch.setattr(caption_payload, "MAX_ASS_PAYLOAD_BYTES", 32)
     with pytest.raises(ValueError, match="maximum allowed size"):
