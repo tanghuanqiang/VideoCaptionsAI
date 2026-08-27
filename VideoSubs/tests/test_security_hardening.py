@@ -1,7 +1,9 @@
+import asyncio
 import io
 
 import pytest
 from fastapi import UploadFile
+from fastapi.exceptions import HTTPException
 from fastapi.testclient import TestClient
 
 from src.routers import burn
@@ -176,3 +178,26 @@ def test_hard_burn_path_must_stay_inside_outputs(monkeypatch, tmp_path):
     assert burn._resolve_video_path(str(persisted_video.resolve())) == str(persisted_video.resolve())
     assert burn._resolve_video_path("../private.mp4") is None
     assert burn._resolve_video_path(str(external_video.resolve())) is None
+
+
+def test_task_download_rejects_output_paths_outside_outputs(monkeypatch, tmp_path):
+    from src.routers import tasks
+    from src.utils.task_queue import Task, TaskStatus
+
+    outputs = tmp_path / "outputs"
+    outputs.mkdir()
+    outside = tmp_path / "private.txt"
+    outside.write_text("secret", encoding="utf-8")
+    monkeypatch.setattr(tasks._config, "OUTPUTS_DIR", str(outputs))
+
+    task = Task("deadbeef", "burn_task", {})
+    task.status = TaskStatus.COMPLETED
+    task.result = {"output_path": str(outside)}
+    tasks.burn_queue.tasks[task.task_id] = task
+    try:
+        with pytest.raises(HTTPException) as exc_info:
+            asyncio.run(tasks.download_burn_result(task.task_id, filename=None))
+        assert exc_info.value.status_code == 404
+        assert tasks._safe_download_filename("evil\r\n.mp4", "fallback.mp4") == "evil.mp4"
+    finally:
+        tasks.burn_queue.tasks.pop(task.task_id, None)
