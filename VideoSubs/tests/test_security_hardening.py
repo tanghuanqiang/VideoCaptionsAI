@@ -74,6 +74,23 @@ def test_local_service_blocks_remote_clients_and_never_returns_keys(monkeypatch)
     assert traced.headers["X-Request-ID"] == request_id
 
 
+def test_optional_local_auth_token_protects_api(monkeypatch):
+    from src import app as application
+
+    monkeypatch.setenv("LOCAL_AUTH_TOKEN", "unit-secret-token")
+    client = TestClient(application.app)
+    denied = client.get("/api/config")
+    bearer = client.get("/api/config", headers={"Authorization": "Bearer unit-secret-token"})
+    header = client.get("/api/config", headers={"X-Local-Auth": "unit-secret-token"})
+    health = client.get("/health")
+
+    assert denied.status_code == 401
+    assert denied.headers["www-authenticate"] == "Bearer"
+    assert bearer.status_code == 200
+    assert header.status_code == 200
+    assert health.status_code == 200
+
+
 def test_ass_payload_limit_prevents_oversized_documents(monkeypatch):
     monkeypatch.setattr(caption_payload, "MAX_ASS_PAYLOAD_BYTES", 32)
     with pytest.raises(ValueError, match="maximum allowed size"):

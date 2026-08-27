@@ -6,6 +6,7 @@ import logging
 import re
 import time
 import uuid
+import hmac
 from pathlib import Path
 
 warnings.filterwarnings("ignore", category=UserWarning, module="langchain_tavily")
@@ -28,6 +29,16 @@ _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,96}$")
 def _request_id(request: Request) -> str:
     candidate = request.headers.get("X-Request-ID", "").strip()
     return candidate if _REQUEST_ID_PATTERN.fullmatch(candidate) else uuid.uuid4().hex
+
+
+def _api_auth_token(request: Request) -> str:
+    configured = os.environ.get("LOCAL_AUTH_TOKEN", "")
+    if not configured:
+        return ""
+    authorization = request.headers.get("Authorization", "")
+    if authorization.lower().startswith("bearer "):
+        return authorization[7:].strip()
+    return request.headers.get("X-Local-Auth", "").strip()
 
 # ---- Path resolution ----
 if getattr(sys, "frozen", False):
@@ -168,6 +179,15 @@ async def local_only_requests(request: Request, call_next):
     if client is not None and not is_loopback_host(client.host):
         logger.warning("request_id=%s rejected non-local request for %s", request_id, request.url.path)
         return finalize(JSONResponse(status_code=403, content={"detail": "This local service only accepts loopback requests"}), 403)
+
+    protected_path = request.url.path.startswith("/api/") or request.url.path == "/metrics"
+    configured_token = os.environ.get("LOCAL_AUTH_TOKEN", "")
+    if protected_path and configured_token:
+        provided_token = _api_auth_token(request)
+        if not provided_token or not hmac.compare_digest(provided_token, configured_token):
+            response = JSONResponse(status_code=401, content={"detail": "Authentication required"})
+            response.headers["WWW-Authenticate"] = "Bearer"
+            return finalize(response, 401)
 
     content_length = request.headers.get("content-length")
     if content_length:
