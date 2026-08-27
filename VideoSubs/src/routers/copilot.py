@@ -1,8 +1,10 @@
 ﻿import os
 import json
 import asyncio
+import re
+import secrets
 from typing import Optional, List
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from src.connection_manager import manager
@@ -11,7 +13,15 @@ from src.services.storage import get_file_path, save_upload
 
 router = APIRouter()
 
-COPILOT_USER_ID = "copilot_default"
+COPILOT_SESSION_PATTERN = re.compile(r"^[A-Za-z0-9_-]{8,96}$")
+
+
+def _new_session_id() -> str:
+    return secrets.token_urlsafe(18)
+
+
+def _session_id_or_new(value: Optional[str]) -> str:
+    return value if value and COPILOT_SESSION_PATTERN.fullmatch(value) else _new_session_id()
 
 
 async def stream_graph_updates(
@@ -21,6 +31,7 @@ async def stream_graph_updates(
     video,
     files: list,
     include_context: bool = True,
+    session_id: str = "",
 ):
     system_prompt = """You are a professional video subtitle editing assistant.
 
@@ -56,7 +67,7 @@ Input:
 
     if graph is None:
         await manager.send_personal_message(
-            "Error: Copilot is not configured. Please set your API key in settings.", COPILOT_USER_ID
+            "Error: Copilot is not configured. Please set your API key in settings.", session_id
         )
         return
 
@@ -76,10 +87,10 @@ Input:
 
                 if isinstance(content, str):
                     for char in content:
-                        await manager.send_personal_message(char, COPILOT_USER_ID)
+                        await manager.send_personal_message(char, session_id)
                         await asyncio.sleep(0.02)
     except Exception as e:
-        await manager.send_personal_message(f"Error: {str(e)}", COPILOT_USER_ID)
+        await manager.send_personal_message(f"Error: {str(e)}", session_id)
 
 
 @router.post("/copilot/send")
@@ -91,7 +102,9 @@ async def send_message(
     video: Optional[UploadFile] = File(None),
     files: Optional[List[UploadFile]] = File(None),
     include_context: bool = Form(True),
+    session_id: Optional[str] = Query(None),
 ):
+    session_id = _session_id_or_new(session_id)
     subtitles = []
     styles = []
 
@@ -128,20 +141,22 @@ async def send_message(
             save_upload(f)
 
     asyncio.create_task(
-        stream_graph_updates(text, subtitles, styles, video_obj, files or [], include_context)
+        stream_graph_updates(text, subtitles, styles, video_obj, files or [], include_context, session_id)
     )
-    return JSONResponse({"status": "ok"})
+    return JSONResponse({"status": "ok", "session_id": session_id})
 
 
 @router.get("/copilot/sse")
-async def sse_endpoint():
+async def sse_endpoint(session_id: Optional[str] = Query(None, min_length=8, max_length=96)):
+    session_id = _session_id_or_new(session_id)
+
     async def event_generator():
-        queue = await manager.connect(COPILOT_USER_ID)
+        queue = await manager.connect(session_id)
         try:
             while True:
                 msg = await queue.get()
                 yield f"data: {msg}\n\n"
         except asyncio.CancelledError:
-            manager.disconnect(COPILOT_USER_ID)
+            manager.disconnect(session_id)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

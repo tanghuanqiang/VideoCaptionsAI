@@ -3,6 +3,9 @@ import os
 import sys
 import warnings
 import logging
+import re
+import time
+import uuid
 from pathlib import Path
 
 warnings.filterwarnings("ignore", category=UserWarning, module="langchain_tavily")
@@ -19,6 +22,12 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("VideoCaptionsAI")
+_REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,96}$")
+
+
+def _request_id(request: Request) -> str:
+    candidate = request.headers.get("X-Request-ID", "").strip()
+    return candidate if _REQUEST_ID_PATTERN.fullmatch(candidate) else uuid.uuid4().hex
 
 # ---- Path resolution ----
 if getattr(sys, "frozen", False):
@@ -145,19 +154,30 @@ app.add_middleware(
 
 @app.middleware("http")
 async def local_only_requests(request: Request, call_next):
+    request_id = _request_id(request)
+    request.state.request_id = request_id
+    started_at = time.perf_counter()
+
+    def finalize(response, status_code: int):
+        response.headers["X-Request-ID"] = request_id
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
+        logger.info("request_id=%s method=%s path=%s status=%s duration_ms=%.1f", request_id, request.method, request.url.path, status_code, elapsed_ms)
+        return response
+
     client = request.client
     if client is not None and not is_loopback_host(client.host):
-        logger.warning("Rejected non-local request for %s", request.url.path)
-        return JSONResponse(status_code=403, content={"detail": "This local service only accepts loopback requests"})
+        logger.warning("request_id=%s rejected non-local request for %s", request_id, request.url.path)
+        return finalize(JSONResponse(status_code=403, content={"detail": "This local service only accepts loopback requests"}), 403)
 
     content_length = request.headers.get("content-length")
     if content_length:
         try:
             if int(content_length) > MAX_REQUEST_SIZE:
-                return JSONResponse(status_code=413, content={"detail": "Request body is too large"})
+                return finalize(JSONResponse(status_code=413, content={"detail": "Request body is too large"}), 413)
         except ValueError:
-            return JSONResponse(status_code=400, content={"detail": "Invalid Content-Length header"})
-    return await call_next(request)
+            return finalize(JSONResponse(status_code=400, content={"detail": "Invalid Content-Length header"}), 400)
+    response = await call_next(request)
+    return finalize(response, response.status_code)
 
 # Mount outputs
 app.mount("/outputs", StaticFiles(directory=OUTPUTS_DIR), name="outputs")
@@ -184,11 +204,14 @@ app.include_router(project.router)
 # ---- Global exception handler ----
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
-    return JSONResponse(
+    request_id = getattr(request.state, "request_id", "unknown")
+    logger.exception("request_id=%s unhandled exception on %s %s", request_id, request.method, request.url.path)
+    response = JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},
     )
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 
 # ---- Health check ----

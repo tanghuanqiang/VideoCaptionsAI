@@ -1,6 +1,8 @@
 import os
 import json
 import hashlib
+import tempfile
+import threading
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
@@ -12,6 +14,7 @@ from src.utils.task_queue import burn_queue
 from src.tools.subtitle_tools import asr_transcribe_video, probe_media
 
 router = APIRouter()
+_cache_write_lock = threading.RLock()
 
 ALLOWED_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".flv", ".wmv",
                       ".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".wma"}
@@ -40,6 +43,25 @@ def _file_md5(path: str) -> str:
         for chunk in iter(lambda: fh.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _write_cache_atomically(cache_file: str, result: dict) -> None:
+    """Write a complete JSON cache without exposing a partial document."""
+    cache_dir = os.path.dirname(os.path.abspath(cache_file))
+    os.makedirs(cache_dir, exist_ok=True)
+    with _cache_write_lock:
+        fd, temporary = tempfile.mkstemp(prefix=".asr-cache-", suffix=".tmp", dir=cache_dir)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                json.dump(result, fh, ensure_ascii=False, indent=2)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(temporary, cache_file)
+        finally:
+            try:
+                os.remove(temporary)
+            except OSError:
+                pass
 
 
 @router.post("/asr/")
@@ -169,8 +191,7 @@ async def api_asr(
         result = result.dict()
 
     try:
-        with open(cache_file, "w", encoding="utf-8") as f:
-            json.dump(result, f, ensure_ascii=False, indent=2)
+        _write_cache_atomically(cache_file, result)
         print(f"ASR result cached: {cache_key}")
     except Exception as e:
         print(f"Failed to cache ASR result: {e}")

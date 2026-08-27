@@ -297,7 +297,10 @@ export const subtitleService = {
       return;
     }
 
-    const source = new EventSource(apiPath(API_CONFIG.endpoints.copilotStream));
+    const sessionId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const streamUrl = `${apiPath(API_CONFIG.endpoints.copilotStream)}?session_id=${encodeURIComponent(sessionId)}`;
+    const sendUrl = `${apiPath(API_CONFIG.endpoints.copilotSend)}?session_id=${encodeURIComponent(sessionId)}`;
+    const source = new EventSource(streamUrl);
     const idleTimeoutMs = 1000;
     const maxWaitMs = 15000;
     let seenMessage = false;
@@ -311,10 +314,12 @@ export const subtitleService = {
       }
     };
 
-    const postPromise = fetch(apiPath(API_CONFIG.endpoints.copilotSend), {
+    const form = new FormData();
+    form.append("text", prompt);
+    form.append("include_context", "false");
+    const postPromise = fetch(sendUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: prompt, include_context: false }),
+      body: form,
     });
 
     await postPromise.then(async (res) => {
