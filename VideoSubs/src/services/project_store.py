@@ -2,6 +2,8 @@
 
 import json
 import os
+import tempfile
+import threading
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -9,6 +11,7 @@ from src.config import OUTPUTS_DIR
 
 PROJECT_FILENAME = "captionflo-project.json"
 MAX_PROJECT_DOCUMENT_BYTES = int(os.environ.get("MAX_PROJECT_DOCUMENT_BYTES", 25 * 1024 * 1024))
+_project_lock = threading.RLock()
 
 
 def project_path() -> Path:
@@ -25,8 +28,13 @@ def _find_persisted_video(video_name: Optional[str]) -> Optional[Path]:
     if not root.exists():
         return None
     for candidate in root.rglob(candidate_name):
-        if candidate.is_file() and candidate.name != PROJECT_FILENAME:
-            return candidate
+        if candidate.is_symlink():
+            continue
+        resolved = candidate.resolve()
+        if root.resolve() not in resolved.parents:
+            continue
+        if resolved.is_file() and resolved.name != PROJECT_FILENAME:
+            return resolved
     return None
 
 
@@ -51,22 +59,37 @@ def sanitize_document(document: Dict[str, Any]) -> Dict[str, Any]:
 
 def save_document(document: Dict[str, Any]) -> Dict[str, Any]:
     path = project_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
     saved = sanitize_document(document)
     serialized = json.dumps(saved, ensure_ascii=False, indent=2)
     if len(serialized.encode("utf-8")) > MAX_PROJECT_DOCUMENT_BYTES:
         raise ValueError("Project document exceeds the maximum allowed size")
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(serialized, encoding="utf-8")
-    temporary.replace(path)
+    with _project_lock:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, temporary_name = tempfile.mkstemp(
+            prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent)
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
+                handle.write(serialized)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary_name, path)
+        finally:
+            try:
+                os.remove(temporary_name)
+            except OSError:
+                pass
     return saved
 
 
 def load_document() -> Optional[Dict[str, Any]]:
     path = project_path()
-    if not path.exists():
-        return None
-    document = json.loads(path.read_text(encoding="utf-8"))
+    with _project_lock:
+        if not path.exists():
+            return None
+        if path.is_symlink() or path.stat().st_size > MAX_PROJECT_DOCUMENT_BYTES:
+            raise ValueError("Saved project exceeds the maximum allowed size")
+        document = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(document, dict):
         raise ValueError("Saved project must be a JSON object")
 

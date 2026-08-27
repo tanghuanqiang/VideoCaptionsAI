@@ -218,3 +218,28 @@ def test_task_download_rejects_output_paths_outside_outputs(monkeypatch, tmp_pat
         assert tasks._safe_download_filename("evil\r\n.mp4", "fallback.mp4") == "evil.mp4"
     finally:
         tasks.burn_queue.tasks.pop(task.task_id, None)
+
+
+def test_project_store_atomic_concurrent_save_and_size_guard(monkeypatch, tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from src.services import project_store
+
+    outputs = tmp_path / "outputs"
+    outputs.mkdir()
+    monkeypatch.setattr(project_store, "OUTPUTS_DIR", str(outputs))
+    monkeypatch.setattr(project_store, "MAX_PROJECT_DOCUMENT_BYTES", 4096)
+
+    def save(index):
+        project_store.save_document({"version": index, "videoUrl": "blob:discard-me"})
+
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        list(executor.map(save, range(24)))
+
+    loaded = project_store.load_document()
+    assert loaded["version"] in range(24)
+    assert loaded["videoUrl"] is None
+    assert not list(outputs.glob("*.tmp"))
+
+    project_store.project_path().write_text("x" * 5000, encoding="utf-8")
+    with pytest.raises(ValueError, match="exceeds"):
+        project_store.load_document()
