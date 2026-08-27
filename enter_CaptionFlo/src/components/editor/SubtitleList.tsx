@@ -1,5 +1,6 @@
 import { useDeferredValue, useMemo, useState } from "react";
-import { Search, ListFilter, Captions, ClipboardCheck, Gauge } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, ListFilter, Captions, ClipboardCheck, Gauge } from "lucide-react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { useEditor } from "@/state/EditorContext";
 import { formatMs, isGroupEstimated } from "@/lib/editorUtils";
@@ -23,6 +24,10 @@ export function SubtitleList() {
   );
   const reviewedCount = groups.filter((group) => group.reviewStatus === "reviewed").length;
   const reviewProgress = groups.length ? Math.round((reviewedCount / groups.length) * 100) : 0;
+  const reviewQueue = useMemo(
+    () => groups.filter((group) => group.reviewStatus !== "reviewed").sort((a, b) => a.startMs - b.startMs),
+    [groups],
+  );
   const issueIds = useMemo(
     () => new Set(analyzeCaptionQuality(deferredGroups, state.doc.durationMs, state.doc.qualityProfile).issues.map((issue) => issue.groupId)),
     [deferredGroups, state.doc.durationMs, state.doc.qualityProfile],
@@ -58,6 +63,20 @@ export function SubtitleList() {
     }
   };
 
+  const moveReviewQueue = (direction: 1 | -1) => {
+    if (reviewQueue.length === 0) {
+      toast.success("审校队列已完成");
+      return;
+    }
+    const current = selection.groupIds.length === 1 ? reviewQueue.findIndex((group) => group.id === selection.groupIds[0]) : -1;
+    const nextIndex = current < 0
+      ? (direction === 1 ? 0 : reviewQueue.length - 1)
+      : (current + direction + reviewQueue.length) % reviewQueue.length;
+    const next = reviewQueue[nextIndex];
+    dispatch({ type: "SELECT", selection: { groupIds: [next.id], unitIds: [] } });
+    dispatch({ type: "SET_CURRENT_MS", ms: next.startMs });
+  };
+
   return (
     <aside className="glass-panel flex h-full w-72 flex-col rounded-xl">
       <div className="flex items-center justify-between px-4 pb-2 pt-3.5">
@@ -69,6 +88,20 @@ export function SubtitleList() {
           </span>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => moveReviewQueue(-1)}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-foreground/50 transition-colors hover:bg-foreground/5"
+            title={`上一条待审校字幕（${reviewQueue.length}）`}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => moveReviewQueue(1)}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-foreground/50 transition-colors hover:bg-foreground/5"
+            title={`下一条待审校字幕（${reviewQueue.length}）`}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
           <button
             onClick={() => setOnlyUnreviewed((v) => !v)}
             className={cn(
@@ -111,6 +144,7 @@ export function SubtitleList() {
           <div className="mt-1 h-1 overflow-hidden rounded-full bg-foreground/10">
             <div className="h-full rounded-full bg-success transition-[width]" style={{ width: `${reviewProgress}%` }} />
           </div>
+          <button onClick={() => moveReviewQueue(1)} className="mt-1.5 text-[10px] text-primary hover:underline">继续审校（剩余 {reviewQueue.length} 条）</button>
         </div>
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-foreground/40" />
