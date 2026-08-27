@@ -243,3 +243,20 @@ def test_project_store_atomic_concurrent_save_and_size_guard(monkeypatch, tmp_pa
     project_store.project_path().write_text("x" * 5000, encoding="utf-8")
     with pytest.raises(ValueError, match="exceeds"):
         project_store.load_document()
+
+
+def test_copilot_input_validation_rejects_malformed_or_unsafe_inputs():
+    from src.routers import copilot
+
+    with pytest.raises(HTTPException) as invalid_json:
+        copilot._parse_context_json("not-json", "subtitles_json")
+    assert invalid_json.value.status_code == 400
+
+    with pytest.raises(HTTPException) as wrong_shape:
+        copilot._parse_context_json("{}", "styles_json")
+    assert wrong_shape.value.status_code == 400
+
+    unsafe = UploadFile(filename="payload.exe", file=io.BytesIO(b"x"))
+    with pytest.raises(HTTPException) as bad_extension:
+        copilot._validate_copilot_upload(unsafe)
+    assert bad_extension.value.status_code == 400

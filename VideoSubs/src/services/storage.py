@@ -106,13 +106,13 @@ def save_upload_to_path(file: UploadFile, dest_path: str, max_bytes: int = MAX_U
             pass
     return written
 
-def save_upload(file: UploadFile) -> str:
+def save_upload(file: UploadFile, max_bytes: int = MAX_UPLOAD_SIZE) -> str:
     """保存上传文件到临时路径"""
     uploads_dir = os.path.join(OUTPUTS_DIR, "uploads", "direct")
     os.makedirs(uploads_dir, exist_ok=True)
     unique_name = f"{uuid.uuid4()}{_safe_extension(file.filename)}"
     dest_path = os.path.join(uploads_dir, unique_name)
-    save_upload_to_path(file, dest_path)
+    save_upload_to_path(file, dest_path, max_bytes=max_bytes)
     return dest_path
 
 def save_upload_with_uuid(file: UploadFile, user_id: str) -> tuple[str, str]:

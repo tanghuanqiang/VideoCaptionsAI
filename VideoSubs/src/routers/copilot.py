@@ -10,10 +10,20 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from src.connection_manager import manager
 from src.agent.SubsAI import graph, reload_agent
 from src.services.storage import get_file_path, save_upload
+from src.config import MAX_UPLOAD_SIZE
 
 router = APIRouter()
 
 COPILOT_SESSION_PATTERN = re.compile(r"^[A-Za-z0-9_-]{8,96}$")
+MAX_COPILOT_TEXT_BYTES = 32 * 1024
+MAX_COPILOT_CONTEXT_BYTES = 2 * 1024 * 1024
+MAX_COPILOT_FILES = 4
+MAX_COPILOT_FILE_BYTES = min(MAX_UPLOAD_SIZE, 50 * 1024 * 1024)
+ALLOWED_COPILOT_EXTENSIONS = {
+    ".mp4", ".mov", ".avi", ".mkv", ".webm", ".mp3", ".wav",
+    ".m4a", ".aac", ".flac", ".ogg", ".ass", ".ssa", ".srt",
+    ".vtt", ".txt", ".json", ".md",
+}
 
 
 def _new_session_id() -> str:
@@ -22,6 +32,28 @@ def _new_session_id() -> str:
 
 def _session_id_or_new(value: Optional[str]) -> str:
     return value if value and COPILOT_SESSION_PATTERN.fullmatch(value) else _new_session_id()
+
+
+def _parse_context_json(raw: Optional[str], field_name: str) -> list:
+    if not raw:
+        return []
+    if len(raw.encode("utf-8")) > MAX_COPILOT_CONTEXT_BYTES:
+        raise HTTPException(status_code=413, detail=f"{field_name} is too large")
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail=f"{field_name} must be valid JSON") from exc
+    if not isinstance(value, list):
+        raise HTTPException(status_code=400, detail=f"{field_name} must be a JSON array")
+    return value
+
+
+def _validate_copilot_upload(upload: UploadFile) -> None:
+    extension = os.path.splitext(upload.filename or "")[1].lower()
+    if extension not in ALLOWED_COPILOT_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Unsupported Copilot file type: {extension}")
+    if upload.size and upload.size > MAX_COPILOT_FILE_BYTES:
+        raise HTTPException(status_code=413, detail="Copilot attachment is too large")
 
 
 async def stream_graph_updates(
@@ -105,20 +137,17 @@ async def send_message(
     session_id: Optional[str] = Query(None),
 ):
     session_id = _session_id_or_new(session_id)
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="text must not be empty")
+    if len(text.encode("utf-8")) > MAX_COPILOT_TEXT_BYTES:
+        raise HTTPException(status_code=413, detail="Copilot prompt is too large")
+
     subtitles = []
     styles = []
 
     if include_context:
-        if subtitles_json:
-            try:
-                subtitles = json.loads(subtitles_json)
-            except Exception as e:
-                print("invalid subtitles_json:", e)
-        if styles_json:
-            try:
-                styles = json.loads(styles_json)
-            except Exception as e:
-                print("invalid styles_json:", e)
+        subtitles = _parse_context_json(subtitles_json, "subtitles_json")
+        styles = _parse_context_json(styles_json, "styles_json")
 
     print(f"Copilot received: {text} (include_context={include_context})")
 
@@ -133,12 +162,15 @@ async def send_message(
                     self.path = path
             video_obj = MockUploadFile(video_path)
     elif video:
+        _validate_copilot_upload(video)
         video_obj = video
-        save_upload(video)
+        save_upload(video, max_bytes=MAX_COPILOT_FILE_BYTES)
 
+    if len(files or []) > MAX_COPILOT_FILES:
+        raise HTTPException(status_code=400, detail=f"At most {MAX_COPILOT_FILES} Copilot attachments are allowed")
     for f in (files or []):
-        if not os.path.exists(f.filename or ""):
-            save_upload(f)
+        _validate_copilot_upload(f)
+        save_upload(f, max_bytes=MAX_COPILOT_FILE_BYTES)
 
     asyncio.create_task(
         stream_graph_updates(text, subtitles, styles, video_obj, files or [], include_context, session_id)
