@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Copy, Lock, RotateCcw, SlidersHorizontal, Unlock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, Lock, Paintbrush, RotateCcw, SlidersHorizontal, Unlock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useEditor } from "@/state/EditorContext";
@@ -197,6 +197,21 @@ export function CaptionPropertiesPanel({ group }: { group: CaptionGroup }) {
             dispatch({ type: "APPLY_STYLE", ids: [group.id], styleId: id })
           }
         />
+        {group.speaker?.trim() && (
+          <div className="mt-2 rounded-md border border-border/60 px-2.5 py-2">
+            <div className="flex items-center justify-between gap-2 text-[11px]">
+              <span className="flex min-w-0 items-center gap-1 text-foreground/60"><Paintbrush className="h-3.5 w-3.5" />{group.speaker} 的样式规则</span>
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => dispatch({ type: "SET_SPEAKER_STYLE", speaker: group.speaker!, styleId: group.baseStyleId })}
+              >设为默认</Button>
+            </div>
+            {state.doc.speakerStyleIds[group.speaker.trim()] && (
+              <p className="mt-1 text-[10px] text-foreground/45">当前规则：{state.doc.speakerStyleIds[group.speaker.trim()]}</p>
+            )}
+          </div>
+        )}
 
         <SectionTitle>字体</SectionTitle>
         <FieldRow label="字号">

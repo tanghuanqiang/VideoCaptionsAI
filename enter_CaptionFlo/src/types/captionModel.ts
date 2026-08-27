@@ -18,6 +18,15 @@ export type TimingSource = "asr-word" | "estimated";
 export type CaptionReviewStatus = "draft" | "needs-review" | "reviewed";
 export type CaptionContentTag = "chapter" | "highlight";
 
+export type ProjectMarkerKind = "chapter" | "review" | "note";
+
+export interface ProjectMarker {
+  id: string;
+  timeMs: number;
+  label: string;
+  kind: ProjectMarkerKind;
+}
+
 export interface CaptionGlossaryEntry {
   id: string;
   preferred: string;

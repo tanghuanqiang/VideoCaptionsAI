@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Scissors, Film, Captions, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { BookmarkPlus, Captions, Film, Flag, Maximize2, MessageSquareText, Scissors, ZoomIn, ZoomOut } from "lucide-react";
 import { useEditor } from "@/state/EditorContext";
 import { formatClock, isGroupEstimated } from "@/lib/editorUtils";
 import { graphemesOf } from "@/types/captionModel";
@@ -13,6 +13,8 @@ export function Timeline() {
   const { doc, currentMs, mode } = state;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
+  const [markerLabel, setMarkerLabel] = useState("");
+  const [markerKind, setMarkerKind] = useState<"chapter" | "review" | "note">("note");
   const pxPerSec = BASE_PX_PER_SEC * zoom;
 
   const durationMs = doc.durationMs || 20000;
@@ -34,6 +36,12 @@ export function Timeline() {
     dispatch({ type: "SET_CURRENT_MS", ms: (x / pxPerSec) * 1000 });
   };
 
+  const addMarker = () => {
+    if (!markerLabel.trim()) return;
+    dispatch({ type: "ADD_MARKER", marker: { timeMs: currentMs, label: markerLabel, kind: markerKind } });
+    setMarkerLabel("");
+  };
+
   return (
     <div className="glass-panel flex h-full flex-col rounded-xl">
       <div className="flex items-center justify-between px-4 py-2">
@@ -46,6 +54,13 @@ export function Timeline() {
           )}
         </div>
         <div className="flex items-center gap-2 text-[11px] text-foreground/50">
+          <div className="hidden items-center gap-1 lg:flex">
+            <select value={markerKind} onChange={(event) => setMarkerKind(event.target.value as typeof markerKind)} className="h-6 rounded border border-border bg-background px-1 text-[10px]">
+              <option value="note">备注</option><option value="review">复核</option><option value="chapter">章节</option>
+            </select>
+            <input value={markerLabel} onChange={(event) => setMarkerLabel(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addMarker(); }} placeholder="在播放头添加标记" className="h-6 w-28 rounded border border-border bg-background px-1.5 text-[10px] outline-none focus:border-primary" />
+            <button onClick={addMarker} disabled={!markerLabel.trim()} className="flex h-6 w-6 items-center justify-center rounded hover:bg-foreground/5 disabled:opacity-30" title="添加时间轴标记"><BookmarkPlus className="h-3.5 w-3.5" /></button>
+          </div>
           <button onClick={() => setZoom((value) => Math.max(0.5, Number((value - 0.25).toFixed(2))))} className="flex h-6 w-6 items-center justify-center rounded hover:bg-foreground/5" title="缩小时间轴"><ZoomOut className="h-3.5 w-3.5" /></button>
           <span className="w-9 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
           <button onClick={() => setZoom((value) => Math.min(4, Number((value + 0.25).toFixed(2))))} className="flex h-6 w-6 items-center justify-center rounded hover:bg-foreground/5" title="放大时间轴"><ZoomIn className="h-3.5 w-3.5" /></button>
@@ -84,6 +99,26 @@ export function Timeline() {
           <TrackLabelRow icon={<Film className="h-3 w-3" />} label="视频">
             <div className="mx-0 my-1 h-8 rounded-md bg-gradient-to-r from-foreground/15 to-foreground/5 ring-1 ring-inset ring-foreground/10" style={{ width: totalWidth }} />
           </TrackLabelRow>
+
+          {doc.markers.length > 0 && (
+            <TrackLabelRow icon={<Flag className="h-3 w-3" />} label="标记">
+              <div className="relative h-7" style={{ width: totalWidth }}>
+                {doc.markers.map((marker) => (
+                  <button
+                    key={marker.id}
+                    onClick={() => dispatch({ type: "SET_CURRENT_MS", ms: marker.timeMs })}
+                    onDoubleClick={() => dispatch({ type: "DELETE_MARKER", id: marker.id })}
+                    className={cn("absolute top-1 flex max-w-36 items-center gap-1 rounded px-1 py-0.5 text-[10px] text-foreground/75 hover:bg-foreground/10", marker.kind === "chapter" ? "text-primary" : marker.kind === "review" ? "text-warning-foreground" : "text-foreground/65")}
+                    style={{ left: msToX(marker.timeMs) }}
+                    title={`${marker.label} · 双击删除`}
+                  >
+                    {marker.kind === "review" ? <MessageSquareText className="h-3 w-3 shrink-0" /> : <Flag className="h-3 w-3 shrink-0" />}
+                    <span className="truncate">{marker.label}</span>
+                  </button>
+                ))}
+              </div>
+            </TrackLabelRow>
+          )}
 
           {/* Subtitle track */}
           <TrackLabelRow icon={<Captions className="h-3 w-3" />} label="字幕">

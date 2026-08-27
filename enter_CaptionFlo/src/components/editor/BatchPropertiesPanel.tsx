@@ -1,4 +1,4 @@
-import { Layers, RotateCcw, Timer, Wand2 } from "lucide-react";
+import { Layers, Paintbrush, RotateCcw, Timer, Wand2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "@/state/EditorContext";
@@ -20,7 +20,7 @@ function shared<T>(items: (T | undefined)[]): { value: T | undefined; mixed: boo
 }
 
 export function BatchPropertiesPanel({ groups }: { groups: CaptionGroup[] }) {
-  const { dispatch } = useEditor();
+  const { state, dispatch } = useEditor();
   const [prefix, setPrefix] = useState("");
   const [suffix, setSuffix] = useState("");
   const [normalizeWhitespace, setNormalizeWhitespace] = useState(false);
@@ -118,6 +118,11 @@ export function BatchPropertiesPanel({ groups }: { groups: CaptionGroup[] }) {
         </FieldRow>
 
         <SectionTitle>批量操作</SectionTitle>
+        {Object.keys(state.doc.speakerStyleIds).length > 0 && (
+          <Button variant="subtle" size="sm" className="mb-2 w-full" onClick={() => dispatch({ type: "APPLY_SPEAKER_STYLES" })}>
+            <Paintbrush />应用说话人样式规则
+          </Button>
+        )}
         <FieldRow label="说话人">
           <TextField value={speaker.value} mixed={speaker.mixed} onChange={(v) => applyMetadata({ speaker: v.trim() || undefined })} />
         </FieldRow>

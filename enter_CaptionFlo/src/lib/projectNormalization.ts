@@ -1,5 +1,5 @@
 import type { AssStyle, CaptionUnit, WordTimestamp } from "@/types/subtitleTypes";
-import type { CaptionGroup, CaptionReviewStatus } from "@/types/captionModel";
+import type { CaptionGroup, CaptionReviewStatus, ProjectMarker } from "@/types/captionModel";
 import type { CaptionGlossaryEntry } from "@/types/captionModel";
 
 type UnknownRecord = Record<string, unknown>;
@@ -18,6 +18,34 @@ function stringValue(value: unknown, fallback = ""): string {
 
 function normalizeReviewStatus(value: unknown): CaptionReviewStatus | undefined {
   return value === "draft" || value === "needs-review" || value === "reviewed" ? value : undefined;
+}
+
+export function normalizeSpeakerStyleIds(value: unknown): Record<string, string> {
+  const source = record(value);
+  if (!source) return {};
+  return Object.fromEntries(Object.entries(source).flatMap(([speaker, styleId]) => {
+    const name = speaker.trim();
+    return name && typeof styleId === "string" && styleId.trim() ? [[name, styleId]] : [];
+  }));
+}
+
+export function normalizeProjectMarkers(value: unknown, durationMs: number): ProjectMarker[] {
+  if (!Array.isArray(value)) return [];
+  const used = new Set<string>();
+  return value.flatMap((item, index) => {
+    const entry = record(item);
+    const label = stringValue(entry?.label).trim();
+    const kind = entry?.kind === "chapter" || entry?.kind === "review" || entry?.kind === "note" ? entry.kind : "note";
+    const rawTime = Math.max(0, finiteNumber(entry?.timeMs, 0));
+    const timeMs = durationMs > 0 ? Math.min(rawTime, durationMs) : rawTime;
+    if (!label) return [];
+    const baseId = stringValue(entry?.id).trim() || `marker-${index + 1}`;
+    let id = baseId;
+    let suffix = 2;
+    while (used.has(id)) id = `${baseId}-${suffix++}`;
+    used.add(id);
+    return [{ id, timeMs, label, kind }];
+  }).sort((a, b) => a.timeMs - b.timeMs);
 }
 
 function normalizeWords(value: unknown, groupStartMs: number, groupEndMs: number): WordTimestamp[] | undefined {

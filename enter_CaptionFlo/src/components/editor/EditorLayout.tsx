@@ -14,7 +14,7 @@ import {
   DEFAULT_CAPTION_QUALITY_PROFILE,
   isCaptionQualityProfile,
 } from "@/lib/captionQuality";
-import { normalizeCaptionGlossary, normalizeCaptionGroups, normalizeStyles } from "@/lib/projectNormalization";
+import { normalizeCaptionGlossary, normalizeCaptionGroups, normalizeProjectMarkers, normalizeSpeakerStyleIds, normalizeStyles } from "@/lib/projectNormalization";
 import { TopBar } from "./TopBar";
 import { SubtitleList } from "./SubtitleList";
 import { VideoStage } from "./VideoStage";
@@ -57,6 +57,8 @@ function normalizeProjectDoc(raw: unknown): EditorDoc | null {
       ? Math.min(120, Math.max(1, doc.frameRate))
       : 30,
     glossary: normalizeCaptionGlossary(doc.glossary),
+    speakerStyleIds: normalizeSpeakerStyleIds(doc.speakerStyleIds),
+    markers: normalizeProjectMarkers(doc.markers, typeof doc.durationMs === "number" ? doc.durationMs : 0),
     qualityProfile: isCaptionQualityProfile(doc.qualityProfile)
       ? doc.qualityProfile
       : DEFAULT_CAPTION_QUALITY_PROFILE,

@@ -11,6 +11,7 @@ import type {
   CaptionEffect,
   CaptionGlossaryEntry,
   CaptionGroup,
+  ProjectMarker,
   CaptionOverrides,
   CaptionSelection,
 } from "@/types/captionModel";
@@ -40,6 +41,8 @@ export interface EditorDoc {
   durationMs: number;
   frameRate: number;
   glossary: CaptionGlossaryEntry[];
+  speakerStyleIds: Record<string, string>;
+  markers: ProjectMarker[];
   qualityProfile: CaptionQualityProfile;
   /** Real intrinsic video resolution; ASS PlayRes is aligned to this. */
   resolution: { width: number; height: number };
@@ -76,6 +79,8 @@ const initialDoc: EditorDoc = {
   durationMs: 0,
   frameRate: 30,
   glossary: [],
+  speakerStyleIds: {},
+  markers: [],
   qualityProfile: DEFAULT_CAPTION_QUALITY_PROFILE,
   resolution: { width: 1280, height: 720 },
   groups: [],
@@ -110,6 +115,10 @@ type Action =
   | { type: "SET_DURATION"; durationMs: number }
   | { type: "SET_FRAME_RATE"; frameRate: number }
   | { type: "SET_GLOSSARY"; glossary: CaptionGlossaryEntry[] }
+  | { type: "SET_SPEAKER_STYLE"; speaker: string; styleId?: string }
+  | { type: "APPLY_SPEAKER_STYLES" }
+  | { type: "ADD_MARKER"; marker: Omit<ProjectMarker, "id"> }
+  | { type: "DELETE_MARKER"; id: string }
   | { type: "SET_QUALITY_PROFILE"; profile: CaptionQualityProfile }
   | { type: "SET_RESOLUTION"; width: number; height: number }
   | { type: "SET_CURRENT_MS"; ms: number }
@@ -303,6 +312,35 @@ function reducer(state: EditorState, action: Action): EditorState {
 
     case "SET_GLOSSARY":
       return commitDoc(state, { ...doc, glossary: action.glossary });
+
+    case "SET_SPEAKER_STYLE": {
+      const speaker = action.speaker.trim();
+      if (!speaker) return state;
+      const speakerStyleIds = { ...doc.speakerStyleIds };
+      if (action.styleId) speakerStyleIds[speaker] = action.styleId;
+      else delete speakerStyleIds[speaker];
+      return commitDoc(state, { ...doc, speakerStyleIds });
+    }
+
+    case "APPLY_SPEAKER_STYLES": {
+      const groups = doc.groups.map((group) => {
+        const styleId = group.speaker ? doc.speakerStyleIds[group.speaker.trim()] : undefined;
+        return styleId && !group.locked ? { ...group, baseStyleId: styleId } : group;
+      });
+      return commitDoc(state, { ...doc, groups });
+    }
+
+    case "ADD_MARKER": {
+      const label = action.marker.label.trim();
+      if (!label) return state;
+      const timeMs = clampMs(action.marker.timeMs, doc.durationMs);
+      const existingIds = new Set(doc.markers.map((marker) => marker.id));
+      const marker = { ...action.marker, id: uniqueId("marker", existingIds), label, timeMs };
+      return commitDoc(state, { ...doc, markers: [...doc.markers, marker].sort((a, b) => a.timeMs - b.timeMs) });
+    }
+
+    case "DELETE_MARKER":
+      return commitDoc(state, { ...doc, markers: doc.markers.filter((marker) => marker.id !== action.id) });
 
     case "SET_QUALITY_PROFILE":
       return commitDoc(state, { ...doc, qualityProfile: action.profile });
