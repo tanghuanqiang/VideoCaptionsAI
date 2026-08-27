@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { BookText, FileOutput, Highlighter, MessageSquareText, Plus, Replace, Sparkles, X } from "lucide-react";
+import { BookText, FileOutput, Highlighter, Languages, MessageSquareText, Plus, Replace, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   applyKeywordHighlights,
@@ -8,10 +8,13 @@ import {
   repairFillerWords,
 } from "@/lib/captionTextTools";
 import { applyCaptionGlossary, findCaptionGlossaryIssues } from "@/lib/captionGlossary";
+import { analyzeBilingualCaptions, prepareSecondaryCaptions } from "@/lib/bilingualQuality";
 import {
   buildContentPackageMarkdown,
   buildContentPackageJson,
   buildCaptionReviewCsv,
+  buildCaptionGlossaryCsv,
+  importCaptionGlossaryCsv,
   importCaptionReviewCsv,
   captionReviewFilename,
   contentPackageFilename,
@@ -24,6 +27,7 @@ import { useEditor } from "@/state/EditorContext";
 export function ContentOptimizationPanel() {
   const { state, dispatch } = useEditor();
   const reviewFileRef = useRef<HTMLInputElement>(null);
+  const glossaryFileRef = useRef<HTMLInputElement>(null);
   const [searchText, setSearchText] = useState("");
   const [replacementText, setReplacementText] = useState("");
   const [preferredTerm, setPreferredTerm] = useState("");
@@ -47,6 +51,7 @@ export function ContentOptimizationPanel() {
       .filter((issue) => !state.doc.groups.find((group) => group.id === issue.groupId)?.locked),
     [state.doc.glossary, state.doc.groups],
   );
+  const bilingualIssues = useMemo(() => analyzeBilingualCaptions(state.doc.groups), [state.doc.groups]);
   const chapters = useMemo(() => deriveContentChapters(state.doc.groups), [state.doc.groups]);
   const highlights = useMemo(() => deriveContentHighlights(state.doc.groups), [state.doc.groups]);
 
@@ -152,6 +157,44 @@ export function ContentOptimizationPanel() {
     toast.success(`已统一 ${glossaryIssues.length} 处术语写法`);
   };
 
+  const exportGlossary = () => {
+    const csv = buildCaptionGlossaryCsv(state.doc.glossary);
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${state.doc.projectName || "captions"}-glossary.csv`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
+
+  const importGlossary = async (file: File) => {
+    const entries = importCaptionGlossaryCsv(await file.text());
+    if (entries.length === 0) {
+      toast.error("未找到可导入的术语表记录");
+      return;
+    }
+    const seen = new Set(state.doc.glossary.map((entry) => entry.preferred.toLocaleLowerCase()));
+    const merged = [...state.doc.glossary];
+    entries.forEach((entry) => {
+      if (seen.has(entry.preferred.toLocaleLowerCase())) return;
+      seen.add(entry.preferred.toLocaleLowerCase());
+      merged.push({ ...entry, id: `term-${Date.now()}-${merged.length + 1}` });
+    });
+    dispatch({ type: "SET_GLOSSARY", glossary: merged });
+    toast.success(`已导入 ${merged.length - state.doc.glossary.length} 个术语`);
+  };
+
+  const prepareSecondary = () => {
+    const next = prepareSecondaryCaptions(state.doc.groups);
+    const added = next.filter((group, index) => group.secondaryText !== state.doc.groups[index]?.secondaryText).length;
+    if (added === 0) {
+      toast.info("没有缺失的副字幕需要准备");
+      return;
+    }
+    dispatch({ type: "SET_GROUPS", groups: next, commit: true });
+    toast.success(`已为 ${added} 条字幕创建待翻译副字幕`);
+  };
+
   if (state.doc.groups.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
@@ -172,6 +215,17 @@ export function ContentOptimizationPanel() {
           const file = event.target.files?.[0];
           event.target.value = "";
           if (file) void importReviewSheet(file);
+        }}
+      />
+      <input
+        ref={glossaryFileRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (file) void importGlossary(file);
         }}
       />
       <div className="border-b border-border/60 px-4 py-3">
@@ -253,6 +307,31 @@ export function ContentOptimizationPanel() {
                 <BookText className="h-3.5 w-3.5" />
                 统一术语（{glossaryIssues.length} 处）
               </button>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button onClick={exportGlossary} className="flex h-8 items-center justify-center gap-1 rounded-md border border-border text-xs text-foreground/70 hover:bg-foreground/5"><FileOutput className="h-3.5 w-3.5" />导出术语表</button>
+                <button onClick={() => glossaryFileRef.current?.click()} className="flex h-8 items-center justify-center gap-1 rounded-md border border-border text-xs text-foreground/70 hover:bg-foreground/5"><BookText className="h-3.5 w-3.5" />导入术语表</button>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="mb-3 border-b border-border/60 px-2 pb-3">
+          <div className="flex items-center gap-2">
+            <Languages className="h-4 w-4 text-primary" />
+            <div>
+              <p className="text-xs font-medium">双语交付检查</p>
+              <p className="mt-0.5 text-[11px] text-foreground/50">{bilingualIssues.length ? `${bilingualIssues.length} 条需要处理` : "副字幕已具备交付条件"}</p>
+            </div>
+          </div>
+          {bilingualIssues.length > 0 && (
+            <>
+              <button onClick={prepareSecondary} className="mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-primary/25 text-xs font-medium text-primary hover:bg-primary/10">
+                <Languages className="h-3.5 w-3.5" />创建缺失的待翻译副字幕
+              </button>
+              <div className="mt-2 space-y-1">
+                {bilingualIssues.slice(0, 3).map((issue) => (
+                  <button key={`${issue.groupId}-${issue.kind}`} onClick={() => focusIssue(issue.groupId)} className="block w-full truncate rounded px-1.5 py-1 text-left text-[11px] text-foreground/55 hover:bg-foreground/5">{issue.message}</button>
+                ))}
+              </div>
             </>
           )}
         </div>

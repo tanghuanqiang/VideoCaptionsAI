@@ -224,3 +224,22 @@ export function captionReviewFilename(projectName: string): string {
     .slice(0, 80) || "captions";
   return `${safeName}-review-sheet.csv`;
 }
+
+export function buildCaptionGlossaryCsv(glossary: Array<{ preferred: string; variants: string[] }>): string {
+  const header = ["标准术语", "旧写法"];
+  const rows = glossary.map((entry) => [entry.preferred, entry.variants.join("、")].map(csvCell).join(","));
+  return `\uFEFF${[header.map(csvCell).join(","), ...rows].join("\r\n")}\r\n`;
+}
+
+export function importCaptionGlossaryCsv(csv: string): Array<{ preferred: string; variants: string[] }> {
+  const rows = csv.replace(/^\uFEFF/u, "").split(/\r?\n/u).filter(Boolean).map(parseCsvRow);
+  if (rows.length < 2) return [];
+  const preferredIndex = rows[0].indexOf("标准术语");
+  const variantsIndex = rows[0].indexOf("旧写法");
+  if (preferredIndex < 0 || variantsIndex < 0) return [];
+  return rows.slice(1).flatMap((row) => {
+    const preferred = row[preferredIndex]?.trim() ?? "";
+    const variants = [...new Set((row[variantsIndex] ?? "").split(/[、，,\n]/u).map((value) => value.trim()).filter((value) => value && value !== preferred))];
+    return preferred && variants.length ? [{ preferred, variants }] : [];
+  });
+}
