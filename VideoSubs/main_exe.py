@@ -1,6 +1,6 @@
 """
 VideoCaptionsAI - Windows Desktop Application Entry Point
-System tray + local server. Supports LAN access.
+System tray + loopback-only local server.
 """
 import sys
 import os
@@ -80,7 +80,7 @@ def show_already_running():
         pass
 
 ICON_PATH = _EXE_DIR / "_internal" / "icon.ico" if getattr(sys, "frozen", False) else _EXE_DIR / "icon.ico"
-HOST = "0.0.0.0"
+HOST = "127.0.0.1"
 
 def find_free_port():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -129,7 +129,7 @@ def run_server():
     t = threading.Thread(target=serve, daemon=True)
     t.start()
     time.sleep(3)
-    log.info("Server listening on http://0.0.0.0:%d", PORT)
+    log.info("Server listening on http://127.0.0.1:%d", PORT)
 
 def get_lan_ip():
     try:
@@ -149,8 +149,6 @@ def create_tray_icon():
     else:
         image = Image.new("RGB", (64, 64), color="#3a7bd5")
     image = image.resize((32, 32), Image.LANCZOS)
-    lan_ip = get_lan_ip()
-
     def on_open():
         open_desktop_window()
 
@@ -171,7 +169,6 @@ def create_tray_icon():
         pystray.MenuItem("打开桌面窗口", on_open, default=True),
         pystray.MenuItem("浏览器打开", on_open_browser),
         pystray.Menu.SEPARATOR,
-        pystray.MenuItem(f"局域网: http://{lan_ip}:{PORT}", None, enabled=False),
         pystray.MenuItem(f"本机: http://127.0.0.1:{PORT}", None, enabled=False),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("退出", on_quit),
@@ -199,8 +196,7 @@ def main():
     log.info("Opening desktop window...")
     threading.Thread(target=open_desktop_window, daemon=True).start()
 
-    lan_ip = get_lan_ip()
-    log.info("Ready. LAN: http://%s:%d", lan_ip, PORT)
+    log.info("Ready. Local: http://127.0.0.1:%d", PORT)
 
     import uvicorn
     from src.app import app

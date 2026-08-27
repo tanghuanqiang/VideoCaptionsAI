@@ -8,6 +8,7 @@ import json
 import os
 import traceback
 import inspect
+import tempfile
 from datetime import datetime
 from typing import Dict, Optional, Callable, Any
 from enum import Enum
@@ -17,6 +18,23 @@ try:
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
+
+_METRIC_QUEUE_SIZE = None
+_METRIC_ACTIVE_TASKS = None
+_METRIC_TASK_FAILURES = None
+_METRIC_TASK_DURATION = None
+
+
+def _get_metrics():
+    global _METRIC_QUEUE_SIZE, _METRIC_ACTIVE_TASKS, _METRIC_TASK_FAILURES, _METRIC_TASK_DURATION
+    if not PROMETHEUS_AVAILABLE:
+        return None
+    if _METRIC_QUEUE_SIZE is None:
+        _METRIC_QUEUE_SIZE = Gauge('task_queue_size', 'Number of tasks in queue')
+        _METRIC_ACTIVE_TASKS = Gauge('task_active_tasks', 'Number of currently processing tasks')
+        _METRIC_TASK_FAILURES = Counter('task_failures_total', 'Total number of failed tasks', ['task_type'])
+        _METRIC_TASK_DURATION = Histogram('task_duration_seconds', 'Task duration in seconds', ['task_type'])
+    return (_METRIC_QUEUE_SIZE, _METRIC_ACTIVE_TASKS, _METRIC_TASK_FAILURES, _METRIC_TASK_DURATION)
 
 class TaskStatus(str, Enum):
     QUEUED = "queued"
@@ -104,10 +122,12 @@ class TaskQueue:
         
         # Metrics
         if PROMETHEUS_AVAILABLE:
-            self.metric_queue_size = Gauge('task_queue_size', 'Number of tasks in queue')
-            self.metric_active_tasks = Gauge('task_active_tasks', 'Number of currently processing tasks')
-            self.metric_task_failures = Counter('task_failures_total', 'Total number of failed tasks', ['task_type'])
-            self.metric_task_duration = Histogram('task_duration_seconds', 'Task duration in seconds', ['task_type'])
+            (
+                self.metric_queue_size,
+                self.metric_active_tasks,
+                self.metric_task_failures,
+                self.metric_task_duration,
+            ) = _get_metrics()
         
     def register_handler(self, task_type: str, handler: Callable):
         """注册任务处理器"""
@@ -116,6 +136,8 @@ class TaskQueue:
 
     async def start(self):
         """Start the task queue processor."""
+        if self._worker_task is not None and not self._worker_task.done():
+            return
         # Recreate queue in the current event loop
         self.queue = asyncio.Queue()
         # Load persisted state
@@ -124,7 +146,7 @@ class TaskQueue:
         self.load_state()
         
         # 将未完成的任务重新加入队列
-        for task_id, task in self.tasks.items():
+        for task_id, task in list(self.tasks.items()):
             if task.status in [TaskStatus.QUEUED, TaskStatus.PROCESSING, TaskStatus.RETRYING]:
                 # 如果是 PROCESSING，重置为 QUEUED 或 RETRYING
                 if task.status == TaskStatus.PROCESSING:
@@ -148,10 +170,25 @@ class TaskQueue:
     def save_state(self):
         """保存队列状态到磁盘"""
         try:
-            os.makedirs(os.path.dirname(self.persistence_file), exist_ok=True)
+            parent = os.path.dirname(os.path.abspath(self.persistence_file))
+            os.makedirs(parent, exist_ok=True)
             data = {task_id: task.to_dict() for task_id, task in self.tasks.items()}
-            with open(self.persistence_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+            fd, temporary_path = tempfile.mkstemp(
+                prefix=f".{os.path.basename(self.persistence_file)}.",
+                suffix=".tmp",
+                dir=parent,
+            )
+            try:
+                with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(temporary_path, self.persistence_file)
+            finally:
+                try:
+                    os.remove(temporary_path)
+                except OSError:
+                    pass
             # print(f"Queue state saved to {self.persistence_file}")
         except Exception as e:
             print(f"Failed to save queue state: {e}")
@@ -165,7 +202,11 @@ class TaskQueue:
             with open(self.persistence_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
+            if not isinstance(data, dict):
+                raise ValueError("Queue state must be a JSON object")
             for task_id, task_data in data.items():
+                if not isinstance(task_id, str) or not isinstance(task_data, dict):
+                    continue
                 self.tasks[task_id] = Task.from_dict(task_data)
             
             print(f"Loaded {len(self.tasks)} tasks from {self.persistence_file}")

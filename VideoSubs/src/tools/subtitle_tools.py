@@ -1,4 +1,4 @@
-﻿# subtitle_tools.py
+# subtitle_tools.py
 import os
 import subprocess
 import json
@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from langchain_core.tools import tool
 from src.agent.Subs import AssStyle, SubtitleDoc, SubtitleEvent
 from src.utils.model_loader import get_whisper_model
+import src.config as _config
 
 # Windows: prevent subprocess from spawning console windows
 import sys as _sys
@@ -114,7 +115,7 @@ def asr_transcribe_video(media_path: str, lang: str = None, model_size: str = No
         result = model.transcribe(media_path, language=lang)
     detected_lang = result.get('language', 'unknown')
     print(f"Transcription finished. Detected language: {detected_lang}")
-    
+
     events = []
     for i, seg in enumerate(result.get('segments', [])):
         events.append(SubtitleEvent(
@@ -125,7 +126,7 @@ def asr_transcribe_video(media_path: str, lang: str = None, model_size: str = No
             words=normalize_word_timestamps(seg.get("words")),
             style="Default"
         ))
-    
+
     return SubtitleDoc(language=detected_lang, events=events)
 
 
@@ -252,45 +253,51 @@ def run_ffmpeg_burn(media_height: int, media_width: int, media_path: str, ass_pa
     if not os.path.exists(ass_abs):
         raise FileNotFoundError(f"ASS file not found for ffmpeg: {ass_abs}")
 
-    # FFmpeg filter path escaping for Windows
+    # FFmpeg filter path escaping for Windows. The ASS document comes from
+    # the frontend; only configure libass font lookup here.
     ass_path_escaped = ass_abs.replace("\\", "/").replace(":", "\\:")
+    fonts_dir = os.path.abspath(getattr(_config, "FONTS_DIR", ""))
+    vf = f"ass='{ass_path_escaped}'"
+    if fonts_dir and os.path.isdir(fonts_dir):
+        fonts_dir_escaped = fonts_dir.replace("\\", "/").replace(":", "\\:")
+        vf += f":fontsdir='{fonts_dir_escaped}'"
 
     cmd = [
         "ffmpeg", "-y", "-i", media_abs,
-        "-vf", f"ass='{ass_path_escaped}'",
+        "-vf", vf,
         "-c:v", "libx264", "-crf", "23", "-preset", "fast", "-c:a", "aac", "-b:a", "128k", out_path
     ]
     log_path = os.path.join(task_dir, "ffmpeg.log")
-    
+
     print(f"Running FFmpeg: {' '.join(cmd)}")
 
     # Initialize progress tracking variables
     duration_sec = 0.0
     log_file = None
-    
+
     try:
         # 使用 Popen 以便实时读取输出
         process = subprocess.Popen(
-            cmd, 
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.PIPE, 
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             universal_newlines=True,
             encoding="utf-8",
             errors="replace",
             creationflags=_CREATE_NO_WINDOW
         )
         log_file = open(log_path, "w", encoding="utf-8")
-        
+
         while True:
             # 读取 stderr (FFmpeg 进度输出�?stderr)
             line = process.stderr.readline()
             if not line and process.poll() is not None:
                 break
-            
+
             if line:
                 log_file.write(line)
                 log_file.flush()
-                
+
                 # 解析总时�?Duration: 00:00:10.50
                 if "Duration" in line and duration_sec == 0:
                     match = re.search(r"Duration: (\d{2}):(\d{2}):(\d{2}\.\d{2})", line)
@@ -298,7 +305,7 @@ def run_ffmpeg_burn(media_height: int, media_width: int, media_path: str, ass_pa
                         h, m, s = map(float, match.groups())
                         duration_sec = h*3600 + m*60 + s
                         print(f"Video Duration: {duration_sec}s")
-                
+
                 # 解析当前时间 time=00:00:05.12
                 if "time=" in line and duration_sec > 0:
                     match = re.search(r"time=(\d{2}):(\d{2}):(\d{2}\.\d{2})", line)
@@ -309,12 +316,12 @@ def run_ffmpeg_burn(media_height: int, media_width: int, media_path: str, ass_pa
                         percent = max(0, min(99, percent)) # 限制�?0-99
                         if progress_callback:
                             progress_callback(percent)
-        
+
         log_file.close()
-        
+
         if process.returncode != 0:
             raise subprocess.CalledProcessError(process.returncode, cmd)
-            
+
         return out_path
     except Exception as e:
         # 确保日志文件关闭
@@ -419,4 +426,3 @@ def format_time(t: float, ass: bool = False) -> str:
     else:
         ms = int((t - int(t)) * 1000)
         return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
-

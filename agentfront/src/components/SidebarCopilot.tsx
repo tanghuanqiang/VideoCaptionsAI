@@ -108,9 +108,11 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
   const [showSettings, setShowSettings] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [apiKey, setApiKey] = useState("");
+  const [hasStoredApiKey, setHasStoredApiKey] = useState(false);
   const [apiBase, setApiBase] = useState("https://api.openai.com/v1");
   const [modelName, setModelName] = useState("gpt-4o");
   const [tavilyKey, setTavilyKey] = useState("");
+  const [hasStoredTavilyKey, setHasStoredTavilyKey] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
 
   // editable content for codeblocks, keyed by `${msg.id}-${type}-${blockIdx}`
@@ -209,9 +211,11 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
       .then(r => r.json())
       .then(cfg => {
         setApiKey(cfg.llm_api_key || "");
+        setHasStoredApiKey(Boolean(cfg.llm_api_key_configured || cfg.llm_api_key));
         setApiBase(cfg.llm_api_base || "https://api.openai.com/v1");
         setModelName(cfg.llm_model_name || "gpt-4o");
         setTavilyKey(cfg.tavily_api_key || "");
+        setHasStoredTavilyKey(Boolean(cfg.tavily_api_key_configured || cfg.tavily_api_key));
         setSettingsLoaded(true);
       })
       .catch(() => setSettingsLoaded(true));
@@ -219,14 +223,14 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
 
   // Auto-show welcome if no API key
   useEffect(() => {
-    if (settingsLoaded && !apiKey && messages.length === 0) {
+    if (settingsLoaded && !apiKey && !hasStoredApiKey && messages.length === 0) {
       setMessages([{
         id: 'welcome',
         text: '欢迎！我可以协助：语音识别、字幕编辑、样式调整、视频烧录。\n\n点击右上角齿轮图标配置 OpenAI 兼容 API。',
         role: 'assistant'
       }]);
     }
-  }, [settingsLoaded, apiKey, messages.length]);
+  }, [settingsLoaded, apiKey, hasStoredApiKey, messages.length]);
 
   // keep messagesRef updated for the timeout callback
   useEffect(() => { messagesRef.current = messages; }, [messages]);
@@ -239,7 +243,7 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
   const saveSettings = async () => {
     setSavingSettings(true);
     try {
-      await fetch("/api/config", {
+      const response = await fetch("/api/config", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
@@ -249,6 +253,12 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
           tavily_api_key: tavilyKey,
         }),
       });
+      if (!response.ok) throw new Error("Save config failed");
+      const saved = await response.json();
+      setApiKey("");
+      setTavilyKey("");
+      setHasStoredApiKey(Boolean(saved.llm_api_key_configured || apiKey));
+      setHasStoredTavilyKey(Boolean(saved.tavily_api_key_configured || tavilyKey));
       setShowSettings(false);
     } catch(e) { console.error("Save config failed", e); }
     setSavingSettings(false);
@@ -317,8 +327,8 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
         <span>AI 助手</span>
         <div style={{display:'flex',gap:6,alignItems:'center'}}>
           <button
-            className={!apiKey && settingsLoaded ? "gear-pulse" : ""}
-            style={{background:showSettings?'#3a7bd5':(!apiKey&&settingsLoaded?'#e67e22':'#23272e'),color:'#fff',border:'none',borderRadius:4,padding:'4px 8px',cursor:'pointer',fontSize:16,lineHeight:1}}
+            className={!apiKey && !hasStoredApiKey && settingsLoaded ? "gear-pulse" : ""}
+            style={{background:showSettings?'#3a7bd5':(!apiKey&&!hasStoredApiKey&&settingsLoaded?'#e67e22':'#23272e'),color:'#fff',border:'none',borderRadius:4,padding:'4px 8px',cursor:'pointer',fontSize:16,lineHeight:1}}
             onClick={() => setShowSettings(!showSettings)}
             title="API 设置"
           >⚙</button>
@@ -342,17 +352,19 @@ const SidebarCopilot: React.FC<SidebarCopilotProps> = ({ messages, setMessages, 
             <label style={{fontSize:11,color:'#888',display:'block',marginBottom:2}}>API 基础地址</label>
             <input value={apiBase} onChange={e=>setApiBase(e.target.value)} placeholder="https://api.openai.com/v1" style={{width:'100%',padding:'6px 8px',background:'#0d1117',border:'1px solid #333',borderRadius:4,color:'#e0e0e0',fontSize:12}} />
           </div>
-          <div style={{marginBottom:8}}>
-            <label style={{fontSize:11,color:'#888',display:'block',marginBottom:2}}>API 密钥</label>
-            <input type="password" value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="sk-..." style={{width:'100%',padding:'6px 8px',background:'#0d1117',border:'1px solid #333',borderRadius:4,color:'#e0e0e0',fontSize:12}} />
+           <div style={{marginBottom:8}}>
+             <label style={{fontSize:11,color:'#888',display:'block',marginBottom:2}}>API 密钥</label>
+             <input type="password" value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="sk-..." style={{width:'100%',padding:'6px 8px',background:'#0d1117',border:'1px solid #333',borderRadius:4,color:'#e0e0e0',fontSize:12}} />
+             {hasStoredApiKey && <div style={{fontSize:11,color:'#8ab4f8',marginTop:4}}>已保存本地密钥；留空将保持不变。</div>}
           </div>
           <div style={{marginBottom:8}}>
             <label style={{fontSize:11,color:'#888',display:'block',marginBottom:2}}>模型名称</label>
             <input value={modelName} onChange={e=>setModelName(e.target.value)} placeholder="gpt-4o" style={{width:'100%',padding:'6px 8px',background:'#0d1117',border:'1px solid #333',borderRadius:4,color:'#e0e0e0',fontSize:12}} />
           </div>
-          <div style={{marginBottom:10}}>
-            <label style={{fontSize:11,color:'#888',display:'block',marginBottom:2}}>Tavily API 密钥（可选）</label>
-            <input type="password" value={tavilyKey} onChange={e=>setTavilyKey(e.target.value)} placeholder="tvly-..." style={{width:'100%',padding:'6px 8px',background:'#0d1117',border:'1px solid #333',borderRadius:4,color:'#e0e0e0',fontSize:12}} />
+           <div style={{marginBottom:10}}>
+             <label style={{fontSize:11,color:'#888',display:'block',marginBottom:2}}>Tavily API 密钥（可选）</label>
+             <input type="password" value={tavilyKey} onChange={e=>setTavilyKey(e.target.value)} placeholder="tvly-..." style={{width:'100%',padding:'6px 8px',background:'#0d1117',border:'1px solid #333',borderRadius:4,color:'#e0e0e0',fontSize:12}} />
+             {hasStoredTavilyKey && <div style={{fontSize:11,color:'#8ab4f8',marginTop:4}}>已保存本地密钥；留空将保持不变。</div>}
           </div>
           <button onClick={saveSettings} disabled={savingSettings} style={{width:'100%',padding:'8px',background:'#3a7bd5',color:'#fff',border:'none',borderRadius:4,cursor:'pointer',fontSize:13,fontWeight:600}}>
             {savingSettings ? '保存中...' : '保存并重载'}

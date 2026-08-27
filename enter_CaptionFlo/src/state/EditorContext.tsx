@@ -1,0 +1,785 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useReducer,
+  type ReactNode,
+} from "react";
+import type { AssStyle } from "@/types/subtitleTypes";
+import type {
+  CaptionEffect,
+  CaptionGlossaryEntry,
+  CaptionGroup,
+  ProjectMarker,
+  CaptionOverrides,
+  CaptionSelection,
+} from "@/types/captionModel";
+import {
+  mergeCaptionGroups,
+  splitCaptionGroupAtGrapheme,
+} from "@/types/captionModel";
+import { defaultStyle, stylePresets } from "@/constants";
+import { normalizeCaptionGroups, normalizeStyles } from "@/lib/projectNormalization";
+import {
+  DEFAULT_CAPTION_QUALITY_PROFILE,
+  type CaptionQualityProfile,
+} from "@/lib/captionQuality";
+
+export type VideoStatus = "empty" | "loaded";
+export type AsrStatus = "idle" | "running" | "success" | "error";
+export type ExportStatus = "idle" | "running" | "success" | "error";
+export type EditorMode = "edit" | "cut";
+export type ExportKind = "subtitle" | "video" | null;
+
+export interface EditorDoc {
+  projectName: string;
+  videoUrl: string | null;
+  videoName: string | null;
+  videoFileId: string | null;
+  videoPath: string | null;
+  durationMs: number;
+  frameRate: number;
+  glossary: CaptionGlossaryEntry[];
+  speakerStyleIds: Record<string, string>;
+  markers: ProjectMarker[];
+  qualityProfile: CaptionQualityProfile;
+  /** Real intrinsic video resolution; ASS PlayRes is aligned to this. */
+  resolution: { width: number; height: number };
+  groups: CaptionGroup[];
+  styles: AssStyle[];
+  selection: CaptionSelection;
+}
+
+export interface EditorState {
+  doc: EditorDoc;
+  past: EditorDoc[];
+  future: EditorDoc[];
+  currentMs: number;
+  isPlaying: boolean;
+  mode: EditorMode;
+  video: VideoStatus;
+  asr: { status: AsrStatus; progress: number; label: string; error: string | null };
+  exportState: {
+    status: ExportStatus;
+    kind: ExportKind;
+    progress: number;
+    label: string;
+    error: string | null;
+    resultName: string | null;
+  };
+}
+
+const initialDoc: EditorDoc = {
+  projectName: "未命名项目",
+  videoUrl: null,
+  videoName: null,
+  videoFileId: null,
+  videoPath: null,
+  durationMs: 0,
+  frameRate: 30,
+  glossary: [],
+  speakerStyleIds: {},
+  markers: [],
+  qualityProfile: DEFAULT_CAPTION_QUALITY_PROFILE,
+  resolution: { width: 1280, height: 720 },
+  groups: [],
+  styles: [defaultStyle, ...stylePresets.map((p) => p.style)],
+  selection: { groupIds: [], unitIds: [] },
+};
+
+const initialState: EditorState = {
+  doc: initialDoc,
+  past: [],
+  future: [],
+  currentMs: 0,
+  isPlaying: false,
+  mode: "edit",
+  video: "empty",
+  asr: { status: "idle", progress: 0, label: "", error: null },
+  exportState: {
+    status: "idle",
+    kind: null,
+    progress: 0,
+    label: "",
+    error: null,
+    resultName: null,
+  },
+};
+
+type Action =
+  | { type: "SET_PROJECT_NAME"; name: string }
+  | { type: "LOAD_VIDEO"; url: string; name: string; durationMs?: number; fileId?: string | null; filePath?: string | null }
+  | { type: "SET_VIDEO_SOURCE"; videoUrl?: string | null; videoFileId?: string | null; videoPath?: string | null }
+  | { type: "LOAD_PROJECT"; doc: EditorDoc }
+  | { type: "SET_DURATION"; durationMs: number }
+  | { type: "SET_FRAME_RATE"; frameRate: number }
+  | { type: "SET_GLOSSARY"; glossary: CaptionGlossaryEntry[] }
+  | { type: "SET_SPEAKER_STYLE"; speaker: string; styleId?: string }
+  | { type: "APPLY_SPEAKER_STYLES" }
+  | { type: "ADD_MARKER"; marker: Omit<ProjectMarker, "id"> }
+  | { type: "DELETE_MARKER"; id: string }
+  | { type: "SET_QUALITY_PROFILE"; profile: CaptionQualityProfile }
+  | { type: "SET_RESOLUTION"; width: number; height: number }
+  | { type: "SET_CURRENT_MS"; ms: number }
+  | { type: "SET_PLAYING"; playing: boolean }
+  | { type: "SET_MODE"; mode: EditorMode }
+  | { type: "SET_GROUPS"; groups: CaptionGroup[]; commit?: boolean }
+  | { type: "SET_STYLES"; styles: AssStyle[]; commit?: boolean }
+  | { type: "ADD_STYLE"; style: AssStyle }
+  | { type: "SELECT"; selection: CaptionSelection }
+  | { type: "UPDATE_GROUP"; id: string; patch: Partial<CaptionGroup>; commit?: boolean }
+  | { type: "UPDATE_GROUP_METADATA"; ids: string[]; patch: Partial<Pick<CaptionGroup, "speaker" | "secondaryText" | "reviewStatus" | "reviewNote" | "locked">> }
+  | { type: "UPDATE_GROUP_OVERRIDES"; ids: string[]; patch: CaptionOverrides }
+  | { type: "SHIFT_SELECTED_TIME"; deltaMs: number }
+  | { type: "RIPPLE_SHIFT_AFTER_SELECTED"; deltaMs: number }
+  | { type: "NUDGE_GROUP_EDGE"; id: string; edge: "start" | "end"; deltaFrames: number }
+  | { type: "NORMALIZE_SELECTED_TIMING"; gapMs: number }
+  | { type: "RESET_GROUP_OVERRIDES"; ids: string[] }
+  | { type: "APPLY_STYLE"; ids: string[]; styleId: string }
+  | { type: "UPDATE_UNIT"; groupId: string; unitId: string; patch: Partial<CaptionOverrides> }
+  | { type: "SET_UNIT_EFFECT"; groupId: string; unitId: string; effect?: CaptionEffect }
+  | { type: "SPLIT_GROUP"; groupId: string; graphemeIndex: number }
+  | { type: "MERGE_SELECTED" }
+  | { type: "DELETE_SELECTED" }
+  | { type: "DUPLICATE_SELECTED"; offsetMs?: number }
+  | { type: "TRANSFORM_SELECTED_TEXT"; prefix?: string; suffix?: string; normalizeWhitespace?: boolean }
+  | { type: "REPLACE_TEXT"; search: string; replacement: string; ids?: string[] }
+  | { type: "ASR_START" }
+  | { type: "ASR_PROGRESS"; progress: number; label: string }
+  | { type: "ASR_SUCCESS"; groups: CaptionGroup[]; styles?: AssStyle[] }
+  | { type: "ASR_ERROR"; error: string }
+  | { type: "ASR_RESET" }
+  | { type: "EXPORT_START"; kind: Exclude<ExportKind, null> }
+  | { type: "EXPORT_PROGRESS"; progress: number; label: string }
+  | { type: "EXPORT_SUCCESS"; resultName: string }
+  | { type: "EXPORT_ERROR"; error: string }
+  | { type: "EXPORT_RESET" }
+  | { type: "UNDO" }
+  | { type: "REDO" };
+
+const HISTORY_LIMIT = 50;
+
+function normalizeSelection(doc: EditorDoc, selection: CaptionSelection): CaptionSelection {
+  const groupIds = [...new Set(selection.groupIds)].filter((id) => doc.groups.some((group) => group.id === id));
+  if (groupIds.length !== 1) return { groupIds, unitIds: [] };
+  const group = doc.groups.find((item) => item.id === groupIds[0]);
+  const unitIds = (selection.unitIds ?? []).filter((unitId) => group?.units.some((unit) => unit.id === unitId));
+  return { groupIds, unitIds };
+}
+
+function normalizeDocSelection(doc: EditorDoc): EditorDoc {
+  return { ...doc, selection: normalizeSelection(doc, doc.selection) };
+}
+
+function sameDoc(left: EditorDoc, right: EditorDoc): boolean {
+  try {
+    return JSON.stringify(left) === JSON.stringify(right);
+  } catch {
+    return left === right;
+  }
+}
+
+/** Wrap a doc mutation with history push. */
+function commitDoc(state: EditorState, next: EditorDoc): EditorState {
+  const normalized = normalizeDocSelection(next);
+  if (sameDoc(state.doc, normalized)) return state;
+  return {
+    ...state,
+    doc: normalized,
+    past: [...state.past, state.doc].slice(-HISTORY_LIMIT),
+    future: [],
+  };
+}
+
+function sortGroups(groups: CaptionGroup[]): CaptionGroup[] {
+  return [...groups].sort((a, b) => a.startMs - b.startMs);
+}
+
+function uniqueId(base: string, used: Set<string>): string {
+  let candidate = `${base}-copy`;
+  let suffix = 2;
+  while (used.has(candidate)) candidate = `${base}-copy-${suffix++}`;
+  used.add(candidate);
+  return candidate;
+}
+
+function shiftedRange(startMs: number, endMs: number, offsetMs: number, durationMs: number) {
+  const duration = Math.max(1, endMs - startMs);
+  const maxStart = durationMs > 0 ? Math.max(0, durationMs - duration) : Number.POSITIVE_INFINITY;
+  const nextStart = Math.min(Math.max(0, startMs + offsetMs), maxStart);
+  return { startMs: nextStart, endMs: nextStart + duration };
+}
+
+function clampMs(ms: number, durationMs: number): number {
+  if (!Number.isFinite(ms)) return 0;
+  return durationMs > 0 ? Math.min(Math.max(0, ms), durationMs) : Math.max(0, ms);
+}
+
+function normalizedFrameRate(frameRate: number): number {
+  return Number.isFinite(frameRate) ? Math.min(120, Math.max(1, frameRate)) : 30;
+}
+
+function normalizeGroupTiming(group: CaptionGroup, durationMs: number, patch: Partial<CaptionGroup>): Partial<CaptionGroup> {
+  const startMs = clampMs(Number.isFinite(patch.startMs) ? patch.startMs as number : group.startMs, durationMs);
+  const rawEnd = Number.isFinite(patch.endMs) ? patch.endMs as number : group.endMs;
+  const endMs = durationMs > 0
+    ? Math.min(durationMs, Math.max(startMs + 1, rawEnd))
+    : Math.max(startMs + 1, rawEnd);
+  return { ...patch, startMs, endMs };
+}
+
+function mayEditLockedGroup(patch: object): boolean {
+  return Object.keys(patch).every((key) => key === "reviewStatus" || key === "reviewNote" || key === "locked");
+}
+
+function reducer(state: EditorState, action: Action): EditorState {
+  const { doc } = state;
+  switch (action.type) {
+    case "SET_PROJECT_NAME":
+      return { ...state, doc: { ...doc, projectName: action.name } };
+
+    case "LOAD_VIDEO":
+      {
+      const durationMs = Number.isFinite(action.durationMs) ? Math.max(0, action.durationMs ?? 0) : doc.durationMs;
+      return {
+        ...state,
+        video: "loaded",
+        doc: {
+          ...doc,
+          videoUrl: action.url,
+          videoName: action.name,
+          videoFileId: action.fileId ?? doc.videoFileId,
+          videoPath: action.filePath ?? doc.videoPath,
+          durationMs,
+        },
+      };
+      }
+
+    case "SET_VIDEO_SOURCE":
+      return {
+        ...state,
+        doc: {
+          ...doc,
+          videoUrl: action.videoUrl ?? doc.videoUrl,
+          videoFileId: action.videoFileId ?? doc.videoFileId,
+          videoPath: action.videoPath ?? doc.videoPath,
+        },
+      };
+
+    case "LOAD_PROJECT":
+      {
+      const loadedDoc = normalizeDocSelection({
+        ...action.doc,
+        projectName: action.doc.projectName?.trim() || "未命名项目",
+        durationMs: Number.isFinite(action.doc.durationMs) ? Math.max(0, action.doc.durationMs) : 0,
+        selection: action.doc.selection ?? { groupIds: [], unitIds: [] },
+        styles: normalizeStyles(action.doc.styles, doc.styles),
+        videoFileId: action.doc.videoFileId ?? null,
+        videoPath: action.doc.videoPath ?? null,
+        videoUrl: action.doc.videoUrl ?? null,
+        groups: normalizeCaptionGroups(action.doc.groups, Number.isFinite(action.doc.durationMs) ? Math.max(0, action.doc.durationMs) : 0, doc.styles[0]?.id ?? "Default"),
+      });
+      return {
+        ...state,
+        video: loadedDoc.videoUrl || loadedDoc.videoFileId || loadedDoc.videoPath ? "loaded" : "empty",
+        doc: loadedDoc,
+        past: [],
+        future: [],
+        currentMs: 0,
+        isPlaying: false,
+        mode: "edit",
+        asr: { status: "idle", progress: 0, label: "", error: null },
+        exportState: {
+          status: "idle",
+          kind: null,
+          progress: 0,
+          label: "",
+          error: null,
+          resultName: null,
+        },
+      };
+      }
+
+    case "SET_DURATION":
+      {
+      const durationMs = Number.isFinite(action.durationMs) ? Math.max(0, action.durationMs) : doc.durationMs;
+      return { ...state, doc: { ...doc, durationMs }, currentMs: clampMs(state.currentMs, durationMs) };
+      }
+
+    case "SET_FRAME_RATE":
+      return commitDoc(state, { ...doc, frameRate: normalizedFrameRate(action.frameRate) });
+
+    case "SET_GLOSSARY":
+      return commitDoc(state, { ...doc, glossary: action.glossary });
+
+    case "SET_SPEAKER_STYLE": {
+      const speaker = action.speaker.trim();
+      if (!speaker) return state;
+      const speakerStyleIds = { ...doc.speakerStyleIds };
+      if (action.styleId) speakerStyleIds[speaker] = action.styleId;
+      else delete speakerStyleIds[speaker];
+      return commitDoc(state, { ...doc, speakerStyleIds });
+    }
+
+    case "APPLY_SPEAKER_STYLES": {
+      const groups = doc.groups.map((group) => {
+        const styleId = group.speaker ? doc.speakerStyleIds[group.speaker.trim()] : undefined;
+        return styleId && !group.locked ? { ...group, baseStyleId: styleId } : group;
+      });
+      return commitDoc(state, { ...doc, groups });
+    }
+
+    case "ADD_MARKER": {
+      const label = action.marker.label.trim();
+      if (!label) return state;
+      const timeMs = clampMs(action.marker.timeMs, doc.durationMs);
+      const existingIds = new Set(doc.markers.map((marker) => marker.id));
+      const marker = { ...action.marker, id: uniqueId("marker", existingIds), label, timeMs };
+      return commitDoc(state, { ...doc, markers: [...doc.markers, marker].sort((a, b) => a.timeMs - b.timeMs) });
+    }
+
+    case "DELETE_MARKER":
+      return commitDoc(state, { ...doc, markers: doc.markers.filter((marker) => marker.id !== action.id) });
+
+    case "SET_QUALITY_PROFILE":
+      return commitDoc(state, { ...doc, qualityProfile: action.profile });
+
+    case "SET_RESOLUTION":
+      return {
+        ...state,
+        doc: {
+          ...doc,
+          resolution: { width: action.width, height: action.height },
+        },
+      };
+
+    case "SET_CURRENT_MS":
+      return { ...state, currentMs: clampMs(action.ms, doc.durationMs) };
+
+    case "SET_PLAYING":
+      return { ...state, isPlaying: action.playing };
+
+    case "SET_MODE":
+      return { ...state, mode: action.mode };
+
+    case "SET_GROUPS": {
+      const next = normalizeDocSelection({ ...doc, groups: sortGroups(action.groups) });
+      return action.commit ? commitDoc(state, next) : { ...state, doc: next };
+    }
+
+    case "SET_STYLES": {
+      const next = { ...doc, styles: action.styles };
+      return action.commit ? commitDoc(state, next) : { ...state, doc: next };
+    }
+
+    case "ADD_STYLE":
+      return commitDoc(state, { ...doc, styles: [...doc.styles, action.style] });
+
+    case "SELECT":
+      return { ...state, doc: { ...doc, selection: normalizeSelection(doc, action.selection) } };
+
+    case "UPDATE_GROUP": {
+      const currentGroup = doc.groups.find((group) => group.id === action.id);
+      if (!currentGroup) return state;
+      if (currentGroup.locked && !mayEditLockedGroup(action.patch)) return state;
+      const safePatch = action.patch.startMs !== undefined || action.patch.endMs !== undefined
+        ? normalizeGroupTiming(currentGroup, doc.durationMs, action.patch)
+        : action.patch;
+      const groups = doc.groups.map((g) =>
+        g.id === action.id ? { ...g, ...safePatch } : g,
+      );
+      const next = normalizeDocSelection({ ...doc, groups: sortGroups(groups) });
+      return action.commit ? commitDoc(state, next) : { ...state, doc: next };
+    }
+
+    case "UPDATE_GROUP_METADATA": {
+      const groups = doc.groups.map((g) =>
+        action.ids.includes(g.id) && (!g.locked || mayEditLockedGroup(action.patch)) ? { ...g, ...action.patch } : g,
+      );
+      return commitDoc(state, { ...doc, groups: sortGroups(groups) });
+    }
+
+    case "UPDATE_GROUP_OVERRIDES": {
+      const groups = doc.groups.map((g) =>
+        action.ids.includes(g.id)
+          && !g.locked
+          ? { ...g, overrides: { ...g.overrides, ...action.patch } }
+          : g,
+      );
+      return commitDoc(state, { ...doc, groups });
+    }
+
+    case "SHIFT_SELECTED_TIME": {
+      const ids = new Set(doc.selection.groupIds);
+      if (ids.size === 0 || !Number.isFinite(action.deltaMs)) return state;
+      const delta = Math.round(action.deltaMs);
+      const groups = doc.groups.map((g) => {
+        if (!ids.has(g.id) || g.locked) return g;
+        const duration = Math.max(1, g.endMs - g.startMs);
+        const startMs = Math.min(Math.max(0, g.startMs + delta), Math.max(0, doc.durationMs - duration));
+        return { ...g, startMs, endMs: startMs + duration };
+      });
+      return commitDoc(state, { ...doc, groups: sortGroups(groups) });
+    }
+
+    case "RIPPLE_SHIFT_AFTER_SELECTED": {
+      const selected = doc.groups.filter((group) => doc.selection.groupIds.includes(group.id));
+      if (selected.length === 0 || !Number.isFinite(action.deltaMs)) return state;
+      const anchorMs = Math.max(...selected.map((group) => group.endMs));
+      const delta = Math.round(action.deltaMs);
+      const groups = doc.groups.map((group) => {
+        if (group.startMs < anchorMs || group.locked) return group;
+        const range = shiftedRange(group.startMs, group.endMs, delta, doc.durationMs);
+        return { ...group, ...range };
+      });
+      return commitDoc(state, { ...doc, groups: sortGroups(groups) });
+    }
+
+    case "NUDGE_GROUP_EDGE": {
+      const group = doc.groups.find((item) => item.id === action.id);
+      if (!group || group.locked || !Number.isFinite(action.deltaFrames)) return state;
+      const deltaMs = (1000 / normalizedFrameRate(doc.frameRate)) * action.deltaFrames;
+      const patch = action.edge === "start"
+        ? { startMs: Math.round(group.startMs + deltaMs) }
+        : { endMs: Math.round(group.endMs + deltaMs) };
+      const nextGroup = { ...group, ...normalizeGroupTiming(group, doc.durationMs, patch) };
+      const groups = doc.groups.map((item) => item.id === group.id ? nextGroup : item);
+      return commitDoc(state, { ...doc, groups: sortGroups(groups) });
+    }
+
+    case "NORMALIZE_SELECTED_TIMING": {
+      const selected = doc.groups.filter((g) => doc.selection.groupIds.includes(g.id)).sort((a, b) => a.startMs - b.startMs);
+      if (selected.length < 2) return state;
+      const gap = Math.max(0, Math.round(action.gapMs));
+      let cursor = selected[0].startMs;
+      const updates = new Map<string, CaptionGroup>();
+      for (const group of selected) {
+        if (group.locked) continue;
+        const duration = Math.max(1, group.endMs - group.startMs);
+        const startMs = Math.min(cursor, Math.max(0, doc.durationMs - duration));
+        const next = { ...group, startMs, endMs: startMs + duration };
+        updates.set(group.id, next);
+        cursor = next.endMs + gap;
+      }
+      const groups = doc.groups.map((g) => updates.get(g.id) ?? g);
+      return commitDoc(state, { ...doc, groups: sortGroups(groups) });
+    }
+
+    case "RESET_GROUP_OVERRIDES": {
+      const groups = doc.groups.map((g) =>
+        action.ids.includes(g.id) && !g.locked ? { ...g, overrides: {} } : g,
+      );
+      return commitDoc(state, { ...doc, groups });
+    }
+
+    case "APPLY_STYLE": {
+      const groups = doc.groups.map((g) =>
+        action.ids.includes(g.id) && !g.locked ? { ...g, baseStyleId: action.styleId } : g,
+      );
+      return commitDoc(state, { ...doc, groups });
+    }
+
+    case "UPDATE_UNIT": {
+      const groups = doc.groups.map((g) => {
+        if (g.id !== action.groupId || g.locked) return g;
+        return {
+          ...g,
+          units: g.units.map((u) =>
+            u.id === action.unitId
+              ? { ...u, overrides: { ...u.overrides, ...action.patch } }
+              : u,
+          ),
+        };
+      });
+      return commitDoc(state, { ...doc, groups });
+    }
+
+    case "SET_UNIT_EFFECT": {
+      const groups = doc.groups.map((g) => {
+        if (g.id !== action.groupId || g.locked) return g;
+        return {
+          ...g,
+          units: g.units.map((u) =>
+            u.id === action.unitId ? { ...u, effect: action.effect } : u,
+          ),
+        } as CaptionGroup;
+      });
+      return commitDoc(state, { ...doc, groups });
+    }
+
+    case "SPLIT_GROUP": {
+      const target = doc.groups.find((g) => g.id === action.groupId);
+      if (!target || target.locked) return state;
+      const result = splitCaptionGroupAtGrapheme(target, action.graphemeIndex);
+      if (!result) return state;
+      const groups = sortGroups([
+        ...doc.groups.filter((g) => g.id !== action.groupId),
+        ...result,
+      ]);
+      return commitDoc(state, {
+        ...doc,
+        groups,
+        selection: { groupIds: [result[0].id], unitIds: [] },
+      });
+    }
+
+    case "MERGE_SELECTED": {
+      const ids = doc.selection.groupIds;
+      if (ids.length < 2) return state;
+      const selected = doc.groups.filter((g) => ids.includes(g.id));
+      if (selected.some((group) => group.locked)) return state;
+      const merged = mergeCaptionGroups(selected);
+      if (!merged) return state;
+      const groups = sortGroups([
+        ...doc.groups.filter((g) => !ids.includes(g.id)),
+        merged,
+      ]);
+      return commitDoc(state, {
+        ...doc,
+        groups,
+        selection: { groupIds: [merged.id], unitIds: [] },
+      });
+    }
+
+    case "DELETE_SELECTED": {
+      const ids = doc.selection.groupIds;
+      if (ids.length === 0) return state;
+      const groups = doc.groups.filter((g) => !ids.includes(g.id) || g.locked);
+      return commitDoc(state, {
+        ...doc,
+        groups,
+        selection: { groupIds: [], unitIds: [] },
+      });
+    }
+
+    case "DUPLICATE_SELECTED": {
+      const selected = doc.groups.filter((g) => doc.selection.groupIds.includes(g.id) && !g.locked);
+      if (selected.length === 0) return state;
+      const offset = Math.max(1, Math.round(action.offsetMs ?? 250));
+      const usedIds = new Set(doc.groups.map((group) => group.id));
+      const copies = selected.map((group) => {
+        const id = uniqueId(group.id, usedIds);
+        const range = shiftedRange(group.startMs, group.endMs, offset, doc.durationMs);
+        const actualOffset = range.startMs - group.startMs;
+        const units = group.units.map((unit, unitIndex) => ({
+          ...unit,
+          id: `${id}-unit-${unitIndex + 1}`,
+          startMs: Math.max(range.startMs, Math.min(range.endMs - 1, unit.startMs + actualOffset)),
+          endMs: Math.min(range.endMs, Math.max(range.startMs + 1, unit.endMs + actualOffset)),
+        }));
+        const words = group.words?.flatMap((word) => {
+          const start = Math.max(range.startMs, word.start * 1000 + actualOffset);
+          const end = Math.min(range.endMs, word.end * 1000 + actualOffset);
+          return end > start ? [{ ...word, start: start / 1000, end: end / 1000 }] : [];
+        });
+        return { ...group, id, ...range, units, words };
+      });
+      return commitDoc(state, {
+        ...doc,
+        groups: sortGroups([...doc.groups, ...copies]),
+        selection: { groupIds: copies.map((group) => group.id), unitIds: [] },
+      });
+    }
+
+    case "TRANSFORM_SELECTED_TEXT": {
+      const ids = new Set(doc.selection.groupIds);
+      if (ids.size === 0) return state;
+      const prefix = action.prefix ?? "";
+      const suffix = action.suffix ?? "";
+      const groups = doc.groups.map((group) => {
+        if (!ids.has(group.id) || group.locked) return group;
+        const normalized = action.normalizeWhitespace ? group.text.replace(/\s+/gu, " ").trim() : group.text;
+        return { ...group, text: `${prefix}${normalized}${suffix}`, units: [], words: undefined, effect: undefined };
+      });
+      return commitDoc(state, { ...doc, groups });
+    }
+
+    case "REPLACE_TEXT": {
+      if (!action.search) return state;
+      const ids = action.ids ? new Set(action.ids) : null;
+      const groups = doc.groups.map((group) => {
+        if ((ids && !ids.has(group.id)) || group.locked) return group;
+        const text = group.text.split(action.search).join(action.replacement);
+        return text === group.text ? group : { ...group, text, units: [], words: undefined, effect: undefined };
+      });
+      return commitDoc(state, { ...doc, groups });
+    }
+
+    case "ASR_START":
+      return {
+        ...state,
+        asr: { status: "running", progress: 0, label: "准备中", error: null },
+      };
+    case "ASR_PROGRESS":
+      return {
+        ...state,
+        asr: { ...state.asr, progress: action.progress, label: action.label },
+      };
+    case "ASR_SUCCESS": {
+      const next: EditorDoc = {
+        ...doc,
+        groups: sortGroups(action.groups),
+        styles: action.styles ?? doc.styles,
+        selection: { groupIds: [], unitIds: [] },
+      };
+      return {
+        ...commitDoc(state, next),
+        asr: { status: "success", progress: 100, label: "识别完成", error: null },
+      };
+    }
+    case "ASR_ERROR":
+      return {
+        ...state,
+        asr: { status: "error", progress: 0, label: "", error: action.error },
+      };
+    case "ASR_RESET":
+      return {
+        ...state,
+        asr: { status: "idle", progress: 0, label: "", error: null },
+      };
+
+    case "EXPORT_START":
+      return {
+        ...state,
+        exportState: {
+          status: "running",
+          kind: action.kind,
+          progress: 0,
+          label: "开始",
+          error: null,
+          resultName: null,
+        },
+      };
+    case "EXPORT_PROGRESS":
+      return {
+        ...state,
+        exportState: {
+          ...state.exportState,
+          progress: action.progress,
+          label: action.label,
+        },
+      };
+    case "EXPORT_SUCCESS":
+      return {
+        ...state,
+        exportState: {
+          ...state.exportState,
+          status: "success",
+          progress: 100,
+          resultName: action.resultName,
+        },
+      };
+    case "EXPORT_ERROR":
+      return {
+        ...state,
+        exportState: { ...state.exportState, status: "error", error: action.error },
+      };
+    case "EXPORT_RESET":
+      return {
+        ...state,
+        exportState: {
+          status: "idle",
+          kind: null,
+          progress: 0,
+          label: "",
+          error: null,
+          resultName: null,
+        },
+      };
+
+    case "UNDO": {
+      if (state.past.length === 0) return state;
+      const previous = state.past[state.past.length - 1];
+      return {
+        ...state,
+        doc: previous,
+        past: state.past.slice(0, -1),
+        future: [state.doc, ...state.future].slice(0, HISTORY_LIMIT),
+      };
+    }
+    case "REDO": {
+      if (state.future.length === 0) return state;
+      const nextDoc = state.future[0];
+      return {
+        ...state,
+        doc: nextDoc,
+        past: [...state.past, state.doc].slice(-HISTORY_LIMIT),
+        future: state.future.slice(1),
+      };
+    }
+
+    default:
+      return state;
+  }
+}
+
+interface EditorContextValue {
+  state: EditorState;
+  dispatch: React.Dispatch<Action>;
+  canUndo: boolean;
+  canRedo: boolean;
+  selectedGroups: CaptionGroup[];
+  selectedUnit: { group: CaptionGroup; unitId: string } | null;
+  styleById: (id: string) => AssStyle;
+  currentGroup: CaptionGroup | null;
+}
+
+const EditorContext = createContext<EditorContextValue | null>(null);
+
+export function EditorProvider({ children }: { children: ReactNode }) {
+  const [state, dispatch] = useReducer(reducer, initialState);
+
+  const styleById = useCallback(
+    (id: string) =>
+      state.doc.styles.find((s) => s.id === id) ?? defaultStyle,
+    [state.doc.styles],
+  );
+
+  const selectedGroups = useMemo(
+    () =>
+      state.doc.groups.filter((g) =>
+        state.doc.selection.groupIds.includes(g.id),
+      ),
+    [state.doc.groups, state.doc.selection.groupIds],
+  );
+
+  const selectedUnit = useMemo(() => {
+    const unitId = state.doc.selection.unitIds?.[0];
+    if (!unitId || selectedGroups.length !== 1) return null;
+    const group = selectedGroups[0];
+    if (!group.units.some((u) => u.id === unitId)) return null;
+    return { group, unitId };
+  }, [selectedGroups, state.doc.selection.unitIds]);
+
+  const currentGroup = useMemo(() => {
+    const currentMs = state.currentMs;
+    return (
+      state.doc.groups.find(
+        (g) => currentMs >= g.startMs && currentMs < g.endMs,
+      ) ?? null
+    );
+  }, [state.doc.groups, state.currentMs]);
+
+  const value: EditorContextValue = {
+    state,
+    dispatch,
+    canUndo: state.past.length > 0,
+    canRedo: state.future.length > 0,
+    selectedGroups,
+    selectedUnit,
+    styleById,
+    currentGroup,
+  };
+
+  return (
+    <EditorContext.Provider value={value}>{children}</EditorContext.Provider>
+  );
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useEditor() {
+  const ctx = useContext(EditorContext);
+  if (!ctx) throw new Error("useEditor must be used within EditorProvider");
+  return ctx;
+}

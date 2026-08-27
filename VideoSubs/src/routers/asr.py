@@ -1,17 +1,20 @@
-﻿import os
+import os
 import json
 import hashlib
+import tempfile
+import threading
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 
-from src.services.storage import get_file_path, save_upload
+from src.services.storage import UploadTooLargeError, get_file_path, save_upload
 from src.config import MAX_UPLOAD_SIZE, OUTPUTS_DIR
 from src.services.style_recommender import generate_recommended_style
 from src.utils.task_queue import burn_queue
-from src.tools.subtitle_tools import asr_transcribe_video
+from src.tools.subtitle_tools import asr_transcribe_video, probe_media
 
 router = APIRouter()
+_cache_write_lock = threading.RLock()
 
 ALLOWED_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".flv", ".wmv",
                       ".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".wma"}
@@ -23,6 +26,44 @@ def _validate_file_ext(filename: str):
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
 
 
+def _resolve_saved_path(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    relative = value[len("/outputs/"):] if value.startswith("/outputs/") else value
+    root = os.path.abspath(OUTPUTS_DIR)
+    candidate = os.path.abspath(os.path.join(root, relative))
+    if os.path.commonpath([root, candidate]) != root:
+        return None
+    return candidate if os.path.isfile(candidate) else None
+
+
+def _file_md5(path: str) -> str:
+    digest = hashlib.md5()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _write_cache_atomically(cache_file: str, result: dict) -> None:
+    """Write a complete JSON cache without exposing a partial document."""
+    cache_dir = os.path.dirname(os.path.abspath(cache_file))
+    os.makedirs(cache_dir, exist_ok=True)
+    with _cache_write_lock:
+        fd, temporary = tempfile.mkstemp(prefix=".asr-cache-", suffix=".tmp", dir=cache_dir)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                json.dump(result, fh, ensure_ascii=False, indent=2)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(temporary, cache_file)
+        finally:
+            try:
+                os.remove(temporary)
+            except OSError:
+                pass
+
+
 @router.post("/asr/")
 async def api_asr(
     file: Optional[UploadFile] = File(None),
@@ -31,23 +72,29 @@ async def api_asr(
     async_mode: bool = Form(False),
     width: Optional[int] = Form(None),
     height: Optional[int] = Form(None),
+    file_path: Optional[str] = Form(None),
 ):
     if file_uuid:
         path = get_file_path(file_uuid)
         if not path or not os.path.exists(path):
             raise HTTPException(status_code=404, detail="File not found")
-        cache_key = f"{file_uuid}_{quality}"
     elif file:
         if file.filename:
             _validate_file_ext(file.filename)
         if file.size and file.size > MAX_UPLOAD_SIZE:
             raise HTTPException(status_code=413, detail=f"File too large. Max size is {MAX_UPLOAD_SIZE/1024/1024}MB")
-        path = save_upload(file)
-        with open(path, "rb") as f:
-            file_hash = hashlib.md5(f.read()).hexdigest()
-        cache_key = f"{file_hash}_{quality}"
+        try:
+            path = save_upload(file)
+        except UploadTooLargeError as exc:
+            raise HTTPException(status_code=413, detail=str(exc)) from exc
+    elif file_path:
+        path = _resolve_saved_path(file_path)
+        if not path:
+            raise HTTPException(status_code=404, detail="File not found")
     else:
-        raise HTTPException(status_code=400, detail="Either file or file_uuid is required")
+        raise HTTPException(status_code=400, detail="Either file, file_uuid, or file_path is required")
+
+    cache_key = f"{_file_md5(path)}_{quality}"
 
     cache_dir = os.path.join(OUTPUTS_DIR, "asr_cache")
     os.makedirs(cache_dir, exist_ok=True)
@@ -75,6 +122,10 @@ async def api_asr(
             model_size = "medium" if file_size > 50 * 1024 * 1024 else "small"
         except Exception:
             model_size = "small"
+    elif quality == "fast":
+        model_size = "base"
+    elif quality == "balanced":
+        model_size = "small"
     elif quality == "high":
         model_size = "medium"
     elif quality == "professional":
@@ -103,13 +154,35 @@ async def api_asr(
             detail={
                 "code": "ASR_INFERENCE_FAILED",
                 "message": "语音识别推理失败，请检查媒体音轨、模型和后端日志。",
-                "type": type(exc).__name__,
             },
         ) from exc
+
+    # The generated frontend does not send width/height form fields. Probe the
+    # actual media so the response still carries the existing resolution/fps
+    # contract and the ASS PlayRes can stay aligned with the source video.
+    if not result.resolution:
+        try:
+            media_info = probe_media.invoke({"media_path": path})
+            probed_width = media_info.get("width")
+            probed_height = media_info.get("height")
+            if probed_width and probed_height:
+                result.resolution = {"width": int(probed_width), "height": int(probed_height)}
+            for stream in media_info.get("streams", []):
+                if stream.get("codec_type") != "video":
+                    continue
+                rate = str(stream.get("r_frame_rate", ""))
+                if "/" in rate:
+                    numerator, denominator = rate.split("/", 1)
+                    if float(denominator):
+                        result.fps = float(numerator) / float(denominator)
+                break
+        except Exception as exc:
+            print(f"Could not probe ASR media metadata: {exc}")
 
     if width and height:
         style = generate_recommended_style(width, height)
         result.recommended_style = style
+        result.resolution = {"width": width, "height": height}
         if result.events:
             for event in result.events:
                 event.style = style.Name
@@ -118,8 +191,7 @@ async def api_asr(
         result = result.dict()
 
     try:
-        with open(cache_file, "w", encoding="utf-8") as f:
-            json.dump(result, f, ensure_ascii=False, indent=2)
+        _write_cache_atomically(cache_file, result)
         print(f"ASR result cached: {cache_key}")
     except Exception as e:
         print(f"Failed to cache ASR result: {e}")

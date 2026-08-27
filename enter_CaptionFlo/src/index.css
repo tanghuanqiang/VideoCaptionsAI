@@ -1,0 +1,202 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Shared CJK font for both the app UI and the ASS (libass) preview. */
+@font-face {
+  font-family: "Noto Sans SC";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/NotoSansSC-Regular.woff2") format("woff2");
+}
+
+@layer base {
+  :root {
+    /* ===== Light mode ===== */
+    --background: 220 14% 96%;            /* #F3F4F6 */
+    --foreground: 240 6% 12%;             /* #1D1D1F */
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 6% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 6% 12%;
+
+    --primary: 211 100% 50%;             /* system blue #007AFF */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 13% 91%;
+    --secondary-foreground: 240 6% 12%;
+
+    --muted: 220 14% 93%;
+    --muted-foreground: 240 2% 44%;      /* #6E6E73 */
+
+    --accent: 211 100% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 4 100% 59%;           /* #FF3B30 */
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 71% 49%;              /* #34C759 */
+    --success-foreground: 0 0% 100%;
+
+    --warning: 37 100% 52%;              /* #FF9F0A */
+    --warning-foreground: 0 0% 100%;
+
+    --border: 220 13% 88%;
+    --input: 220 13% 85%;
+    --ring: 211 100% 50%;
+
+    --radius: 0.625rem;
+
+    /* Glass / material */
+    --glass-bg: 0 0% 100%;
+    --glass-alpha: 0.72;
+    --glass-border: 0 0% 100%;
+    --glass-border-alpha: 0.55;
+    --stage-bg: 240 6% 8%;               /* video canvas dark */
+
+    --shadow-soft: 0 1px 2px hsl(240 6% 12% / 0.06), 0 4px 16px hsl(240 6% 12% / 0.08);
+    --shadow-panel: 0 8px 40px hsl(240 6% 12% / 0.12);
+    --shadow-float: 0 12px 48px hsl(240 6% 12% / 0.18);
+
+    /* Timing states */
+    --timing-asr: 211 100% 50%;          /* calibrated / precise */
+    --timing-estimated: 37 100% 52%;     /* estimated */
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 211 100% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 211 100% 50%;
+  }
+
+  .dark {
+    /* ===== Dark mode ===== */
+    --background: 220 6% 8%;             /* #111214 */
+    --foreground: 0 0% 96%;
+
+    --card: 220 5% 14%;
+    --card-foreground: 0 0% 96%;
+
+    --popover: 220 6% 12%;
+    --popover-foreground: 0 0% 96%;
+
+    --primary: 211 100% 55%;            /* brighter system blue */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 5% 20%;
+    --secondary-foreground: 0 0% 96%;
+
+    --muted: 220 5% 18%;
+    --muted-foreground: 240 3% 62%;
+
+    --accent: 211 100% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 4 100% 62%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 69% 52%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 37 100% 56%;
+    --warning-foreground: 0 0% 10%;
+
+    --border: 220 5% 22%;
+    --input: 220 5% 24%;
+    --ring: 211 100% 55%;
+
+    --glass-bg: 220 5% 16%;             /* #26272B */
+    --glass-alpha: 0.76;
+    --glass-border: 0 0% 100%;
+    --glass-border-alpha: 0.08;
+    --stage-bg: 220 8% 5%;
+
+    --shadow-soft: 0 1px 2px hsl(0 0% 0% / 0.4), 0 4px 16px hsl(0 0% 0% / 0.35);
+    --shadow-panel: 0 8px 40px hsl(0 0% 0% / 0.5);
+    --shadow-float: 0 12px 48px hsl(0 0% 0% / 0.6);
+
+    --timing-asr: 211 100% 60%;
+    --timing-estimated: 37 100% 58%;
+
+    --sidebar-background: 220 6% 10%;
+    --sidebar-foreground: 240 4.8% 90%;
+    --sidebar-primary: 211 100% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 5% 18%;
+    --sidebar-accent-foreground: 0 0% 96%;
+    --sidebar-border: 220 5% 20%;
+    --sidebar-ring: 211 100% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text",
+      "SF Pro Display", "Segoe UI", "Noto Sans SC", "PingFang SC",
+      "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+@layer components {
+  /* Frosted glass panels: nav, lists, property panel, playback controls, popovers, toasts */
+  .glass-panel {
+    background-color: hsl(var(--glass-bg) / var(--glass-alpha));
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid hsl(var(--glass-border) / var(--glass-border-alpha));
+    box-shadow: var(--shadow-panel);
+  }
+
+  .glass-float {
+    background-color: hsl(var(--glass-bg) / calc(var(--glass-alpha) + 0.08));
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid hsl(var(--glass-border) / var(--glass-border-alpha));
+    box-shadow: var(--shadow-float);
+  }
+
+  /* Solid surfaces: text editing, numeric inputs, timeline tracks, error banners */
+  .solid-surface {
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+  }
+}
+
+/* Thin, macOS-like scrollbars */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 9999px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}

@@ -12,6 +12,7 @@ cryptography
 
 # ---- File handling ----
 python-multipart>=0.0.6
+pysubs2>=1.7.2
 aiofiles>=23.0
 
 # ---- Speech Recognition ----
